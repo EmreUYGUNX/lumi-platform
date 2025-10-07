@@ -1,3 +1,5 @@
+export * from "./config.js";
+
 export interface AuditTimestamps {
   createdAt: Date;
   updatedAt: Date;

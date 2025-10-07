@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --project tsconfig.json --noEmit --emitDeclarationOnly false",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {

@@ -1,27 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "jsx": "preserve",
-    "types": [
-      "node",
-      "react",
-      "react-dom"
-    ],
     "allowJs": true,
     "noEmit": true,
     "isolatedModules": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".next/tsconfig.tsbuildinfo",
     "plugins": [
       {
         "name": "next"
       }
     ]
   },
-  "include": [
-    "src/**/*",
-    ".next/types/**/*.ts"
-  ],
+  "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts"],
   "references": [
     {
       "path": "../../packages/ui"

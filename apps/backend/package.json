@@ -9,18 +9,22 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "start": "NODE_ENV=production node --enable-source-maps dist/index.js",
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.build.json",
     "clean": "rimraf dist",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit --emitDeclarationOnly false",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
     "@lumi/shared": "workspace:*",
-    "@lumi/types": "workspace:*"
+    "@lumi/types": "workspace:*",
+    "dotenv": "^16.4.5",
+    "dotenv-expand": "^11.0.6",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^20.12.7"
+    "@types/node": "^20.12.7",
+    "vitest": "workspace:*"
   }
 }

@@ -8,6 +8,8 @@ apps/**/.next/
 apps/**/build/
 packages/**/dist/
 **/*.tsbuildinfo
+.eslintcache
+**/.eslintcache
 coverage/
 
 # Logs
@@ -22,6 +24,9 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.template
+!.env.example
+!.env.test
+!.env.production.template
 
 # Editor directories and files
 .vscode/*

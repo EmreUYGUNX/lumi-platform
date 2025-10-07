@@ -1,0 +1,10 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+build/
+coverage/
+.cache/
+.husky/_/
+*.log

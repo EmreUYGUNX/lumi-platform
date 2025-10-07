@@ -6,11 +6,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.build.json",
     "clean": "rimraf dist",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit --emitDeclarationOnly false",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "peerDependencies": {

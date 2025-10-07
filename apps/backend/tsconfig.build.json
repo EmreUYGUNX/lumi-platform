@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": false,
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**", "**/*.test.tsx", "**/*.spec.tsx"]
+}
