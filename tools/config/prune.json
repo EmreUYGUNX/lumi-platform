@@ -1,0 +1,4 @@
+{
+  "defaultScopes": ["@lumi/backend", "@lumi/frontend"],
+  "docker": true
+}

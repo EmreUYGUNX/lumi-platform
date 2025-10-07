@@ -1,0 +1,92 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "CI",
+    "NODE_ENV",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "STORAGE_BUCKET",
+    "TURBO_TOKEN",
+    "TURBO_TEAM",
+    "SENTRY_DSN"
+  ],
+  "globalDependencies": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
+    "**/*.schema.*",
+    "**/tsconfig.json"
+  ],
+  "tasks": {
+    "clean": {
+      "cache": false,
+      "persistent": false,
+      "outputs": ["node_modules", ".turbo", "dist", "build", ".next", "coverage"],
+      "env": ["PRUNE_STRATEGY"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": [],
+      "inputs": ["src/**", "apps/**", "packages/**", "tools/**", "*.cjs", "*.config.*", "*.json"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "src/**",
+        "apps/**",
+        "packages/**",
+        "tsconfig.json",
+        "tsconfig.*.json",
+        "*.ts",
+        "*.tsx"
+      ]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [
+        "dist/**",
+        "build/**",
+        ".next/**",
+        "coverage/**",
+        "storybook-static/**",
+        "lib/**"
+      ],
+      "env": ["NODE_ENV", "BUILD_TARGET", "ASSET_PREFIX"]
+    },
+    "test": {
+      "dependsOn": ["^test", "build"],
+      "outputs": ["coverage/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI"],
+      "inputs": ["src/**", "tests/**", "apps/**", "packages/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^dev", "build"],
+      "env": ["NODE_ENV", "DEBUG", "LOG_LEVEL", "API_BASE_URL", "APP_PORT"]
+    },
+    "format": {
+      "cache": false,
+      "outputs": [],
+      "inputs": ["src/**", "apps/**", "packages/**", "*.config.*", "*.json"]
+    },
+    "postinstall": {
+      "dependsOn": ["^postinstall"],
+      "cache": false,
+      "outputs": [],
+      "inputs": ["package.json", "pnpm-lock.yaml"]
+    },
+    "deploy": {
+      "dependsOn": ["build"],
+      "outputs": [".deploy/**"],
+      "cache": false,
+      "env": ["CI", "TURBO_TOKEN", "TURBO_TEAM"]
+    }
+  }
+}

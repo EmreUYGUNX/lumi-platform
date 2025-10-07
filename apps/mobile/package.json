@@ -1,0 +1,15 @@
+{
+  "name": "@lumi/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "React Native mobile client placeholder for Lumi commerce platform.",
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"Mobile app scaffolding pending - use Expo in future phase\"",
+    "build": "echo \"Mobile build pending\""
+  },
+  "dependencies": {
+    "@lumi/shared": "workspace:*",
+    "@lumi/types": "workspace:*"
+  }
+}

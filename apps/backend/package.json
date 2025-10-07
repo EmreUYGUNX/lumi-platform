@@ -1,0 +1,26 @@
+{
+  "name": "@lumi/backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backend service for Lumi commerce platform.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx watch src/index.ts",
+    "start": "NODE_ENV=production node --enable-source-maps dist/index.js",
+    "build": "tsc --project tsconfig.json",
+    "clean": "rimraf dist",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "format": "prettier \"src/**/*.{ts,tsx}\" --check"
+  },
+  "dependencies": {
+    "@lumi/shared": "workspace:*",
+    "@lumi/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7"
+  }
+}

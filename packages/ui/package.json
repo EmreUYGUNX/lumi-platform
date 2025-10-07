@@ -1,0 +1,24 @@
+{
+  "name": "@lumi/ui",
+  "version": "0.0.0",
+  "description": "Design system primitives and components.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "clean": "rimraf dist",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "format": "prettier \"src/**/*.{ts,tsx}\" --check"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dependencies": {
+    "@lumi/shared": "workspace:*",
+    "@lumi/types": "workspace:*"
+  }
+}

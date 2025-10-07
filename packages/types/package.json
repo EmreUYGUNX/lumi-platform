@@ -1,0 +1,16 @@
+{
+  "name": "@lumi/types",
+  "version": "0.0.0",
+  "description": "Shared TypeScript types for the Lumi monorepo.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "clean": "rimraf dist",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "format": "prettier \"src/**/*.{ts,tsx}\" --check"
+  }
+}
