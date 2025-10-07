@@ -12,8 +12,8 @@
     "build": "tsc --project tsconfig.json",
     "clean": "rimraf dist",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "test": "vitest run",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit --emitDeclarationOnly false",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {

@@ -22,6 +22,20 @@
     "**/*.schema.*",
     "**/tsconfig.json"
   ],
+  "globalPassThroughEnv": [
+    "TURBO_TOKEN",
+    "TURBO_TEAM",
+    "TURBO_REMOTE_CACHE_SIGNATURE_KEY"
+  ],
+  "remoteCache": {
+    "enabled": true,
+    "timeout": 45,
+    "uploadTimeout": 90
+  },
+  "concurrency": "100%",
+  "daemon": true,
+  "envMode": "strict",
+  "ui": "stream",
   "tasks": {
     "clean": {
       "cache": false,
