@@ -69,9 +69,11 @@ function createProjectJestConfig({
       `<rootDir>/${projectRelativeRoot}/**/*.jest.(spec|test).[tj]s?(x)`,
     ],
     moduleNameMapper: {
-      "^@lumi/testing/jest$": path.join(repoRoot, "packages/testing/src/assertions/jest.ts"),
       ...sharedModuleNameMapper,
       ...moduleNameMapper,
+      "^@lumi/testing/jest$": path.join(repoRoot, "packages/testing/src/assertions/jest.ts"),
+      "^@lumi/testing$": path.join(repoRoot, "packages/testing/src/index.ts"),
+      "^@lumi/testing/(.*)$": path.join(repoRoot, "packages/testing/src/$1"),
       "^(\\.{1,2}/.*)\\.js$": "$1",
     },
     collectCoverageFrom: [
