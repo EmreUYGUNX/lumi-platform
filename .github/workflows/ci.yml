@@ -121,15 +121,15 @@ jobs:
       - *restore-turbo-cache
 
       - name: Run unit tests with coverage
-        if: matrix["node-version"] == '20.11.0'
+        if: matrix.node == '20.11.0'
         run: pnpm test:coverage
 
       - name: Run unit tests
-        if: matrix["node-version"] != '20.11.0'
+        if: matrix.node != '20.11.0'
         run: pnpm test
 
       - name: Upload coverage artifacts
-        if: matrix["node-version"] == '20.11.0'
+        if: matrix.node == '20.11.0'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
@@ -138,7 +138,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload coverage to Codecov
-        if: matrix["node-version"] == '20.11.0' && secrets.CODECOV_TOKEN != ''
+        if: matrix.node == '20.11.0' && secrets.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
