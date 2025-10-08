@@ -7,7 +7,9 @@
     "baseUrl": ".",
     "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lumi/types": ["../../packages/types/dist/index.d.ts"],
+      "@lumi/types/*": ["../../packages/types/dist/*.d.ts"]
     }
   },
   "include": ["src/**/*", "__tests__/**/*"],
