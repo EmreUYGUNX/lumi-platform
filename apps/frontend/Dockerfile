@@ -34,7 +34,7 @@ WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/frontend... --frozen-lockfile
+  pnpm install --filter @lumi/frontend... --frozen-lockfile --ignore-scripts
 RUN chown -R lumi:nodejs /workspace
 USER lumi
 EXPOSE 3000

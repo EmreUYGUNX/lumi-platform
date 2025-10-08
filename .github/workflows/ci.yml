@@ -186,6 +186,8 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         with:
           args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+      - name: Ensure SARIF report exists
+        run: test -f gitleaks.sarif || touch gitleaks.sarif
       - name: Upload secret scan report
         if: always()
         uses: actions/upload-artifact@v4
