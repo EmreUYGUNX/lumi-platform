@@ -128,7 +128,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload coverage to Codecov
         # Düzeltildi: ${{ secrets... }} kullanımı eklendi
-        if: matrix.node == '20.x' && secrets.CODECOV_TOKEN != ''
+        if: ${{ matrix.node == '20.x' && secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -268,7 +268,7 @@ jobs:
     steps:
       - name: Post Slack alert
         # Düzeltildi: ${{ secrets... }} kullanımı eklendi
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
         uses: slackapi/slack-github-action@v1.27.0
         with:
           payload: |
