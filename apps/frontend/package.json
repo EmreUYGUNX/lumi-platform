@@ -10,7 +10,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "format": "prettier \"src/**/*.{ts,tsx}\" --check"
+    "format": "prettier \"src/**/*.{ts,tsx}\" --check",
+    "test": "pnpm run test:jest",
+    "test:jest": "jest --config jest.config.cjs --runInBand"
   },
   "dependencies": {
     "@lumi/shared": "workspace:*",
@@ -21,8 +23,11 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@types/node": "^20.12.7",
     "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22"
+    "@types/react-dom": "^18.2.22",
+    "@testing-library/react": "^15.0.7",
+    "@lumi/testing": "workspace:*"
   }
 }

@@ -1,0 +1,116 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
+
+import type { ApplicationConfig } from "@lumi/types";
+
+const REQUIRED_ENV = {
+  NODE_ENV: "test",
+  APP_NAME: "Lumi",
+  APP_PORT: "4100",
+  API_BASE_URL: "http://localhost:4100",
+  FRONTEND_URL: "http://localhost:3100",
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
+  REDIS_URL: "redis://localhost:6379/0",
+  STORAGE_BUCKET: "lumi-testing",
+  LOG_LEVEL: "info",
+  JWT_SECRET: "unit-test-secret-1234",
+  SENTRY_DSN: "",
+  FEATURE_FLAGS: '{"betaCheckout":true}',
+  CONFIG_HOT_RELOAD: "false",
+  CONFIG_ENCRYPTION_KEY: "",
+  CI: "true",
+} as const;
+
+interface ConfigInternals {
+  flatten: (input: unknown, prefix?: string) => Record<string, unknown>;
+  computeDiffKeys: (previous: ApplicationConfig | undefined, next: ApplicationConfig) => string[];
+}
+
+describe("configuration internals", () => {
+  let internals: ConfigInternals;
+  let restoreEnv: NodeJS.ProcessEnv;
+
+  beforeAll(async () => {
+    restoreEnv = { ...process.env };
+    Object.entries(REQUIRED_ENV).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
+
+    const module = await import("../index.js");
+    internals = module.configInternals;
+  });
+
+  afterAll(async () => {
+    process.env = restoreEnv;
+    const { resetEnvironmentCache } = await import("../env.js");
+    resetEnvironmentCache();
+    jest.resetModules();
+  });
+
+  it("returns an empty object when flattening primitives without a prefix", () => {
+    expect(internals.flatten("value")).toEqual({});
+  });
+
+  it("decorates primitives with the provided prefix during flattening", () => {
+    expect(internals.flatten("value", "root")).toEqual({ root: "value" });
+  });
+
+  it("enumerates all keys when computing differences without a previous snapshot", () => {
+    const baseConfig: ApplicationConfig = {
+      app: {
+        name: "Lumi",
+        environment: "development",
+        port: 4000,
+        apiBaseUrl: "http://localhost:4000",
+        frontendUrl: "http://localhost:3000",
+        logLevel: "info",
+      },
+      database: { url: "postgresql://localhost:5432/lumi" },
+      cache: { redisUrl: "redis://localhost:6379" },
+      storage: { bucket: "lumi-local" },
+      security: { jwtSecret: "development-secret".padEnd(16, "x") },
+      observability: { sentryDsn: undefined },
+      featureFlags: { betaCheckout: true },
+      runtime: { ci: false },
+    };
+
+    const diff = internals.computeDiffKeys(undefined, baseConfig);
+    expect(diff).toEqual(expect.arrayContaining(["app.name", "runtime.ci"]));
+    expect(diff.length).toBeGreaterThan(0);
+  });
+
+  it("detects modified keys between configuration snapshots", () => {
+    const previous: ApplicationConfig = {
+      app: {
+        name: "Lumi",
+        environment: "development",
+        port: 4000,
+        apiBaseUrl: "http://localhost:4000",
+        frontendUrl: "http://localhost:3000",
+        logLevel: "info",
+      },
+      database: { url: "postgresql://localhost:5432/lumi" },
+      cache: { redisUrl: "redis://localhost:6379" },
+      storage: { bucket: "lumi-local" },
+      security: { jwtSecret: "development-secret".padEnd(16, "x") },
+      observability: { sentryDsn: undefined },
+      featureFlags: { betaCheckout: true },
+      runtime: { ci: false },
+    };
+
+    const next: ApplicationConfig = {
+      ...previous,
+      app: {
+        ...previous.app,
+        port: 4500,
+      },
+      runtime: {
+        ...previous.runtime,
+        ci: true,
+      },
+    };
+
+    const diff = internals.computeDiffKeys(previous, next);
+    expect(diff).toEqual(expect.arrayContaining(["app.port", "runtime.ci"]));
+  });
+});

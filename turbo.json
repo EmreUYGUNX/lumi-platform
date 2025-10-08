@@ -22,11 +22,7 @@
     "**/*.schema.*",
     "**/tsconfig.json"
   ],
-  "globalPassThroughEnv": [
-    "TURBO_TOKEN",
-    "TURBO_TEAM",
-    "TURBO_REMOTE_CACHE_SIGNATURE_KEY"
-  ],
+  "globalPassThroughEnv": ["TURBO_TOKEN", "TURBO_TEAM", "TURBO_REMOTE_CACHE_SIGNATURE_KEY"],
   "remoteCache": {
     "enabled": true,
     "timeout": 45,
@@ -75,6 +71,12 @@
     },
     "test": {
       "dependsOn": ["^test", "build"],
+      "outputs": ["coverage/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI"],
+      "inputs": ["src/**", "tests/**", "apps/**", "packages/**"]
+    },
+    "test:jest": {
+      "dependsOn": ["^test:jest", "build"],
       "outputs": ["coverage/**", "test-results/**"],
       "env": ["NODE_ENV", "CI"],
       "inputs": ["src/**", "tests/**", "apps/**", "packages/**"]

@@ -9,7 +9,9 @@
     "build": "tsc --project tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
-    "test": "vitest run --passWithNoTests",
+    "test": "pnpm run test:jest",
+    "test:jest": "jest --config jest.config.cjs --runInBand",
+    "test:vitest": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
@@ -20,5 +22,11 @@
   "dependencies": {
     "@lumi/shared": "workspace:*",
     "@lumi/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@lumi/testing": "workspace:*",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^15.0.7",
+    "@jest/globals": "^29.7.0"
   }
 }

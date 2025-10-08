@@ -1,10 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "files": [],
+  "include": ["jest.setup.ts", "jest.polyfills.ts"],
   "references": [
     { "path": "./packages/types" },
     { "path": "./packages/shared" },
     { "path": "./packages/ui" },
+    { "path": "./packages/testing" },
     { "path": "./apps/backend" },
     { "path": "./apps/frontend" }
   ]

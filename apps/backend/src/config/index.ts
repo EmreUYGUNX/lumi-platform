@@ -161,3 +161,11 @@ export const onConfigChange = (
 };
 
 export const getLastConfigChange = () => lastChange;
+
+/**
+ * @internal Exposes internal helpers strictly for unit testing. Do not rely on these in production code.
+ */
+export const configInternals = {
+  flatten,
+  computeDiffKeys,
+};

@@ -26,6 +26,9 @@ module.exports = {
     react: {
       version: "detect",
     },
+    next: {
+      rootDir: ["apps/frontend/"],
+    },
   },
   plugins: [
     "@typescript-eslint",
@@ -87,6 +90,8 @@ module.exports = {
           "*.config.*.ts",
           "scripts/**",
           ".husky/**",
+          "jest.*.{ts,tsx}",
+          "**/jest.*.{ts,tsx}"
         ],
         optionalDependencies: false,
       },

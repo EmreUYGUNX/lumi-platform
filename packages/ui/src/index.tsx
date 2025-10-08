@@ -5,5 +5,7 @@ export type TextProps = PropsWithChildren<{
 }>;
 
 export function Text({ as: Component = "span", children }: TextProps): ReactElement {
-  return <Component>{children}</Component>;
+  const variant = Component === "span" ? "body" : "custom";
+
+  return <Component data-variant={variant}>{children}</Component>;
 }

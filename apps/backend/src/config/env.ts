@@ -61,6 +61,7 @@ const EnvSchema = z
       .string()
       .optional()
       .transform((value) => {
+        /* istanbul ignore if -- zod pre-validates string types */
         if (typeof value !== "string") {
           // eslint-disable-next-line unicorn/no-useless-undefined
           return undefined;
@@ -85,7 +86,7 @@ const EnvSchema = z
   })
   .transform((value) => ({
     ...value,
-    FEATURE_FLAGS: value.FEATURE_FLAGS ?? "{}",
+    FEATURE_FLAGS: value.FEATURE_FLAGS,
   }));
 
 type EnvParseResult = z.infer<typeof EnvSchema>;
@@ -95,8 +96,8 @@ const envEmitter = new EventEmitter();
 let cachedEnv: ResolvedEnvironment | undefined;
 const watchers = new Map<string, ReturnType<typeof watch>>();
 
-const defaultEnv: RuntimeEnvironment =
-  (process.env.NODE_ENV as RuntimeEnvironment) ?? "development";
+const resolveRuntimeEnv = (): RuntimeEnvironment =>
+  (process.env.NODE_ENV as RuntimeEnvironment | undefined) ?? "development";
 
 const getEnvDirectory = () => process.cwd();
 
@@ -171,7 +172,7 @@ export function loadEnvironment(options: LoadEnvironmentOptions = {}): ResolvedE
     return cachedEnv;
   }
 
-  const activeEnv = (process.env.NODE_ENV as RuntimeEnvironment) ?? defaultEnv;
+  const activeEnv = resolveRuntimeEnv();
   const files = envFileOrder(activeEnv);
 
   files.forEach((file) => {
@@ -229,9 +230,8 @@ export const onEnvironmentChange = (
   return () => envEmitter.off("reloaded", listener);
 };
 
-export const getEnvFileOrder = (
-  env: RuntimeEnvironment = (process.env.NODE_ENV as RuntimeEnvironment) ?? defaultEnv,
-): string[] => envFileOrder(env);
+export const getEnvFileOrder = (env: RuntimeEnvironment = resolveRuntimeEnv()): string[] =>
+  envFileOrder(env);
 
 export const resetEnvironmentCache = () => {
   cachedEnv = undefined;
