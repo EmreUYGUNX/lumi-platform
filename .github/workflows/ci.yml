@@ -78,9 +78,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turbo-${{ matrix["node-version"] }}-${{ hashFiles('turbo.json', 'pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-turbo-${{ matrix.node }}-${{ hashFiles('turbo.json', 'pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ matrix["node-version"] }}-
+            ${{ runner.os }}-turbo-${{ matrix.node }}-
             ${{ runner.os }}-turbo-
 
       - name: Run lint (parallel)
