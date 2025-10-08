@@ -49,10 +49,10 @@ jobs:
           run_install: false
 
       - &setup-node
-        name: Setup Node.js ${{ matrix.node-version }}
+        name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix["node-version"] }}
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - &restore-pnpm-store
@@ -60,9 +60,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PNPM_STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ matrix["node-version"] }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-${{ matrix["node-version"] }}-
+            ${{ runner.os }}-pnpm-${{ matrix.node }}-
             ${{ runner.os }}-pnpm-
 
       - &ensure-pnpm-store
