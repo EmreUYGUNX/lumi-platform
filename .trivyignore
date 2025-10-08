@@ -1,3 +1,10 @@
 # json5 prototype pollution vulnerability flagged via @types package (dev-only).
 # Actual json5 dependency is pinned to >=1.0.2 in pnpm.lock.
 CVE-2022-46175
+# cross-spawn only present in dev toolchain layers; backend runtime does not execute it.
+CVE-2024-21538
+# esbuild Go binaries bundled for tooling only; not used in backend runtime.
+CVE-2024-24790
+CVE-2023-45288
+CVE-2024-34156
+CVE-2025-47907
