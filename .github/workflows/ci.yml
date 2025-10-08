@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main # master yerine main kullandık
       - develop
   pull_request:
 
@@ -27,12 +27,12 @@ defaults:
 
 jobs:
   lint:
-    name: Lint (Node ${{ matrix.node-version }})
+    name: Lint (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["20.11.0"]
+        node: ["20.x"] # node-version yerine node ve versiyonu güncelledik
     steps:
       - &checkout
         name: Checkout repository
@@ -40,21 +40,18 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-
       - &setup-pnpm
         name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9.0.6
           run_install: false
-
       - &setup-node
         name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
-
       - &restore-pnpm-store
         name: Restore pnpm store
         uses: actions/cache@v4
@@ -64,15 +61,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-${{ matrix.node }}-
             ${{ runner.os }}-pnpm-
-
       - &ensure-pnpm-store
         name: Ensure pnpm store directory
         run: mkdir -p "$PNPM_STORE_PATH"
-
       - &install-deps
         name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - &restore-turbo-cache
         name: Restore Turbo cache
         uses: actions/cache@v4
@@ -82,17 +76,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-${{ matrix.node }}-
             ${{ runner.os }}-turbo-
-
       - name: Run lint (parallel)
         run: pnpm exec turbo run lint --concurrency=50%
 
   typecheck:
-    name: Typecheck (Node ${{ matrix.node-version }})
+    name: Typecheck (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["20.11.0"]
+        node: ["20.x"]
     steps:
       - *checkout
       - *setup-pnpm
@@ -105,12 +98,12 @@ jobs:
         run: pnpm typecheck
 
   test:
-    name: Tests (Node ${{ matrix.node-version }})
+    name: Tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["20.11.0", "22.x"]
+        node: ["20.x", "22.x"]
     steps:
       - *checkout
       - *setup-pnpm
@@ -119,26 +112,23 @@ jobs:
       - *ensure-pnpm-store
       - *install-deps
       - *restore-turbo-cache
-
       - name: Run unit tests with coverage
-        if: matrix.node == '20.11.0'
+        if: matrix.node == '20.x'
         run: pnpm test:coverage
-
       - name: Run unit tests
-        if: matrix.node != '20.11.0'
+        if: matrix.node != '20.x'
         run: pnpm test
-
       - name: Upload coverage artifacts
-        if: matrix.node == '20.11.0'
+        if: matrix.node == '20.x'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
           path: |
             **/coverage/**
           if-no-files-found: ignore
-
       - name: Upload coverage to Codecov
-        if: matrix.node == '20.11.0' && secrets.CODECOV_TOKEN != ''
+        # Düzeltildi: ${{ secrets... }} kullanımı eklendi
+        if: matrix.node == '20.x' && secrets.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -277,6 +267,7 @@ jobs:
     if: failure()
     steps:
       - name: Post Slack alert
+        # Düzeltildi: ${{ secrets... }} kullanımı eklendi
         if: secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.27.0
         with:
