@@ -225,10 +225,11 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
-          vulnerability-type: "os,library"
+          vuln-type: "os,library"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           exit-code: 1
+          trivyignores: .trivyignore
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:

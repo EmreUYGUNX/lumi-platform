@@ -34,7 +34,7 @@ WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/backend... --frozen-lockfile --ignore-scripts
+  pnpm install --filter @lumi/backend... --frozen-lockfile
 RUN chown -R lumi:nodejs /workspace
 USER lumi
 EXPOSE 4000
@@ -47,7 +47,7 @@ WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile --ignore-scripts
+  NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile
 RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 
