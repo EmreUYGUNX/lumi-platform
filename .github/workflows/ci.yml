@@ -186,20 +186,23 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         with:
           args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
-      - name: Ensure SARIF report exists
+      - name: Evaluate SARIF output
+        id: gitleaks_report
         run: |
-          if [ ! -s gitleaks.sarif ]; then
-            printf '{ "version": "2.1.0", "runs": [] }\n' > gitleaks.sarif
+          if [ -s gitleaks.sarif ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload secret scan report
-        if: always()
+        if: always() && steps.gitleaks_report.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: gitleaks-report
           path: gitleaks.sarif
           if-no-files-found: ignore
       - name: Publish secret scan SARIF
-        if: always()
+        if: always() && steps.gitleaks_report.outputs.exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: gitleaks.sarif

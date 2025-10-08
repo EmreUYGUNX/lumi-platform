@@ -42,7 +42,7 @@ CMD ["pnpm", "--filter", "@lumi/frontend", "dev"]
 
 FROM base AS build
 
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
