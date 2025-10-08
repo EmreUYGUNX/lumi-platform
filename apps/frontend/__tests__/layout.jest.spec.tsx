@@ -2,7 +2,7 @@ import { Children, isValidElement } from "react";
 
 import { describe, it } from "@jest/globals";
 
-import RootLayout, { metadata } from "../src/app/layout";
+import RootLayout, { metadata } from "@/app/layout";
 
 describe("RootLayout component", () => {
   it("declares the public metadata for the application shell", () => {

@@ -1,7 +1,7 @@
 import { describe, it } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 
-import HomePage from "../src/app/page";
+import HomePage from "@/app/page";
 
 describe("HomePage component", () => {
   it("renders the primary heading and placeholder message", () => {

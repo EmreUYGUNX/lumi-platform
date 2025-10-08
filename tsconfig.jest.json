@@ -6,6 +6,20 @@
     "jsx": "react-jsx",
     "isolatedModules": false,
     "verbatimModuleSyntax": false,
-    "types": ["node", "jest", "@testing-library/jest-dom"]
+    "types": ["node", "jest", "@testing-library/jest-dom"],
+    "paths": {
+      "@/*": ["src/*", "apps/frontend/src/*"],
+      "@/app/layout": ["apps/frontend/src/app/layout.tsx"],
+      "@/app/page": ["apps/frontend/src/app/page.tsx"],
+      "@lumi/shared": ["packages/shared/src/index.ts"],
+      "@lumi/shared/*": ["packages/shared/src/*"],
+      "@lumi/types": ["packages/types/src/index.ts"],
+      "@lumi/types/*": ["packages/types/src/*"],
+      "@lumi/ui": ["packages/ui/src/index.ts"],
+      "@lumi/ui/*": ["packages/ui/src/*"],
+      "@lumi/testing": ["packages/testing/src/index.ts"],
+      "@lumi/testing/*": ["packages/testing/src/*"],
+      "@lumi/testing/jest": ["packages/testing/src/assertions/jest.ts"]
+    }
   }
 }

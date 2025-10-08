@@ -7,6 +7,9 @@ module.exports = createProjectJestConfig({
   projectRoot: __dirname,
   testEnvironment: "jsdom",
   tsconfig: path.join(__dirname, "tsconfig.json"),
+  moduleNameMapper: {
+    "^@/(.*)$": path.join(__dirname, "src", "$1"),
+  },
   coverageDirectory: path.join(__dirname, "../../coverage/apps/frontend"),
   setupFiles: []
 });

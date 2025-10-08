@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import type {} from "@lumi/testing/src/assertions/jest.js";
+import type {} from "@lumi/testing/jest";
 
 const REQUIRED_ENV = {
   APP_NAME: "Lumi",
