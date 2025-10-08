@@ -181,7 +181,7 @@ jobs:
         run: pnpm deps:peers
       - name: Secret scanning
         id: gitleaks
-        uses: gitleaks/gileaks-action@v2
+        uses: gitleaks/gitleaks-action@v2
         with:
           args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
       - name: Upload secret scan report
@@ -263,7 +263,7 @@ jobs:
       - security
       - container-security
       - performance
-    if: ${{ failure() }} # if'i de düzelttik
+    if: ${{ failure() }}
     steps:
       - name: Post Slack alert
         if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
