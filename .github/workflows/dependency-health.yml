@@ -1,0 +1,47 @@
+name: Dependency Health Checks
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+      - "**/package.json"
+  pull_request:
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+      - "**/package.json"
+      - ".github/workflows/dependency-health.yml"
+  workflow_dispatch:
+
+jobs:
+  dependency-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.0.6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for duplicate dependencies
+        run: pnpm deps:duplicates
+
+      - name: Verify allowed licenses
+        run: pnpm deps:licenses
+
+      - name: Validate peer dependency graph
+        run: pnpm deps:peers

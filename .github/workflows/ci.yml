@@ -3,42 +3,305 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - master
       - develop
   pull_request:
-    branches:
-      - "**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+  security-events: write
+
+env:
+  PNPM_HOME: ~/.pnpm
+  PNPM_STORE_PATH: ~/.pnpm-store
+  TURBO_CACHE_DIR: .turbo
+  FORCE_COLOR: "1"
+  CI: "true"
+  TURBO_DISABLE_DAEMON: "1"
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  quality-gate:
+  lint:
+    name: Lint (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.11.0"]
     steps:
-      - name: Checkout repository
+      - &checkout
+        name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - &setup-pnpm
+        name: Setup pnpm
+        uses: pnpm/action-setup@v3
         with:
           version: 9.0.6
+          run_install: false
 
-      - name: Setup Node.js
+      - &setup-node
+        name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20.11.0
-          cache: "pnpm"
+          node-version: ${{ matrix["node-version"] }}
+          cache: pnpm
 
-      - name: Install dependencies
+      - &restore-pnpm-store
+        name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ matrix["node-version"] }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-${{ matrix["node-version"] }}-
+            ${{ runner.os }}-pnpm-
+
+      - &ensure-pnpm-store
+        name: Ensure pnpm store directory
+        run: mkdir -p "$PNPM_STORE_PATH"
+
+      - &install-deps
+        name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build
+      - &restore-turbo-cache
+        name: Restore Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TURBO_CACHE_DIR }}
+          key: ${{ runner.os }}-turbo-${{ matrix["node-version"] }}-${{ hashFiles('turbo.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ matrix["node-version"] }}-
+            ${{ runner.os }}-turbo-
 
-      - name: Lint
-        run: pnpm lint
+      - name: Run lint (parallel)
+        run: pnpm exec turbo run lint --concurrency=50%
 
-      - name: Typecheck
+  typecheck:
+    name: Typecheck (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.11.0"]
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - *restore-turbo-cache
+      - name: Run typecheck
         run: pnpm typecheck
 
-      - name: Test
+  test:
+    name: Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20.11.0", "22.x"]
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - *restore-turbo-cache
+
+      - name: Run unit tests with coverage
+        if: matrix["node-version"] == '20.11.0'
+        run: pnpm test:coverage
+
+      - name: Run unit tests
+        if: matrix["node-version"] != '20.11.0'
         run: pnpm test
+
+      - name: Upload coverage artifacts
+        if: matrix["node-version"] == '20.11.0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            **/coverage/**
+          if-no-files-found: ignore
+
+      - name: Upload coverage to Codecov
+        if: matrix["node-version"] == '20.11.0' && secrets.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
+          fail_ci_if_error: false
+
+  build:
+    name: Build Artifacts
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - typecheck
+      - test
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - *restore-turbo-cache
+      - name: Build monorepo
+        run: pnpm build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            apps/backend/dist/**
+            apps/frontend/.next/**
+            packages/ui/dist/**
+          if-no-files-found: warn
+
+  security:
+    name: Dependency & Secret Scans
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - name: Dependency audit
+        run: pnpm audit:security
+      - name: License compliance review
+        run: pnpm deps:licenses
+      - name: Duplicate dependency check
+        run: pnpm deps:duplicates
+      - name: Peer dependency verification
+        run: pnpm deps:peers
+      - name: Secret scanning
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+      - name: Upload secret scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+      - name: Publish secret scan SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+
+  container-security:
+    name: Docker Image Scanning
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - *checkout
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend production image
+        run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
+      - name: Build frontend production image
+        run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
+      - name: File system vulnerability scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          vulnerability-type: "os,library"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: 1
+      - name: Backend image vulnerability scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: lumi-backend-ci:latest
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: 1
+      - name: Frontend image vulnerability scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: lumi-frontend-ci:latest
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: 1
+
+  performance:
+    name: Performance Budgets
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - *restore-turbo-cache
+      - name: Analyze bundle sizes
+        run: pnpm analyze:bundle
+
+  notify:
+    name: Failure Notifications
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - typecheck
+      - test
+      - build
+      - security
+      - container-security
+      - performance
+    if: failure()
+    steps:
+      - name: Post Slack alert
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": ":warning: CI pipeline failed for *${{ github.repository }}* on `${{ github.ref }}`. Workflow: `${{ github.workflow }}`. Check run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '⚠️ **CI pipeline failed**.',
+              '',
+              `Workflow: \`${context.workflow}\``,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Please review failing jobs and address issues before requesting review.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

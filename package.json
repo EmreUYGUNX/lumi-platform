@@ -10,13 +10,22 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel --no-cache",
-    "lint": "turbo run lint",
-    "test": "turbo run test --parallel",
-    "typecheck": "turbo run typecheck",
-    "format": "turbo run format",
-    "clean": "turbo run clean --parallel",
+    "build": "turbo run build --no-daemon",
+    "dev": "turbo run dev --parallel --no-cache --no-daemon",
+    "lint": "turbo run lint --no-daemon",
+    "lint:fix": "turbo run lint --no-daemon -- --fix",
+    "test": "turbo run test --parallel --no-daemon",
+    "test:coverage": "pnpm exec turbo run test --no-daemon -- --coverage",
+    "typecheck": "turbo run typecheck --no-daemon",
+    "format": "turbo run format --no-daemon",
+    "clean": "turbo run clean --parallel --no-daemon",
+    "docker:dev": "docker compose up --build",
+    "docker:down": "docker compose down --remove-orphans",
+    "audit:security": "pnpm audit --prod",
+    "deps:licenses": "pnpm exec license-checker-rseidelsohn --summary --production --excludePrivatePackages --onlyAllow='MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause'",
+    "deps:duplicates": "node tools/scripts/check-duplicates.mjs",
+    "deps:peers": "node tools/scripts/check-peers.mjs",
+    "analyze:bundle": "pnpm --filter @lumi/ui build && pnpm exec size-limit",
     "prune:deploy": "pnpm dlx turbo prune --scope=@lumi/backend --scope=@lumi/frontend --scope=@lumi/mobile --include-dependencies --docker",
     "turbo:daemon": "turbo daemon start --no-update-notifier",
     "turbo:daemon:stop": "turbo daemon stop",
@@ -56,7 +65,12 @@
     "eslint": "^8.57.0",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.7",
+    "license-checker-rseidelsohn": "^4.4.2",
     "prettier": "^3.2.5",
+    "@size-limit/file": "^11.2.0",
+    "size-limit": "^11.2.0",
+    "yaml": "^2.8.1",
+    "@vitest/coverage-v8": "^1.6.1",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "rimraf": "^5.0.5",
     "turbo": "^2.1.3",
@@ -64,6 +78,13 @@
     "typescript": "~5.5.4",
     "vitest": "^1.5.0"
   },
+  "size-limit": [
+    {
+      "name": "UI package bundle",
+      "path": "packages/ui/dist/index.js",
+      "limit": "50 KB"
+    }
+  ],
   "pnpm": {
     "overrides": {
       "eslint": "^8.57.0",

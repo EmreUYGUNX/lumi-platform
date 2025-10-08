@@ -1,0 +1,10 @@
+node_modules
+dist
+.turbo
+coverage
+logs
+*.log
+.env
+.env.*
+!.env.template
+tsconfig.tsbuildinfo

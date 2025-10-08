@@ -1,0 +1,36 @@
+# General artifacts
+node_modules
+.pnpm-store
+.pnpm-debug.log*
+pnpm-error.log
+turbo
+.turbo
+coverage
+.cache
+
+# Build outputs
+apps/**/dist
+apps/**/.next
+packages/**/dist
+
+# Environment files
+.env
+.env.*
+!.env.template
+!.env.production.template
+!.env.test
+
+# VCS and editor configs
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Logs
+*.log
+logs
+
+# Docker
+**/Dockerfile.local

@@ -25,6 +25,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
-    "vitest": "workspace:*"
+    "vitest": "^1.5.0"
   }
 }

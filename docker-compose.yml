@@ -1,0 +1,292 @@
+version: "3.9"
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-node-base: &node-base
+  init: true
+  restart: unless-stopped
+  networks:
+    - lumi_dev
+  logging: *default-logging
+  environment:
+    PNPM_HOME: /usr/local/share/pnpm
+    PNPM_STORE_PATH: /workspace/.pnpm-store
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  backend:
+    <<: *node-base
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: development
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20.12.2}
+        PNPM_VERSION: ${PNPM_VERSION:-9.0.6}
+        VCS_REF: ${GIT_COMMIT_SHA:-dev}
+        BUILD_DATE: ${BUILD_TIMESTAMP:-unknown}
+    env_file:
+      - env/.env.docker
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://lumi:password@postgres:5432/lumi}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      MAILHOG_SMTP_HOST: mailhog
+      MAILHOG_SMTP_PORT: 1025
+      FRONTEND_URL: http://frontend:3000
+      API_BASE_URL: http://backend:4000
+      LOG_LEVEL: debug
+      CONFIG_HOT_RELOAD: "true"
+      NODE_OPTIONS: "--enable-source-maps --inspect=0.0.0.0:9229"
+    volumes:
+      - .:/workspace:delegated
+      - backend_node_modules:/workspace/node_modules
+      - pnpm_store:/workspace/.pnpm-store
+      - turbo_cache:/workspace/.turbo
+    ports:
+      - "4000:4000"
+      - "9229:9229"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "const net=require(''net'');const socket=net.connect({host:''127.0.0.1'',port:process.env.PORT||4000},()=>{socket.end();process.exit(0);});socket.on(''error'',()=>process.exit(1));"',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  frontend:
+    <<: *node-base
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      target: development
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20.12.2}
+        PNPM_VERSION: ${PNPM_VERSION:-9.0.6}
+        VCS_REF: ${GIT_COMMIT_SHA:-dev}
+        BUILD_DATE: ${BUILD_TIMESTAMP:-unknown}
+    env_file:
+      - env/.env.docker
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_API_BASE_URL: http://backend:4000
+      NODE_OPTIONS: "--inspect=0.0.0.0:9230"
+    command:
+      ["pnpm", "--filter", "@lumi/frontend", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+    volumes:
+      - .:/workspace:delegated
+      - frontend_node_modules:/workspace/node_modules
+      - pnpm_store:/workspace/.pnpm-store
+      - turbo_cache:/workspace/.turbo
+    ports:
+      - "3000:3000"
+      - "9230:9230"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "const net=require(''net'');const port=parseInt(process.env.PORT||''3000'',10);const socket=net.connect({host:''127.0.0.1'',port},()=>{socket.end();process.exit(0);});socket.on(''error'',()=>process.exit(1));"',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "log_statement=none"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lumi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-lumi}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lumi} -d ${POSTGRES_DB:-lumi}"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+    networks:
+      - lumi_dev
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "no"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - lumi_dev
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8025/api/v2/messages || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - lumi_dev
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    command:
+      - "--port=8080"
+      - "--docker_only=true"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - lumi_dev
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    volumes:
+      - ./ops/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - lumi_dev
+    depends_on:
+      cadvisor:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+networks:
+  lumi_dev:
+    driver: bridge
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:
+  pnpm_store:
+  turbo_cache:
+  postgres_data:
+  redis_data:
+  prometheus_data:

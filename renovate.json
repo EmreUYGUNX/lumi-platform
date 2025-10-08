@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Istanbul",
+  "schedule": ["before 06:00 on monday"],
+  "rangeStrategy": "bump",
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 10,
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["^@types/"],
+      "groupName": "TypeScript type definitions",
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["typescript", "tslib"],
+      "groupName": "TypeScript toolchain"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "extends": ["schedule:monthly"]
+    }
+  ]
+}
