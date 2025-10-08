@@ -50,7 +50,7 @@ COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
   NODE_ENV=development pnpm install --filter @lumi/frontend... --frozen-lockfile
 RUN NODE_ENV=production pnpm --filter @lumi/frontend... build
-RUN pnpm prune --prod --filter @lumi/frontend...
+RUN pnpm prune --prod
 
 FROM base AS production
 
