@@ -4,7 +4,9 @@
     "noEmit": false,
     "emitDeclarationOnly": false,
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "rootDir": "src",
+    "outDir": "dist"
   },
   "exclude": [
     "**/*.test.ts",
