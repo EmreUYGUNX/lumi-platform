@@ -5,6 +5,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "baseUrl": ".",
+    "types": ["node", "@lumi/testing/jest"],
     "paths": {
       "@/*": ["./src/*"]
     }
