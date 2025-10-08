@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main # master yerine main kullandık
+      - main
       - develop
   pull_request:
 
@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.x"] # node-version yerine node ve versiyonu güncelledik
+        node: ["20.x"]
     steps:
       - &checkout
         name: Checkout repository
@@ -127,8 +127,7 @@ jobs:
             **/coverage/**
           if-no-files-found: ignore
       - name: Upload coverage to Codecov
-        # Düzeltildi: ${{ secrets... }} kullanımı eklendi
-        if: ${{ success() && matrix.node == '20.x' && secrets.CODECOV_TOKEN != '' }}
+        if: ${{ matrix.node == '20.x' && secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -182,7 +181,7 @@ jobs:
         run: pnpm deps:peers
       - name: Secret scanning
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gileaks-action@v2
         with:
           args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
       - name: Upload secret scan report
@@ -264,11 +263,10 @@ jobs:
       - security
       - container-security
       - performance
-    if: failure()
+    if: ${{ failure() }} # if'i de düzelttik
     steps:
       - name: Post Slack alert
-        # Düzeltildi: ${{ secrets... }} kullanımı eklendi
-        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: slackapi/slack-github-action@v1.27.0
         with:
           payload: |
@@ -278,7 +276,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       - name: Comment on pull request
-        if: github.event_name == 'pull_request'
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
         with:
           script: |
