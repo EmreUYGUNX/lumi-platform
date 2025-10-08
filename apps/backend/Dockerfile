@@ -42,13 +42,13 @@ CMD ["pnpm", "--filter", "@lumi/backend", "dev"]
 
 FROM base AS build
 
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/backend... --frozen-lockfile --ignore-scripts
-RUN pnpm --filter @lumi/backend... build
+  NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile --ignore-scripts
+RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 
 FROM base AS production
