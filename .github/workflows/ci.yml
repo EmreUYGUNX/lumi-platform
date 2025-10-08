@@ -187,7 +187,10 @@ jobs:
         with:
           args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
       - name: Ensure SARIF report exists
-        run: test -f gitleaks.sarif || touch gitleaks.sarif
+        run: |
+          if [ ! -s gitleaks.sarif ]; then
+            printf '{ "version": "2.1.0", "runs": [] }\n' > gitleaks.sarif
+          fi
       - name: Upload secret scan report
         if: always()
         uses: actions/upload-artifact@v4
