@@ -47,7 +47,7 @@ WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/backend... --frozen-lockfile
+  pnpm install --filter @lumi/backend... --frozen-lockfile --ignore-scripts
 RUN pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 
