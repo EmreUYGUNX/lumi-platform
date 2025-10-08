@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.x"]
+        node: ["20.11.0"]
     steps:
       - &checkout
         name: Checkout repository
@@ -85,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.x"]
+        node: ["20.11.0"]
     steps:
       - *checkout
       - *setup-pnpm
@@ -103,7 +103,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.x", "22.x"]
+        node: ["20.11.0", "22.x"]
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - *checkout
       - *setup-pnpm
@@ -113,13 +115,13 @@ jobs:
       - *install-deps
       - *restore-turbo-cache
       - name: Run unit tests with coverage
-        if: matrix.node == '20.x'
+        if: ${{ matrix.node == '20.11.0' }}
         run: pnpm test:coverage
       - name: Run unit tests
-        if: matrix.node != '20.x'
+        if: ${{ matrix.node != '20.11.0' }}
         run: pnpm test
       - name: Upload coverage artifacts
-        if: matrix.node == '20.x'
+        if: ${{ matrix.node == '20.11.0' }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
@@ -127,10 +129,10 @@ jobs:
             **/coverage/**
           if-no-files-found: ignore
       - name: Upload coverage to Codecov
-        if: ${{ matrix.node == '20.x' && secrets.CODECOV_TOKEN != '' }}
+        if: ${{ matrix.node == '20.11.0' && env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
           flags: unit
           fail_ci_if_error: false
 
@@ -264,9 +266,11 @@ jobs:
       - container-security
       - performance
     if: ${{ failure() }}
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Post Slack alert
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
         uses: slackapi/slack-github-action@v1.27.0
         with:
           payload: |
@@ -274,7 +278,7 @@ jobs:
               "text": ":warning: CI pipeline failed for *${{ github.repository }}* on `${{ github.ref }}`. Workflow: `${{ github.workflow }}`. Check run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
       - name: Comment on pull request
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v7
