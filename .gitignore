@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.pnpm/
+.jest-cache/
+**/tmp-observability-logs/
 
 # Build outputs
 apps/**/dist/
@@ -11,6 +14,8 @@ packages/**/dist/
 .eslintcache
 **/.eslintcache
 coverage/
+reports/performance/*.json
+reports/performance/*.html
 
 # Logs
 logs/

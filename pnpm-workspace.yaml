@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "apps/**"
+  - "!apps/**/.next/**"
   - "packages/*"
   - "packages/**"
   - "tools/*"

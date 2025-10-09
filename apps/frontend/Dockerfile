@@ -49,7 +49,8 @@ COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
   NODE_ENV=development pnpm install --filter @lumi/frontend... --frozen-lockfile
-RUN NODE_ENV=production pnpm --filter @lumi/frontend... build
+RUN --mount=type=cache,id=lumi-next-cache,target=/workspace/apps/frontend/.next/cache \
+  NODE_ENV=production pnpm --filter @lumi/frontend... build
 RUN pnpm prune --prod
 
 FROM base AS production

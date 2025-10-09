@@ -264,6 +264,25 @@ jobs:
       - *restore-turbo-cache
       - name: Analyze bundle sizes
         run: pnpm analyze:bundle
+      - name: Generate build performance metrics
+        run: pnpm run metrics:build
+      - name: Generate dev task graph metrics
+        run: pnpm run metrics:dev
+      - name: Analyze frontend bundle
+        run: pnpm analyze:frontend
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-metrics
+          path: reports/performance/**
+          if-no-files-found: warn
+      - name: Upload frontend bundle analysis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-bundle-analyzer
+          path: apps/frontend/.next/analyze
+          if-no-files-found: ignore
 
   notify:
     name: Failure Notifications

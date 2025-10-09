@@ -41,16 +41,27 @@
     },
     "lint": {
       "dependsOn": ["^lint"],
-      "outputs": [],
-      "inputs": ["src/**", "apps/**", "packages/**", "tools/**", "*.cjs", "*.config.*", "*.json"]
+      "outputs": [".eslintcache", ".next/cache/eslint/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "src/**",
+        "apps/**/src/**",
+        "apps/**/next.config.*",
+        "packages/**/src/**",
+        "tools/**",
+        "*.cjs",
+        "*.config.*",
+        "*.json"
+      ]
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "outputs": [],
+      "outputs": ["**/*.tsbuildinfo", "**/.tsbuildinfo"],
       "inputs": [
+        "$TURBO_DEFAULT$",
         "src/**",
-        "apps/**",
-        "packages/**",
+        "apps/**/src/**",
+        "packages/**/src/**",
         "tsconfig.json",
         "tsconfig.*.json",
         "*.ts",
@@ -65,7 +76,25 @@
         ".next/**",
         "coverage/**",
         "storybook-static/**",
-        "lib/**"
+        "lib/**",
+        "**/*.tsbuildinfo",
+        "**/.tsbuildinfo"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "src/**",
+        "apps/**/src/**",
+        "apps/**/next.config.*",
+        "apps/**/next.config.*/**",
+        "apps/**/webpack.config.*",
+        "apps/**/tailwind.config.*",
+        "packages/**/src/**",
+        "packages/**/tsconfig.json",
+        "packages/**/tsconfig.*.json",
+        "tools/**/build/**",
+        "turbo.json",
+        "package.json",
+        "pnpm-lock.yaml"
       ],
       "env": ["NODE_ENV", "BUILD_TARGET", "ASSET_PREFIX"]
     },
