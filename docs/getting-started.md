@@ -84,7 +84,7 @@ pnpm typecheck
 pnpm test
 pnpm format --check
 pnpm audit:security
-pnpm exec secretlint "**/*"
+pnpm security:verify
 ```
 
 All commands must complete without errors. Address findings before writing code.

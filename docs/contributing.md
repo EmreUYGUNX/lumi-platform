@@ -19,7 +19,7 @@ This document outlines the expectations for contributing to the Lumi commerce pl
    pnpm test
    pnpm format --check
    pnpm audit:security
-   pnpm exec secretlint "**/*"
+   pnpm security:verify
    ```
 4. Stage changes with meaningful commits (Husky enforces lint-staged).
 5. Push to your fork or origin branch and open a Pull Request (PR).
@@ -46,7 +46,7 @@ This document outlines the expectations for contributing to the Lumi commerce pl
 
 ## 6. Security & Compliance
 
-- Never commit secrets. Validate with `pnpm exec secretlint "**/*"` before pushing.
+- Never commit secrets. Validate with `pnpm security:verify` before pushing.
 - Follow the incident response process for any suspected vulnerability (`docs/guides/emergency-runbook.md`).
 - Ensure new dependencies comply with the license allowlist in `package.json`.
 

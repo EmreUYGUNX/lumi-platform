@@ -23,6 +23,7 @@
     "@lumi/types": "workspace:*",
     "dotenv": "^16.4.5",
     "dotenv-expand": "^11.0.6",
+    "rate-limiter-flexible": "^3.0.5",
     "prom-client": "^15.1.2",
     "@sentry/node": "^8.47.0",
     "winston": "^3.13.0",

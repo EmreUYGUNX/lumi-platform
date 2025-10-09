@@ -181,6 +181,8 @@ jobs:
         run: pnpm deps:duplicates
       - name: Peer dependency verification
         run: pnpm deps:peers
+      - name: Secretlint scan
+        run: pnpm security:secrets
       - name: Secret scanning
         id: gitleaks
         uses: gitleaks/gitleaks-action@v2

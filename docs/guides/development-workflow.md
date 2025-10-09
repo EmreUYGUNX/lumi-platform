@@ -29,7 +29,7 @@ pnpm typecheck
 pnpm test
 pnpm format --check
 pnpm audit:security
-pnpm exec secretlint "**/*"
+pnpm security:verify
 ```
 
 Resolve all issues locally; CI should confirm, not discover, problems.

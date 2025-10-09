@@ -29,7 +29,8 @@ This handbook codifies Phase 0 security requirements (S1–S4) and operational p
 - Secrets are never hardcoded. Use environment variables defined in `env/.env.template`.
 - Seal secrets using `pnpm env:seal` before sharing via version-controlled channels.
 - Commit secret templates only; production values stay in Vault.
-- Run `pnpm exec secretlint "**/*"` before every push and part of CI.
+- Run `pnpm security:verify` locally before pushing; the command wraps secretlint and `pnpm audit:security`.
+- Reference the detailed rotation, backup, and access policy in [`docs/security/secret-operations.md`](security/secret-operations.md).
 
 ## Secure Development Lifecycle
 
@@ -44,10 +45,26 @@ This handbook codifies Phase 0 security requirements (S1–S4) and operational p
 - Run `pnpm audit:security` weekly and before each release.
 - Use Renovate dashboard to approve dependency upgrades after verification.
 - Check license compliance with `pnpm deps:licenses`.
+- GitHub workflows enforce `pnpm security:secrets`, Gitleaks, and the dependency review action on every PR.
+
+## Automation & Tooling
+
+- **Pre-commit**: lint-staged executes `pnpm exec secretlint --maskSecrets` on staged files.
+- **CI**: `.github/workflows/ci.yml` runs secretlint + Gitleaks and uploads SARIF reports; `dependency-review.yml` blocks high severity advisories.
+- **Scheduled audits**: `dependency-security.yml` performs weekly `pnpm audit:security` runs.
+- **Local verification**: `pnpm security:verify` combines secretlint and dependency audit for engineers.
+
+## API Hardening Baseline
+
+- CORS defaults defined in `ApplicationConfig.security.cors` and normalised via `@lumi/shared` helpers.
+- Security headers (CSP, HSTS, COOP/COEP, CORP, X-Content-Type-Options) generated using `resolveSecurityHeaders`.
+- Rate limiting infrastructure provided via `createRateLimiter` (memory strategy by default).
+- Input validation helpers live in `@lumi/shared/validation` with sanitisation and payload size enforcement.
 
 ## Incident Response
 
 - Immediate escalation via Slack `#lumi-incidents` and PagerDuty on-call (see `docs/guides/emergency-runbook.md`).
+- Follow the dedicated security plan in [`docs/security/incident-response.md`](security/incident-response.md).
 - Start an incident document capturing timeline, impact, and mitigation steps.
 - Post-incident reviews are mandatory within 48 hours of resolution.
 
@@ -62,3 +79,8 @@ This handbook codifies Phase 0 security requirements (S1–S4) and operational p
 - Internal: open a confidential ticket tagged `security`.
 - External: Notify security@lumi.com with reproduction steps.
 - Follow responsible disclosure guidelines; do not exploit beyond proof of concept.
+
+## Audits & Compliance
+
+- Use the quarterly checklist in [`docs/security/audit-checklist.md`](security/audit-checklist.md).
+- Track GDPR/KVKK readiness tasks in [`docs/security/compliance.md`](security/compliance.md).

@@ -26,6 +26,54 @@ interface ConfigInternals {
   computeDiffKeys: (previous: ApplicationConfig | undefined, next: ApplicationConfig) => string[];
 }
 
+const createSecuritySection = (): ApplicationConfig["security"] => ({
+  jwtSecret: "development-secret".padEnd(16, "x"),
+  cors: {
+    enabled: true,
+    allowedOrigins: ["http://localhost:3000"],
+    allowedMethods: ["GET", "POST"],
+    allowedHeaders: ["content-type", "authorization"],
+    exposedHeaders: ["x-request-id"],
+    allowCredentials: true,
+    maxAgeSeconds: 600,
+  },
+  headers: {
+    enabled: true,
+    contentSecurityPolicy: "default-src 'self';",
+    referrerPolicy: "strict-origin-when-cross-origin",
+    frameGuard: "DENY",
+    permissionsPolicy: "camera=(), microphone=()",
+    strictTransportSecurity: {
+      maxAgeSeconds: 63_072_000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    expectCt: {
+      enforce: false,
+      maxAgeSeconds: 0,
+      reportUri: undefined,
+    },
+    crossOriginEmbedderPolicy: "require-corp",
+    crossOriginOpenerPolicy: "same-origin",
+    crossOriginResourcePolicy: "same-site",
+    xContentTypeOptions: "nosniff",
+  },
+  rateLimit: {
+    enabled: true,
+    keyPrefix: "test",
+    points: 120,
+    durationSeconds: 60,
+    blockDurationSeconds: 300,
+    strategy: "memory",
+  },
+  validation: {
+    strict: true,
+    sanitize: true,
+    stripUnknown: true,
+    maxBodySizeKb: 512,
+  },
+});
+
 describe("configuration internals", () => {
   let internals: ConfigInternals;
   let restoreEnv: NodeJS.ProcessEnv;
@@ -68,7 +116,7 @@ describe("configuration internals", () => {
       database: { url: "postgresql://localhost:5432/lumi" },
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
-      security: { jwtSecret: "development-secret".padEnd(16, "x") },
+      security: createSecuritySection(),
       observability: {
         sentryDsn: undefined,
         logs: {
@@ -117,7 +165,7 @@ describe("configuration internals", () => {
       database: { url: "postgresql://localhost:5432/lumi" },
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
-      security: { jwtSecret: "development-secret".padEnd(16, "x") },
+      security: createSecuritySection(),
       observability: {
         sentryDsn: undefined,
         logs: {

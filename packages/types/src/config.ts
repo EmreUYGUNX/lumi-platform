@@ -6,6 +6,64 @@ export type FeatureFlagMap = Record<string, boolean>;
 
 export type AlertSeverityLevel = Exclude<LogLevel, "trace" | "debug">;
 
+export interface CorsConfig {
+  enabled: boolean;
+  allowedOrigins: string[];
+  allowedMethods: string[];
+  allowedHeaders: string[];
+  exposedHeaders: string[];
+  allowCredentials: boolean;
+  maxAgeSeconds: number;
+}
+
+export interface StrictTransportSecurityConfig {
+  maxAgeSeconds: number;
+  includeSubDomains: boolean;
+  preload: boolean;
+}
+
+export interface ExpectCtConfig {
+  enforce: boolean;
+  maxAgeSeconds: number;
+  reportUri?: string;
+}
+
+export interface SecurityHeadersConfig {
+  enabled: boolean;
+  contentSecurityPolicy: string;
+  referrerPolicy: string;
+  frameGuard: "DENY" | "SAMEORIGIN";
+  permissionsPolicy: string;
+  strictTransportSecurity: StrictTransportSecurityConfig;
+  expectCt: ExpectCtConfig;
+  crossOriginEmbedderPolicy: "require-corp" | "credentialless" | "unsafe-none";
+  crossOriginOpenerPolicy: "same-origin" | "same-origin-allow-popups" | "unsafe-none";
+  crossOriginResourcePolicy: "same-origin" | "same-site" | "cross-origin";
+  xContentTypeOptions: "nosniff";
+}
+
+export type RateLimitStrategy = "memory" | "redis";
+
+export interface RateLimitConfig {
+  enabled: boolean;
+  keyPrefix: string;
+  points: number;
+  durationSeconds: number;
+  blockDurationSeconds: number;
+  strategy: RateLimitStrategy;
+  inmemoryBlockOnConsumed?: number;
+  redis?: {
+    url: string;
+  };
+}
+
+export interface ValidationConfig {
+  strict: boolean;
+  sanitize: boolean;
+  stripUnknown: boolean;
+  maxBodySizeKb: number;
+}
+
 export interface LogRotationConfig {
   maxSize: string;
   maxFiles: string;
@@ -47,6 +105,10 @@ export interface ResolvedEnvironment {
   storageBucket: string;
   logLevel: LogLevel;
   jwtSecret: string;
+  cors: CorsConfig;
+  securityHeaders: SecurityHeadersConfig;
+  rateLimit: RateLimitConfig;
+  validation: ValidationConfig;
   sentryDsn?: string;
   logDirectory: string;
   logMaxSize: string;
@@ -87,6 +149,10 @@ export interface ApplicationConfig {
   };
   security: {
     jwtSecret: string;
+    cors: CorsConfig;
+    headers: SecurityHeadersConfig;
+    rateLimit: RateLimitConfig;
+    validation: ValidationConfig;
   };
   observability: {
     sentryDsn?: string;

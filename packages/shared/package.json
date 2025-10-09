@@ -16,7 +16,8 @@
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
-    "@lumi/types": "workspace:*"
+    "@lumi/types": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

@@ -3,7 +3,14 @@
   "compilerOptions": {
     "noEmit": false,
     "emitDeclarationOnly": false,
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@lumi/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@lumi/shared/*": ["../../packages/shared/dist/*.d.ts"],
+      "@lumi/types": ["../../packages/types/dist/index.d.ts"],
+      "@lumi/types/*": ["../../packages/types/dist/*.d.ts"]
+    }
   },
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**", "**/*.test.tsx", "**/*.spec.tsx"]
 }

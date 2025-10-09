@@ -76,7 +76,7 @@ Commonly used root-level scripts (full catalog in `package.json`):
 - Linting: ESLint with Airbnb, security, and custom rulesets enforced via Husky.
 - Formatting: Prettier with import sorting and Tailwind plugins.
 - Testing: Jest and Vitest cover unit, integration, and snapshot suites (`docs/testing.md`).
-- Security: Automated secret scanning, dependency audits, and environment validation (`docs/security.md`).
+- Security: Automated secretlint + Gitleaks scanning, dependency reviews, and environment validation (`docs/security.md`). Run `pnpm security:verify` before pushing to execute the combined checks locally.
 - CI/CD: See `.github/workflows/` for pipeline definitions and guardrails.
 
 ## Environment Management

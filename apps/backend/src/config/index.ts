@@ -77,6 +77,10 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
   },
   security: {
     jwtSecret: env.jwtSecret,
+    cors: env.cors,
+    headers: env.securityHeaders,
+    rateLimit: env.rateLimit,
+    validation: env.validation,
   },
   observability: {
     sentryDsn: env.sentryDsn,

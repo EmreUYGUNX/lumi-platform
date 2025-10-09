@@ -37,7 +37,7 @@ This guide defines the baseline deployment process established in Phase 0. Full 
 ## Release Readiness Checklist
 
 - [ ] All tests green on `main`.
-- [ ] Security scans (`pnpm audit:security`, secretlint) pass.
+- [ ] Security scans (`pnpm security:verify`) pass.
 - [ ] Documentation updates merged.
 - [ ] Release notes drafted and approved by Product.
 - [ ] On-call engineers briefed on deployment timeline.

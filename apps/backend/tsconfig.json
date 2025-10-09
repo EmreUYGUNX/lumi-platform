@@ -8,6 +8,8 @@
     "types": ["node"],
     "paths": {
       "@/*": ["./src/*"],
+      "@lumi/shared": ["../../packages/shared/src/index.ts"],
+      "@lumi/shared/*": ["../../packages/shared/src/*"],
       "@lumi/types": ["../../packages/types/dist/index.d.ts"],
       "@lumi/types/*": ["../../packages/types/dist/*.d.ts"]
     }

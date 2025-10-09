@@ -40,6 +40,10 @@ describe("environment loader", () => {
       expect(env.featureFlags.betaCheckout).toBe(true);
       expect(env.logDirectory).toBe("logs");
       expect(env.metricsEnabled).toBe(true);
+      expect(env.cors.allowedOrigins).toContain("http://localhost:3000");
+      expect(env.securityHeaders.enabled).toBe(true);
+      expect(env.rateLimit.points).toBe(120);
+      expect(env.validation.maxBodySizeKb).toBe(512);
 
       const { getConfig, isFeatureEnabled, getFeatureFlags } = await importConfigModule();
       const config = getConfig();
@@ -48,6 +52,10 @@ describe("environment loader", () => {
       expect(config.observability.logs.rotation.maxFiles).toBe("14d");
       expect(config.observability.metrics.defaultMetricsInterval).toBe(5000);
       expect(config.observability.alerting.severityThreshold).toBe("error");
+      expect(config.security.cors.allowedOrigins).toContain("http://localhost:3000");
+      expect(config.security.headers.frameGuard).toBe("DENY");
+      expect(config.security.rateLimit.strategy).toBe("memory");
+      expect(config.security.validation.strict).toBe(true);
       expect(isFeatureEnabled("betaCheckout")).toBe(true);
       const flags = getFeatureFlags();
       expect(flags).toMatchObject({ betaCheckout: true });
@@ -198,6 +206,35 @@ describe("environment loader", () => {
     await withTemporaryEnvironment({ ...BASE_ENV, CONFIG_ENCRYPTION_KEY: KEY }, async (env) => {
       expect(env.configEncryptionKey).toBe(KEY);
     });
+  });
+
+  it("parses security-specific environment overrides", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        CORS_ALLOWED_ORIGINS: "https://one.com, https://two.com",
+        CORS_EXPOSED_HEADERS: "  ",
+        SECURITY_HEADERS_ENABLED: "false",
+        SECURITY_HEADERS_EXPECT_CT_REPORT_URI: "https://ct.lumi.example/report",
+        RATE_LIMIT_ENABLED: "1",
+        RATE_LIMIT_POINTS: "20",
+        RATE_LIMIT_DURATION: "120",
+        RATE_LIMIT_STRATEGY: "redis",
+        RATE_LIMIT_REDIS_URL: "redis://cache:6380/0",
+        VALIDATION_MAX_BODY_KB: "256",
+      },
+      async (env) => {
+        expect(env.cors.allowedOrigins).toEqual(["https://one.com", "https://two.com"]);
+        expect(env.securityHeaders.enabled).toBe(false);
+        expect(env.rateLimit.enabled).toBe(true);
+        expect(env.rateLimit.points).toBe(20);
+        expect(env.rateLimit.durationSeconds).toBe(120);
+        expect(env.rateLimit.redis?.url).toBe("redis://cache:6380/0");
+        expect(env.securityHeaders.expectCt.reportUri).toBe("https://ct.lumi.example/report");
+        expect(env.cors.exposedHeaders).toEqual(["X-Request-Id"]);
+        expect(env.validation.maxBodySizeKb).toBe(256);
+      },
+    );
   });
 
   it("omits the encryption key when only whitespace is provided", async () => {

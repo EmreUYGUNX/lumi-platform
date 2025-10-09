@@ -16,6 +16,25 @@ const NODE_ENVS = [
   "production",
 ] as const satisfies readonly RuntimeEnvironment[];
 const ALERT_SEVERITIES = ["info", "warn", "error", "fatal"] as const;
+const DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "https://localhost:3000"] as const;
+const DEFAULT_CORS_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
+const DEFAULT_CORS_HEADERS = ["Content-Type", "Authorization", "X-Request-Id"] as const;
+const DEFAULT_CORS_EXPOSED_HEADERS = [DEFAULT_CORS_HEADERS[2]] as const;
+const DEFAULT_CORS_ALLOWED_ORIGINS = DEFAULT_CORS_ORIGINS.join(",");
+const DEFAULT_CORS_ALLOWED_HEADERS = DEFAULT_CORS_HEADERS.join(",");
+const DEFAULT_CSP =
+  "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self';";
+const DEFAULT_PERMISSIONS_POLICY =
+  "accelerometer=(),camera=(),geolocation=(),gyroscope=(),microphone=(),payment=()";
+const CROSS_ORIGIN_OPENER_OPTIONS = [
+  "same-origin",
+  "same-origin-allow-popups",
+  "unsafe-none",
+] as const;
+const CROSS_ORIGIN_RESOURCE_OPTIONS = ["same-origin", "same-site", "cross-origin"] as const;
+const DEFAULT_COOP = CROSS_ORIGIN_OPENER_OPTIONS[0];
+const DEFAULT_CORP = CROSS_ORIGIN_RESOURCE_OPTIONS[1];
+const hasLength = (value: string) => value.length > 0;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {
@@ -37,6 +56,24 @@ const booleanTransformer = (value: unknown, fallback = false) => {
   return fallback;
 };
 
+const csvTransformer = (value: unknown, fallback: string[]): string[] => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const entries = value
+    .split(",")
+    .map((token) => token.trim())
+    .filter((token) => hasLength(token));
+
+  return entries.length > 0 ? entries : fallback;
+};
+
+const optionalString = (value: unknown) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed === "" ? undefined : trimmed;
+};
+
 const EnvSchema = z
   .object({
     NODE_ENV: z.enum(NODE_ENVS).default("development"),
@@ -49,6 +86,104 @@ const EnvSchema = z
     STORAGE_BUCKET: z.string().min(1, "STORAGE_BUCKET is required"),
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
     JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
+    CORS_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    CORS_ALLOWED_ORIGINS: z.string().default(DEFAULT_CORS_ALLOWED_ORIGINS),
+    CORS_ALLOWED_METHODS: z.string().default("GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS"),
+    CORS_ALLOWED_HEADERS: z.string().default(DEFAULT_CORS_ALLOWED_HEADERS),
+    CORS_EXPOSED_HEADERS: z.string().default("X-Request-Id"),
+    CORS_ALLOW_CREDENTIALS: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    CORS_MAX_AGE: z.coerce
+      .number()
+      .int()
+      .min(0, "CORS_MAX_AGE must be zero or positive")
+      .default(600),
+    SECURITY_HEADERS_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    SECURITY_HEADERS_CSP: z.string().default(DEFAULT_CSP),
+    SECURITY_HEADERS_REFERRER_POLICY: z.string().default("strict-origin-when-cross-origin"),
+    SECURITY_HEADERS_FRAME_GUARD: z.enum(["DENY", "SAMEORIGIN"]).default("DENY"),
+    SECURITY_HEADERS_PERMISSIONS_POLICY: z.string().default(DEFAULT_PERMISSIONS_POLICY),
+    SECURITY_HEADERS_HSTS_MAX_AGE: z.coerce
+      .number()
+      .int()
+      .min(0, "SECURITY_HEADERS_HSTS_MAX_AGE must be zero or positive")
+      .default(63_072_000),
+    SECURITY_HEADERS_HSTS_INCLUDE_SUBDOMAINS: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    SECURITY_HEADERS_HSTS_PRELOAD: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    SECURITY_HEADERS_EXPECT_CT_ENFORCE: z
+      .any()
+      .transform((value) => booleanTransformer(value, false))
+      .pipe(z.boolean()),
+    SECURITY_HEADERS_EXPECT_CT_MAX_AGE: z.coerce
+      .number()
+      .int()
+      .min(0, "SECURITY_HEADERS_EXPECT_CT_MAX_AGE must be zero or positive")
+      .default(86_400),
+    SECURITY_HEADERS_EXPECT_CT_REPORT_URI: z.string().optional().transform(optionalString),
+    SECURITY_HEADERS_CROSS_ORIGIN_EMBEDDER_POLICY: z
+      .enum(["require-corp", "credentialless", "unsafe-none"])
+      .default("require-corp"),
+    SECURITY_HEADERS_CROSS_ORIGIN_OPENER_POLICY: z
+      .enum(CROSS_ORIGIN_OPENER_OPTIONS)
+      .default(DEFAULT_COOP),
+    SECURITY_HEADERS_CROSS_ORIGIN_RESOURCE_POLICY: z
+      .enum(CROSS_ORIGIN_RESOURCE_OPTIONS)
+      .default(DEFAULT_CORP),
+    SECURITY_HEADERS_X_CONTENT_TYPE_OPTIONS: z.enum(["nosniff"]).default("nosniff"),
+    RATE_LIMIT_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    RATE_LIMIT_STRATEGY: z.enum(["memory", "redis"]).default("memory"),
+    RATE_LIMIT_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_POINTS must be at least 1")
+      .default(120),
+    RATE_LIMIT_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_DURATION must be at least 1 second")
+      .default(60),
+    RATE_LIMIT_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_BLOCK_DURATION must not be negative")
+      .default(300),
+    RATE_LIMIT_KEY_PREFIX: z.string().default("lumi:rate-limit"),
+    RATE_LIMIT_REDIS_URL: z.string().optional().transform(optionalString),
+    VALIDATION_STRICT: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    VALIDATION_SANITIZE: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    VALIDATION_STRIP_UNKNOWN: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    VALIDATION_MAX_BODY_KB: z.coerce
+      .number()
+      .int()
+      .min(16, "VALIDATION_MAX_BODY_KB must be at least 16KB")
+      .max(1024, "VALIDATION_MAX_BODY_KB must not exceed 1024KB")
+      .default(512),
     SENTRY_DSN: z
       .string()
       .optional()
@@ -195,6 +330,56 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   storageBucket: parsed.STORAGE_BUCKET,
   logLevel: parsed.LOG_LEVEL,
   jwtSecret: parsed.JWT_SECRET,
+  cors: {
+    enabled: parsed.CORS_ENABLED,
+    allowedOrigins: csvTransformer(parsed.CORS_ALLOWED_ORIGINS, [...DEFAULT_CORS_ORIGINS]),
+    allowedMethods: csvTransformer(parsed.CORS_ALLOWED_METHODS, [...DEFAULT_CORS_METHODS]),
+    allowedHeaders: csvTransformer(parsed.CORS_ALLOWED_HEADERS, [...DEFAULT_CORS_HEADERS]),
+    exposedHeaders: csvTransformer(parsed.CORS_EXPOSED_HEADERS, [...DEFAULT_CORS_EXPOSED_HEADERS]),
+    allowCredentials: parsed.CORS_ALLOW_CREDENTIALS,
+    maxAgeSeconds: parsed.CORS_MAX_AGE,
+  },
+  securityHeaders: {
+    enabled: parsed.SECURITY_HEADERS_ENABLED,
+    contentSecurityPolicy: parsed.SECURITY_HEADERS_CSP,
+    referrerPolicy: parsed.SECURITY_HEADERS_REFERRER_POLICY,
+    frameGuard: parsed.SECURITY_HEADERS_FRAME_GUARD,
+    permissionsPolicy: parsed.SECURITY_HEADERS_PERMISSIONS_POLICY,
+    strictTransportSecurity: {
+      maxAgeSeconds: parsed.SECURITY_HEADERS_HSTS_MAX_AGE,
+      includeSubDomains: parsed.SECURITY_HEADERS_HSTS_INCLUDE_SUBDOMAINS,
+      preload: parsed.SECURITY_HEADERS_HSTS_PRELOAD,
+    },
+    expectCt: {
+      enforce: parsed.SECURITY_HEADERS_EXPECT_CT_ENFORCE,
+      maxAgeSeconds: parsed.SECURITY_HEADERS_EXPECT_CT_MAX_AGE,
+      reportUri: parsed.SECURITY_HEADERS_EXPECT_CT_REPORT_URI,
+    },
+    crossOriginEmbedderPolicy: parsed.SECURITY_HEADERS_CROSS_ORIGIN_EMBEDDER_POLICY,
+    crossOriginOpenerPolicy: parsed.SECURITY_HEADERS_CROSS_ORIGIN_OPENER_POLICY,
+    crossOriginResourcePolicy: parsed.SECURITY_HEADERS_CROSS_ORIGIN_RESOURCE_POLICY,
+    xContentTypeOptions: parsed.SECURITY_HEADERS_X_CONTENT_TYPE_OPTIONS,
+  },
+  rateLimit: {
+    enabled: parsed.RATE_LIMIT_ENABLED,
+    keyPrefix: parsed.RATE_LIMIT_KEY_PREFIX,
+    points: parsed.RATE_LIMIT_POINTS,
+    durationSeconds: parsed.RATE_LIMIT_DURATION,
+    blockDurationSeconds: parsed.RATE_LIMIT_BLOCK_DURATION,
+    strategy: parsed.RATE_LIMIT_STRATEGY,
+    redis:
+      parsed.RATE_LIMIT_STRATEGY === "redis" && parsed.RATE_LIMIT_REDIS_URL
+        ? {
+            url: parsed.RATE_LIMIT_REDIS_URL,
+          }
+        : undefined,
+  },
+  validation: {
+    strict: parsed.VALIDATION_STRICT,
+    sanitize: parsed.VALIDATION_SANITIZE,
+    stripUnknown: parsed.VALIDATION_STRIP_UNKNOWN,
+    maxBodySizeKb: parsed.VALIDATION_MAX_BODY_KB,
+  },
   sentryDsn: parsed.SENTRY_DSN ?? undefined,
   logDirectory: parsed.LOG_DIRECTORY,
   logMaxSize: parsed.LOG_MAX_SIZE,
