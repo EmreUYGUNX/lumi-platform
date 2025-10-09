@@ -69,7 +69,32 @@ describe("configuration internals", () => {
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
       security: { jwtSecret: "development-secret".padEnd(16, "x") },
-      observability: { sentryDsn: undefined },
+      observability: {
+        sentryDsn: undefined,
+        logs: {
+          directory: "logs",
+          rotation: {
+            maxFiles: "14d",
+            maxSize: "20m",
+            zippedArchive: true,
+          },
+          consoleEnabled: true,
+        },
+        metrics: {
+          enabled: true,
+          endpoint: "/metrics",
+          collectDefaultMetrics: true,
+          defaultMetricsInterval: 5000,
+        },
+        alerting: {
+          enabled: false,
+          webhookUrl: undefined,
+          severityThreshold: "error",
+        },
+        health: {
+          uptimeGracePeriodSeconds: 30,
+        },
+      },
       featureFlags: { betaCheckout: true },
       runtime: { ci: false },
     };
@@ -93,7 +118,32 @@ describe("configuration internals", () => {
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
       security: { jwtSecret: "development-secret".padEnd(16, "x") },
-      observability: { sentryDsn: undefined },
+      observability: {
+        sentryDsn: undefined,
+        logs: {
+          directory: "logs",
+          rotation: {
+            maxFiles: "14d",
+            maxSize: "20m",
+            zippedArchive: true,
+          },
+          consoleEnabled: true,
+        },
+        metrics: {
+          enabled: true,
+          endpoint: "/metrics",
+          collectDefaultMetrics: true,
+          defaultMetricsInterval: 5000,
+        },
+        alerting: {
+          enabled: false,
+          webhookUrl: undefined,
+          severityThreshold: "error",
+        },
+        health: {
+          uptimeGracePeriodSeconds: 30,
+        },
+      },
       featureFlags: { betaCheckout: true },
       runtime: { ci: false },
     };

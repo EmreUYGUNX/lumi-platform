@@ -65,9 +65,9 @@ module.exports = {
     "import/order": [
       "error",
       {
-        groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
+        groups: ["builtin", "external", "internal", ["parent", "sibling"], "index"],
         "newlines-between": "always",
-        alphabetize: { order: "asc", caseInsensitive: true },
+        alphabetize: { order: "ignore", caseInsensitive: true },
         pathGroups: [
           { pattern: "react", group: "external", position: "before" },
           { pattern: "next/**", group: "external", position: "after" },
@@ -144,11 +144,17 @@ module.exports = {
       parserOptions: {
         project: [path.join(__dirname, "apps/backend/tsconfig.json")],
       },
+      settings: {
+        node: {
+          version: ">=20.11.0",
+        },
+      },
       plugins: ["n"],
       extends: ["plugin:n/recommended"],
       rules: {
         "n/no-missing-import": "off",
         "n/no-unsupported-features/es-syntax": "off",
+        "n/no-unsupported-features/node-builtins": "off",
       },
     },
     {

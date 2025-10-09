@@ -1,4 +1,6 @@
 import { getConfig, onConfigChange } from "./config/index.js";
+import { logger } from "./lib/logger.js";
+import { initializeObservability } from "./observability/index.js";
 
 export const createBackendApp = () => {
   let activeConfig = getConfig();
@@ -6,14 +8,18 @@ export const createBackendApp = () => {
   const unsubscribe = onConfigChange(({ snapshot, changedKeys, reason }) => {
     activeConfig = snapshot;
     if (changedKeys.length > 0) {
-      console.info(`Config reloaded (${reason}): ${changedKeys.join(", ")}`);
+      logger.info("Configuration reloaded", { reason, changedKeys });
     }
   });
 
   return {
     start() {
       const { app } = activeConfig;
-      console.info(`[${app.environment}] Backend service starting on port ${app.port}`);
+      initializeObservability();
+      logger.info("Backend service starting", {
+        environment: app.environment,
+        port: app.port,
+      });
       return () => unsubscribe();
     },
   };

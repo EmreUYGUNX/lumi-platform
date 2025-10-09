@@ -38,10 +38,16 @@ describe("environment loader", () => {
     await withTemporaryEnvironment(BASE_ENV, async (env) => {
       expect(env.appPort).toBe(4500);
       expect(env.featureFlags.betaCheckout).toBe(true);
+      expect(env.logDirectory).toBe("logs");
+      expect(env.metricsEnabled).toBe(true);
 
       const { getConfig, isFeatureEnabled, getFeatureFlags } = await importConfigModule();
       const config = getConfig();
       expect(config.app.port).toBe(4500);
+      expect(config.observability.logs.directory).toBe("logs");
+      expect(config.observability.logs.rotation.maxFiles).toBe("14d");
+      expect(config.observability.metrics.defaultMetricsInterval).toBe(5000);
+      expect(config.observability.alerting.severityThreshold).toBe("error");
       expect(isFeatureEnabled("betaCheckout")).toBe(true);
       const flags = getFeatureFlags();
       expect(flags).toMatchObject({ betaCheckout: true });
@@ -217,6 +223,36 @@ describe("environment loader", () => {
       const env = loadEnv({ reload: true, reason: "ci-number" });
       expect(env.ci).toBe(true);
     });
+  });
+
+  it("respects explicit observability overrides", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        LOG_DIRECTORY: "custom-logs",
+        LOG_MAX_SIZE: "50m",
+        LOG_MAX_FILES: "30d",
+        LOG_ENABLE_CONSOLE: "false",
+        METRICS_ENABLED: "false",
+        ALERTING_ENABLED: "true",
+        ALERTING_WEBHOOK_URL: "https://hooks.example.com/alerts",
+        ALERTING_SEVERITY: "fatal",
+        HEALTH_UPTIME_GRACE_PERIOD: "120",
+      },
+      async () => {
+        const { getConfig } = await importConfigModule();
+        const config = getConfig();
+        expect(config.observability.logs.directory).toBe("custom-logs");
+        expect(config.observability.logs.consoleEnabled).toBe(false);
+        expect(config.observability.metrics.enabled).toBe(false);
+        expect(config.observability.alerting).toMatchObject({
+          enabled: true,
+          webhookUrl: "https://hooks.example.com/alerts",
+          severityThreshold: "fatal",
+        });
+        expect(config.observability.health.uptimeGracePeriodSeconds).toBe(120);
+      },
+    );
   });
 
   it("starts watching environment files when hot reload is enabled", async () => {

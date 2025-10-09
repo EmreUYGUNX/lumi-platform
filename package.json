@@ -36,6 +36,7 @@
     "turbo:telemetry:off": "turbo telemetry disable",
     "turbo:telemetry:status": "turbo telemetry status",
     "env:seal": "node tools/scripts/env-seal.mjs",
+    "logs:query": "node tools/scripts/log-query.mjs",
     "prepare": "husky install",
     "postinstall": "turbo run postinstall --parallel --continue --no-daemon",
     "lint-staged": "lint-staged --concurrent false",

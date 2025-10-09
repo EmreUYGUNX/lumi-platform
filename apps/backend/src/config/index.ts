@@ -80,6 +80,30 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
   },
   observability: {
     sentryDsn: env.sentryDsn,
+    logs: {
+      directory: env.logDirectory,
+      rotation: {
+        maxFiles: env.logMaxFiles,
+        maxSize: env.logMaxSize,
+        zippedArchive: true,
+      },
+      consoleEnabled: env.logConsoleEnabled,
+    },
+    metrics: {
+      enabled: env.metricsEnabled,
+      endpoint: env.metricsEndpoint,
+      prefix: env.metricsPrefix,
+      collectDefaultMetrics: env.metricsCollectDefault,
+      defaultMetricsInterval: env.metricsDefaultInterval,
+    },
+    alerting: {
+      enabled: env.alertingEnabled,
+      webhookUrl: env.alertingWebhookUrl,
+      severityThreshold: env.alertingSeverity,
+    },
+    health: {
+      uptimeGracePeriodSeconds: env.healthUptimeGracePeriodSeconds,
+    },
   },
   featureFlags: env.featureFlags,
   runtime: {

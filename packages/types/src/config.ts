@@ -4,6 +4,38 @@ export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
 export type FeatureFlagMap = Record<string, boolean>;
 
+export type AlertSeverityLevel = Exclude<LogLevel, "trace" | "debug">;
+
+export interface LogRotationConfig {
+  maxSize: string;
+  maxFiles: string;
+  zippedArchive: boolean;
+}
+
+export interface LogTransportConfig {
+  directory: string;
+  rotation: LogRotationConfig;
+  consoleEnabled: boolean;
+}
+
+export interface MetricsConfig {
+  enabled: boolean;
+  endpoint: string;
+  prefix?: string;
+  collectDefaultMetrics: boolean;
+  defaultMetricsInterval: number;
+}
+
+export interface AlertingConfig {
+  enabled: boolean;
+  webhookUrl?: string;
+  severityThreshold: AlertSeverityLevel;
+}
+
+export interface HealthConfig {
+  uptimeGracePeriodSeconds: number;
+}
+
 export interface ResolvedEnvironment {
   nodeEnv: RuntimeEnvironment;
   appName: string;
@@ -16,6 +48,19 @@ export interface ResolvedEnvironment {
   logLevel: LogLevel;
   jwtSecret: string;
   sentryDsn?: string;
+  logDirectory: string;
+  logMaxSize: string;
+  logMaxFiles: string;
+  logConsoleEnabled: boolean;
+  metricsEnabled: boolean;
+  metricsEndpoint: string;
+  metricsPrefix?: string;
+  metricsCollectDefault: boolean;
+  metricsDefaultInterval: number;
+  alertingEnabled: boolean;
+  alertingWebhookUrl?: string;
+  alertingSeverity: AlertSeverityLevel;
+  healthUptimeGracePeriodSeconds: number;
   featureFlags: FeatureFlagMap;
   configHotReload: boolean;
   configEncryptionKey?: string;
@@ -45,6 +90,10 @@ export interface ApplicationConfig {
   };
   observability: {
     sentryDsn?: string;
+    logs: LogTransportConfig;
+    metrics: MetricsConfig;
+    alerting: AlertingConfig;
+    health: HealthConfig;
   };
   featureFlags: FeatureFlagMap;
   runtime: {

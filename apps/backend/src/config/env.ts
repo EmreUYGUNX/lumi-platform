@@ -15,6 +15,7 @@ const NODE_ENVS = [
   "staging",
   "production",
 ] as const satisfies readonly RuntimeEnvironment[];
+const ALERT_SEVERITIES = ["info", "warn", "error", "fatal"] as const;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {
@@ -52,6 +53,45 @@ const EnvSchema = z
       .string()
       .optional()
       .transform((value) => (value && value.length > 0 ? value : undefined)),
+    LOG_DIRECTORY: z.string().min(1).default("logs"),
+    LOG_MAX_SIZE: z.string().min(2).default("20m"),
+    LOG_MAX_FILES: z.string().min(2).default("14d"),
+    LOG_ENABLE_CONSOLE: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    METRICS_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    METRICS_ENDPOINT: z.string().default("/metrics"),
+    METRICS_PREFIX: z
+      .string()
+      .optional()
+      .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)),
+    METRICS_COLLECT_DEFAULT: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    METRICS_DEFAULT_INTERVAL: z.coerce
+      .number()
+      .int()
+      .min(1, "METRICS_DEFAULT_INTERVAL must be a positive integer")
+      .default(5000),
+    ALERTING_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, false))
+      .pipe(z.boolean()),
+    ALERTING_WEBHOOK_URL: z
+      .string()
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
+    ALERTING_SEVERITY: z.enum(ALERT_SEVERITIES).default("error"),
+    HEALTH_UPTIME_GRACE_PERIOD: z.coerce
+      .number()
+      .int()
+      .min(0, "HEALTH_UPTIME_GRACE_PERIOD must be zero or positive")
+      .default(30),
     FEATURE_FLAGS: z.string().default("{}"),
     CONFIG_HOT_RELOAD: z
       .any()
@@ -156,6 +196,19 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   logLevel: parsed.LOG_LEVEL,
   jwtSecret: parsed.JWT_SECRET,
   sentryDsn: parsed.SENTRY_DSN ?? undefined,
+  logDirectory: parsed.LOG_DIRECTORY,
+  logMaxSize: parsed.LOG_MAX_SIZE,
+  logMaxFiles: parsed.LOG_MAX_FILES,
+  logConsoleEnabled: parsed.LOG_ENABLE_CONSOLE,
+  metricsEnabled: parsed.METRICS_ENABLED,
+  metricsEndpoint: parsed.METRICS_ENDPOINT,
+  metricsPrefix: parsed.METRICS_PREFIX,
+  metricsCollectDefault: parsed.METRICS_COLLECT_DEFAULT,
+  metricsDefaultInterval: parsed.METRICS_DEFAULT_INTERVAL,
+  alertingEnabled: parsed.ALERTING_ENABLED,
+  alertingWebhookUrl: parsed.ALERTING_WEBHOOK_URL,
+  alertingSeverity: parsed.ALERTING_SEVERITY,
+  healthUptimeGracePeriodSeconds: parsed.HEALTH_UPTIME_GRACE_PERIOD,
   featureFlags: parseFeatureFlags(parsed.FEATURE_FLAGS),
   configHotReload: parsed.CONFIG_HOT_RELOAD,
   configEncryptionKey: parsed.CONFIG_ENCRYPTION_KEY ?? undefined,
