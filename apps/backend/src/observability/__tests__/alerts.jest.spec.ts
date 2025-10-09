@@ -15,7 +15,7 @@ const BASE_ENV = {
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
   JWT_SECRET: "1234567890123456",
-  METRICS_ENABLED: "false",
+  METRICS_ENABLED: "true",
   ALERTING_ENABLED: "true",
   ALERTING_WEBHOOK_URL: "https://hooks.lumi.example/alerts",
   ALERTING_SEVERITY: "warn",
@@ -105,5 +105,99 @@ describe("alerting", () => {
         expect(alerts.listAlertChannels()).not.toContain("default-webhook");
       },
     );
+  });
+
+  it("logs a warning when webhook dispatch cannot occur due to missing fetch", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const alerts = await import("../alerts.js");
+      const loggerModule = await import("../../lib/logger.js");
+      const warnSpy = jest.spyOn(loggerModule.logger, "warn");
+      const previousFetch = global.fetch;
+      // @ts-expect-error - simulate runtime without fetch support
+      global.fetch = undefined;
+      await alerts.sendAlert({
+        severity: "error",
+        message: "Escalation required",
+        source: "webhook-test",
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Alert webhook dispatch skipped: webhook misconfigured or fetch unavailable",
+        expect.objectContaining({ enabled: true, hasWebhook: true }),
+      );
+      warnSpy.mockRestore();
+      global.fetch = previousFetch;
+    });
+  });
+
+  it("logs an error when webhook dispatch fails", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const alerts = await import("../alerts.js");
+      const loggerModule = await import("../../lib/logger.js");
+      const errorSpy = jest.spyOn(loggerModule.logger, "error");
+      fetchMock?.mockImplementationOnce(async () => {
+        throw new Error("network");
+      });
+      await alerts.sendAlert({
+        severity: "error",
+        message: "Dispatch attempt",
+        source: "webhook-test",
+      });
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Alert webhook dispatch failed",
+        expect.objectContaining({ webhookUrl: "https://hooks.lumi.example/alerts" }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  it("suppresses alerts entirely when alerting is disabled", async () => {
+    await withTemporaryEnvironment({ ...BASE_ENV, ALERTING_ENABLED: "false" }, async () => {
+      const alerts = await import("../alerts.js");
+      const loggerModule = await import("../../lib/logger.js");
+      const debugSpy = jest.spyOn(loggerModule.logger, "debug");
+      await alerts.sendAlert({ severity: "error", message: "noop", source: "disabled" });
+      expect(debugSpy).toHaveBeenCalledWith("Alert suppressed because alerting is disabled", {
+        source: "disabled",
+      });
+      debugSpy.mockRestore();
+    });
+  });
+
+  it("warns when no alert channels are registered", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        ALERTING_WEBHOOK_URL: "",
+      },
+      async () => {
+        const alerts = await import("../alerts.js");
+        const loggerModule = await import("../../lib/logger.js");
+        const warnSpy = jest.spyOn(loggerModule.logger, "warn");
+        await alerts.sendAlert({ severity: "error", message: "warn", source: "no-channel" });
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Alert dispatch skipped: no channels registered",
+          expect.objectContaining({ payload: expect.objectContaining({ message: "warn" }) }),
+        );
+        warnSpy.mockRestore();
+      },
+    );
+  });
+
+  it("reports handler failures without aborting alert fan-out", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const alerts = await import("../alerts.js");
+      const loggerModule = await import("../../lib/logger.js");
+      const errorSpy = jest.spyOn(loggerModule.logger, "error");
+      alerts.unregisterAlertChannel("default-webhook");
+      alerts.registerAlertChannel("failing", () => {
+        throw new Error("handler-crash");
+      });
+      await alerts.sendAlert({ severity: "error", message: "boom", source: "handler" });
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Alert handler failed",
+        expect.objectContaining({ name: "failing", error: expect.any(Error) }),
+      );
+      errorSpy.mockRestore();
+    });
   });
 });

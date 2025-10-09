@@ -19,6 +19,8 @@ const allowedPatterns = [
   /^brace-expansion$/,
   /^chalk$/,
   /^camelcase$/,
+  /^color-convert$/,
+  /^color-name$/,
   /^ci-info$/,
   /^cssom$/,
   /^debug$/,

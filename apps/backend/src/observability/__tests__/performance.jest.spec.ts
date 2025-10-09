@@ -52,4 +52,105 @@ describe("performance monitoring", () => {
       expect(() => perf.stopPerformanceMonitoring()).not.toThrow();
     });
   });
+
+  it("records periodic metrics when metrics collection is enabled", async () => {
+    const observeSpy = jest.fn();
+    const setSpy = jest.fn();
+    const monitorMock = {
+      enable: jest.fn(),
+      disable: jest.fn(),
+      mean: 1_000_000,
+      max: 2_000_000,
+      min: 500_000,
+      stddev: 250_000,
+      reset: jest.fn(),
+    };
+    const scheduledCallbacks: (() => void)[] = [];
+    const clearIntervalSpy = jest.fn();
+
+    const monitorEventLoopDelayMock = jest.fn(() => monitorMock);
+    jest.doMock("node:perf_hooks", () => ({
+      monitorEventLoopDelay: monitorEventLoopDelayMock,
+    }));
+
+    jest.doMock("node:timers", () => ({
+      setInterval: jest.fn((callback: () => void) => {
+        scheduledCallbacks.push(callback);
+        return { unref: jest.fn(), ref: jest.fn() } as unknown as NodeJS.Timeout;
+      }),
+      clearInterval: clearIntervalSpy,
+    }));
+
+    jest.doMock("../metrics.js", () => ({
+      createGauge: () => ({ set: setSpy }),
+      createHistogram: () => ({ observe: observeSpy }),
+      isMetricsCollectionEnabled: jest.fn(() => true),
+    }));
+
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const perf = await import("../performance.js");
+      perf.startPerformanceMonitoring();
+      perf.startPerformanceMonitoring();
+      scheduledCallbacks.forEach((callback) => {
+        callback();
+      });
+      expect(observeSpy).toHaveBeenCalled();
+      expect(setSpy).toHaveBeenCalled();
+      perf.stopPerformanceMonitoring();
+    });
+
+    expect(monitorEventLoopDelayMock).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    jest.dontMock("node:perf_hooks");
+    jest.dontMock("node:timers");
+    jest.dontMock("../metrics.js");
+  });
+
+  it("skips sampling when metrics collection is disabled", async () => {
+    const observeSpy = jest.fn();
+    const setSpy = jest.fn();
+    const monitorMock = {
+      enable: jest.fn(),
+      disable: jest.fn(),
+      mean: 0,
+      max: 0,
+      min: 0,
+      stddev: 0,
+      reset: jest.fn(),
+    };
+    const scheduledCallbacks: (() => void)[] = [];
+
+    jest.doMock("node:perf_hooks", () => ({
+      monitorEventLoopDelay: jest.fn(() => monitorMock),
+    }));
+
+    jest.doMock("node:timers", () => ({
+      setInterval: jest.fn((callback: () => void) => {
+        scheduledCallbacks.push(callback);
+        return { unref: jest.fn(), ref: jest.fn() } as unknown as NodeJS.Timeout;
+      }),
+      clearInterval: jest.fn(),
+    }));
+
+    jest.doMock("../metrics.js", () => ({
+      createGauge: () => ({ set: setSpy }),
+      createHistogram: () => ({ observe: observeSpy }),
+      isMetricsCollectionEnabled: jest.fn(() => false),
+    }));
+
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const perf = await import("../performance.js");
+      perf.startPerformanceMonitoring();
+      scheduledCallbacks.forEach((callback) => {
+        callback();
+      });
+      expect(observeSpy).not.toHaveBeenCalled();
+      expect(setSpy).not.toHaveBeenCalled();
+      perf.stopPerformanceMonitoring();
+    });
+
+    jest.dontMock("node:perf_hooks");
+    jest.dontMock("node:timers");
+    jest.dontMock("../metrics.js");
+  });
 });

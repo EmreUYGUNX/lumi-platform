@@ -88,4 +88,67 @@ describe("metrics", () => {
       expect(metrics.isMetricsCollectionEnabled()).toBe(false);
     });
   });
+
+  it("skips async timers when metrics disabled", async () => {
+    await withTemporaryEnvironment({ ...BASE_ENV, METRICS_ENABLED: "false" }, async () => {
+      const metrics = await import("../metrics.js");
+      const histogram = {
+        startTimer: jest.fn(() => jest.fn()),
+      } as unknown as Parameters<typeof metrics.trackDurationAsync>[0];
+      const result = await metrics.trackDurationAsync(histogram, undefined, async () => "ok");
+      expect(result).toBe("ok");
+      expect(histogram.startTimer).not.toHaveBeenCalled();
+    });
+  });
+
+  it("stops async timers when the wrapped operation throws", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const end = jest.fn();
+      const histogram = {
+        startTimer: jest.fn(() => end),
+      } as unknown as Parameters<typeof metrics.trackDurationAsync>[0];
+      await expect(
+        metrics.trackDurationAsync(histogram, undefined, async () => {
+          throw new Error("failure");
+        }),
+      ).rejects.toThrow("failure");
+      expect(end).toHaveBeenCalled();
+    });
+  });
+
+  it("reuses existing counter instances when requesting the same metric", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const first = metrics.createCounter({ name: "duplicate_counter", help: "Dup" });
+      const second = metrics.createCounter({ name: "duplicate_counter", help: "Dup" });
+      expect(second).toBe(first);
+    });
+  });
+
+  it("records async durations when metrics are enabled", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const end = jest.fn();
+      const histogram = {
+        startTimer: jest.fn(() => end),
+      } as unknown as Parameters<typeof metrics.trackDurationAsync>[0];
+      const result = await metrics.trackDurationAsync(histogram, undefined, async () => "value");
+      expect(result).toBe("value");
+      expect(end).toHaveBeenCalled();
+    });
+  });
+
+  it("records uptime gauge immediately when requested", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const gauge = metrics.metricsRegistry.getSingleMetric("lumi_uptime_seconds") as unknown as {
+        set: (value: number) => void;
+      };
+      const setSpy = jest.spyOn(gauge, "set");
+      metrics.recordUptimeNow();
+      expect(setSpy).toHaveBeenCalled();
+      setSpy.mockRestore();
+    });
+  });
 });

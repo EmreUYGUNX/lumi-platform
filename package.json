@@ -104,7 +104,11 @@
   "pnpm": {
     "overrides": {
       "eslint": "^8.57.0",
-      "typescript": "~5.5.4"
+      "typescript": "~5.5.4",
+      "@opentelemetry/api-logs": "0.57.2",
+      "@opentelemetry/instrumentation": "0.57.2",
+      "@opentelemetry/semantic-conventions": "1.37.0",
+      "@types/pg": "8.15.5"
     },
     "packageExtensions": {
       "react-dom@*": {

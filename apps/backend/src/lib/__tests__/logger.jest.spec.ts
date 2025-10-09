@@ -39,6 +39,10 @@ class MemoryTransport extends TransportStream {
     this.logs.push(info as Record<string, unknown>);
     next();
   }
+
+  override close() {
+    return this;
+  }
 }
 
 const loadLoggerModule = async () => import("../logger.js");
@@ -168,6 +172,91 @@ describe("logger", () => {
 
       logger.info("second");
       expect(transport.logs).toHaveLength(1);
+    });
+  });
+
+  it("merges contextual data when augmenting active request scope", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { mergeRequestContext, withRequestContext, getRequestContext } =
+        await loadLoggerModule();
+      withRequestContext({ requestId: "req-456" }, () => {
+        mergeRequestContext({ correlationId: "corr-9" });
+        expect(getRequestContext()).toMatchObject({
+          requestId: "req-456",
+          correlationId: "corr-9",
+        });
+      });
+    });
+  });
+
+  it("handles malformed structured log payloads gracefully", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { extractStructuredLog } = await loadLoggerModule();
+      expect(extractStructuredLog({})).toBeUndefined();
+      const payload = { [Symbol.for("message")]: "not-json" } as Record<string, unknown>;
+      expect(extractStructuredLog(payload)).toBeUndefined();
+    });
+  });
+
+  it("closes existing transports when re-registering with same name", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { registerLogTransport, unregisterLogTransport, listRegisteredTransports } =
+        await loadLoggerModule();
+      const first = new MemoryTransport();
+      const closeSpy = jest.spyOn(first, "close");
+      registerLogTransport("duplicate", first);
+      expect(listRegisteredTransports()).toContain("duplicate");
+
+      const replacement = new MemoryTransport();
+      registerLogTransport("duplicate", replacement);
+      expect(closeSpy).toHaveBeenCalled();
+      unregisterLogTransport("duplicate");
+    });
+  });
+
+  it("creates log directories when disk logging is enabled", async () => {
+    const existsSpy = jest.fn().mockReturnValue(false);
+    const mkdirSpy = jest.fn().mockReturnValue("tmp-observability-logs");
+    jest.doMock("node:fs", () => ({
+      existsSync: existsSpy,
+      mkdirSync: mkdirSpy,
+    }));
+
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        NODE_ENV: "development",
+        CI: "false",
+        LOG_ENABLE_CONSOLE: "false",
+        LOG_DIRECTORY: "tmp-observability-logs",
+      },
+      async () => {
+        await loadLoggerModule();
+        const { reloadConfiguration } = await loadConfigModule();
+        reloadConfiguration("disk-test");
+        expect(existsSpy).toHaveBeenCalled();
+        expect(mkdirSpy).toHaveBeenCalled();
+      },
+    );
+
+    jest.dontMock("node:fs");
+  });
+
+  it("serialises unexpected error payloads gracefully", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { logError, logger } = await loadLoggerModule();
+      const errorSpy = jest.spyOn(logger, "error");
+      const circular: Record<string, unknown> = {};
+      circular.self = circular;
+      logError(circular, "circular-error", { scope: "test" });
+      expect(errorSpy).toHaveBeenCalledWith(
+        "circular-error",
+        expect.objectContaining({
+          scope: "test",
+          error: { message: "[unserializable-error-object]" },
+        }),
+      );
+      errorSpy.mockRestore();
     });
   });
 });
