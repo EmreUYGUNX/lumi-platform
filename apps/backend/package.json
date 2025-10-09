@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "start": "NODE_ENV=production node --enable-source-maps dist/index.js",
-    "build": "pnpm --filter @lumi/types build && tsc --build tsconfig.build.json",
+    "build": "pnpm --filter @lumi/types build && pnpm --filter @lumi/shared build && tsc --build tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",
