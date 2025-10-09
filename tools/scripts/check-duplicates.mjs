@@ -23,6 +23,7 @@ const allowedPatterns = [
   /^color-name$/,
   /^ci-info$/,
   /^cssom$/,
+  /^commander$/,
   /^debug$/,
   /^doctrine$/,
   /^dom-accessibility-api$/,
@@ -87,6 +88,7 @@ const allowedPatterns = [
   /^type-fest$/,
   /^type-detect$/,
   /^wrap-ansi$/,
+  /^ws$/,
   /^unicorn-magic$/,
   /^yocto-queue$/,
 ];
