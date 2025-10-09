@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2025-10-09T22:47:16.911Z",
+  "turboVersion": "2.5.8",
+  "runId": "33qgV7mglIJIOtcb8YG3OS4j5Ho",
+  "success": true,
+  "durationMs": 620,
+  "attemptedTasks": 7,
+  "cachedTasks": 7,
+  "failedTasks": 0,
+  "tasks": [
+    {
+      "taskId": "@lumi/backend#build",
+      "package": "@lumi/backend",
+      "command": "pnpm --filter @lumi/types build && pnpm --filter @lumi/shared build && tsc --build tsconfig.build.json",
+      "durationMs": 6,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/frontend#build",
+      "package": "@lumi/frontend",
+      "command": "next build",
+      "durationMs": 169,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/mobile#build",
+      "package": "@lumi/mobile",
+      "command": "echo \"Mobile build pending\"",
+      "durationMs": 1,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/shared#build",
+      "package": "@lumi/shared",
+      "command": "pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
+      "durationMs": 1,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/testing#build",
+      "package": "@lumi/testing",
+      "command": "tsc --project tsconfig.build.json",
+      "durationMs": 2,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/types#build",
+      "package": "@lumi/types",
+      "command": "tsc --project tsconfig.build.json",
+      "durationMs": 1,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    },
+    {
+      "taskId": "@lumi/ui#build",
+      "package": "@lumi/ui",
+      "command": "tsc --project tsconfig.build.json",
+      "durationMs": 1,
+      "cacheStatus": "HIT",
+      "exitCode": 0
+    }
+  ]
+}

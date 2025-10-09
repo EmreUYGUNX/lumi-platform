@@ -56,3 +56,4 @@ storybook-static/
 # Temporary
 *.tmp
 *.swp
+*.Zone.Identifier

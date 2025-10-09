@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2025-10-09T22:47:18.346Z",
+  "turboVersion": "2.5.8",
+  "totalPackages": 7,
+  "totalTasks": 14,
+  "persistentTasks": 7,
+  "cache": {
+    "hits": 7,
+    "misses": 7
+  },
+  "packages": [
+    {
+      "package": "@lumi/backend",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 7
+    },
+    {
+      "package": "@lumi/frontend",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 9
+    },
+    {
+      "package": "@lumi/mobile",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 5
+    },
+    {
+      "package": "@lumi/shared",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 5
+    },
+    {
+      "package": "@lumi/testing",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 1
+    },
+    {
+      "package": "@lumi/types",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 1
+    },
+    {
+      "package": "@lumi/ui",
+      "taskCount": 2,
+      "persistentTasks": 1,
+      "dependencyCount": 7
+    }
+  ]
+}
