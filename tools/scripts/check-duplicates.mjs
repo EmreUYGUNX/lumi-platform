@@ -70,6 +70,7 @@ const allowedPatterns = [
   /^postcss$/,
   /^pretty-format$/,
   /^pluralize$/,
+  /^read-pkg-up$/,
   /^react-is$/,
   /^read-pkg$/,
   /^resolve$/,
