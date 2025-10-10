@@ -4,6 +4,8 @@ node_modules/
 .pnpm/
 .jest-cache/
 **/tmp-observability-logs/
+backups/
+profiles/
 
 # Build outputs
 apps/**/dist/

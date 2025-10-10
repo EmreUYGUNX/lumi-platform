@@ -16,6 +16,7 @@ module.exports = {
       "./apps/*/tsconfig.json",
       "./packages/*/tsconfig.json",
       "./packages/*/tsconfig.eslint.json",
+      "./tools/tsconfig.json",
     ],
     tsconfigRootDir: __dirname,
   },
@@ -27,6 +28,7 @@ module.exports = {
           "./apps/*/tsconfig.json",
           "./packages/*/tsconfig.json",
           "./packages/*/tsconfig.eslint.json",
+          "./tools/tsconfig.json",
         ],
       },
       node: {
