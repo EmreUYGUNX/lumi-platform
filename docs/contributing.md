@@ -27,6 +27,7 @@ This document outlines the expectations for contributing to the Lumi commerce pl
 ## 3. Commit Standards
 
 - Conventional commit format (e.g., `feat(api): add inventory endpoints`).
+- Use the template in [`docs/templates/commit-template.md`](templates/commit-template.md) for `git commit --template` configuration.
 - Keep commits cohesive and reviewable (< 200 LOC when possible).
 - Do not bypass hooks (`--no-verify`) without approval from the Engineering Manager.
 
@@ -61,6 +62,7 @@ This document outlines the expectations for contributing to the Lumi commerce pl
 - Release branches follow `release/<version>` and are cut by the Release Manager.
 - Releases require sign-off from Engineering, QA, DevOps, and Product (see `PHASE-0-FOUNDATION-SETUP.md`).
 - Tag releases using semantic versioning.
+- Generate or update the project changelog with `pnpm changelog:generate` before release sign-off.
 
 ## 9. Support
 

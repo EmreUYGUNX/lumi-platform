@@ -1,4 +1,4 @@
-/* eslint-disable security/detect-object-injection, sonarjs/no-nested-template-literals */
+/* eslint-disable security/detect-object-injection, sonarjs/no-nested-template-literals, unicorn/prefer-top-level-await */
 import { error, formatDuration, heading, info, parseFlags, runCommand, success } from "./utils";
 
 interface Task {
@@ -106,12 +106,14 @@ async function verify(): Promise<void> {
   success("All verification tasks completed successfully.");
 }
 
-try {
-  await verify();
-} catch (error_) {
-  error(`Verification script crashed: ${(error_ as Error).stack ?? (error_ as Error).message}`);
-  process.exitCode = 1;
-}
+(async () => {
+  try {
+    await verify();
+  } catch (error_) {
+    error(`Verification script crashed: ${(error_ as Error).stack ?? (error_ as Error).message}`);
+    process.exitCode = 1;
+  }
+})();
 
 async function executeTasksSequentially(
   taskList: Task[],
