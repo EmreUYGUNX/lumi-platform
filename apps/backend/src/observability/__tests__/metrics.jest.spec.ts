@@ -151,4 +151,57 @@ describe("metrics", () => {
       setSpy.mockRestore();
     });
   });
+
+  it("does not double prefix metric names that already contain the prefix", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const gauge = metrics.createGauge({
+        name: "lumi_existing_metric",
+        help: "Prefixed gauge",
+      });
+      // @ts-expect-error Gauge exposes its name at runtime.
+      expect(gauge.name).toBe("lumi_existing_metric");
+    });
+  });
+
+  it("invokes collectDefaultMetrics when enabled in configuration", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_COLLECT_DEFAULT: "true",
+      },
+      async () => {
+        jest.resetModules();
+        const metrics = await import("../metrics.js");
+        expect(metrics.isMetricsCollectionEnabled()).toBe(true);
+        expect(metrics.metricsInternals.isDefaultCollectorActive()).toBe(true);
+
+        const snapshot = await metrics.getMetricsSnapshot();
+        expect(snapshot).toContain("process_cpu_user_seconds_total");
+
+        metrics.metricsInternals.resetForTest();
+      },
+    );
+  });
+
+  it("skips synchronous timers when metrics are disabled", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_ENABLED: "false",
+      },
+      async () => {
+        const metrics = await import("../metrics.js");
+        const end = jest.fn();
+        const histogram = {
+          startTimer: jest.fn(() => end),
+        } as unknown as Parameters<typeof metrics.trackDuration>[0];
+
+        metrics.trackDuration(histogram, undefined, () => {});
+
+        expect(histogram.startTimer).not.toHaveBeenCalled();
+        expect(end).not.toHaveBeenCalled();
+      },
+    );
+  });
 });

@@ -21,6 +21,7 @@
   "dependencies": {
     "@lumi/shared": "workspace:*",
     "@lumi/types": "workspace:*",
+    "express": "^4.19.2",
     "dotenv": "^16.4.5",
     "dotenv-expand": "^11.0.6",
     "rate-limiter-flexible": "^3.0.5",
@@ -35,6 +36,7 @@
     "@lumi/testing": "workspace:*",
     "@jest/globals": "^29.7.0",
     "@types/node": "^20.12.7",
+    "@types/express": "^4.17.21",
     "vitest": "^1.5.0"
   }
 }

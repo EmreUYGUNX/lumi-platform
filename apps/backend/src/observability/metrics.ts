@@ -211,3 +211,14 @@ uptimeInterval.unref?.();
 export const recordUptimeNow = () => {
   updateUptimeMetric();
 };
+
+export const metricsInternals = {
+  resetForTest: () => {
+    defaultMetricsRegistered = false;
+    metricsEnabled = false;
+    metricsPrefix = "";
+    METRIC_REGISTRY.clear();
+    registry.clear();
+  },
+  isDefaultCollectorActive: () => defaultMetricsRegistered,
+};

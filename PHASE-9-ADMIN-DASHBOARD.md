@@ -12,6 +12,7 @@
 This phase implements a comprehensive admin dashboard with real-time analytics, product/order/user management, and advanced reporting capabilities. The dashboard provides complete administrative control over the e-commerce platform with role-based access control, data visualization, and operational tools.
 
 **Key Components**:
+
 - Real-time analytics dashboard with sales metrics, visitor tracking, and conversion rates
 - Product management with CRUD operations, bulk actions, inventory tracking
 - Order management with status tracking, fulfillment workflow, shipping integration
@@ -20,6 +21,7 @@ This phase implements a comprehensive admin dashboard with real-time analytics, 
 - System monitoring with performance metrics, error tracking, audit logs
 
 **Technical Stack**:
+
 - Next.js 14 App Router (admin interface)
 - TanStack Query + Zustand (state management)
 - Recharts + Chart.js (data visualization)
@@ -30,18 +32,21 @@ This phase implements a comprehensive admin dashboard with real-time analytics, 
 - Express.js APIs (backend)
 
 **Security Standards**:
+
 - **S3**: All admin routes protected with RBAC (admin, manager roles only)
 - **S2**: Input sanitization on all forms
 - **S4**: API keys and credentials in environment variables only
 - **Q1**: TypeScript strict mode, 0 errors
 
 **Performance Standards**:
+
 - **P1**: Database queries optimized with indexes, pagination, caching
 - **P2**: Dashboard loads in <2.5s, charts render in <800ms
 - Dashboard bundle <220KB gzipped
 - Real-time updates via Server-Sent Events (SSE) or polling
 
 **Quality Standards**:
+
 - **Q2**: All API responses follow standard format `{success, data|error, meta}`
 - **Q3**: Timestamps consistent across dashboard
 - ≥85% backend test coverage
@@ -52,6 +57,7 @@ This phase implements a comprehensive admin dashboard with real-time analytics, 
 ## 🎯 PHASE OBJECTIVES
 
 ### Primary Goals
+
 1. **Admin Dashboard Foundation**: Create secure, role-protected admin interface with navigation, layout, authentication guard
 2. **Analytics & Reporting**: Implement real-time sales analytics, visitor tracking, conversion metrics, revenue reports
 3. **Product Management**: Build comprehensive product CRUD interface with bulk operations, image upload, inventory management
@@ -61,6 +67,7 @@ This phase implements a comprehensive admin dashboard with real-time analytics, 
 7. **System Monitoring**: Add performance metrics, error tracking, audit logs for admin actions
 
 ### Success Criteria
+
 - [ ] Admin dashboard accessible only to authenticated admin/manager users (S3)
 - [ ] Real-time analytics display sales, orders, revenue with <500ms update latency
 - [ ] Product management supports CRUD operations with Cloudinary image integration
@@ -78,6 +85,7 @@ This phase implements a comprehensive admin dashboard with real-time analytics, 
 ### Security Requirements (MANDATORY)
 
 **S3: RBAC Protection**
+
 ```typescript
 // ❌ WRONG: No role check
 export default function AdminDashboard() {
@@ -113,6 +121,7 @@ export default async function AdminLayout({ children }) {
 ```
 
 **S2: Input Sanitization**
+
 ```typescript
 // ❌ WRONG: No validation
 const updateProduct = async (data: any) => {
@@ -146,9 +155,10 @@ const updateProduct = async (req: Request, res: Response) => {
 ```
 
 **S4: No Hardcoded Secrets**
+
 ```typescript
 // ❌ WRONG: Hardcoded credentials
-const ADMIN_API_KEY = "sk_live_abc123";
+const ADMIN_API_KEY = "hardcoded-admin-key";
 
 // ✅ CORRECT: Environment variables
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
@@ -158,6 +168,7 @@ if (!ADMIN_API_KEY) throw new Error("ADMIN_API_KEY not configured");
 ### Performance Requirements (MANDATORY)
 
 **P1: Query Optimization**
+
 ```typescript
 // ❌ WRONG: N+1 query, no pagination
 const orders = await prisma.order.findMany();
@@ -187,23 +198,24 @@ await redis.set(cacheKey, JSON.stringify(analytics), 'EX', 300); // 5min cache
 ```
 
 **P2: Dashboard Performance**
+
 ```typescript
 // ✅ CORRECT: Code splitting, lazy loading
-const ProductManagement = lazy(() => import('./ProductManagement'));
-const OrderManagement = lazy(() => import('./OrderManagement'));
-const Analytics = lazy(() => import('./Analytics'));
+const ProductManagement = lazy(() => import("./ProductManagement"));
+const OrderManagement = lazy(() => import("./OrderManagement"));
+const Analytics = lazy(() => import("./Analytics"));
 
 // Prefetch critical data
 export async function getServerSideProps() {
   const queryClient = new QueryClient();
 
-  await queryClient.prefetchQuery(['dashboard-stats'], fetchDashboardStats);
-  await queryClient.prefetchQuery(['recent-orders'], () => fetchRecentOrders(1, 5));
+  await queryClient.prefetchQuery(["dashboard-stats"], fetchDashboardStats);
+  await queryClient.prefetchQuery(["recent-orders"], () => fetchRecentOrders(1, 5));
 
   return {
     props: {
-      dehydratedState: dehydrate(queryClient)
-    }
+      dehydratedState: dehydrate(queryClient),
+    },
   };
 }
 ```
@@ -211,6 +223,7 @@ export async function getServerSideProps() {
 ### Quality Requirements (MANDATORY)
 
 **Q2: Standard API Format**
+
 ```typescript
 // ❌ WRONG: Inconsistent format
 res.json({ orders: data });
@@ -220,7 +233,7 @@ res.json({
   success: true,
   data: {
     orders: data,
-    summary: { total: 156, pending: 23, shipped: 102, delivered: 31 }
+    summary: { total: 156, pending: 23, shipped: 102, delivered: 31 },
   },
   meta: {
     timestamp: new Date().toISOString(),
@@ -229,9 +242,9 @@ res.json({
       page: 1,
       perPage: 20,
       total: 156,
-      totalPages: 8
-    }
-  }
+      totalPages: 8,
+    },
+  },
 });
 ```
 
@@ -240,6 +253,7 @@ res.json({
 ## 🏗️ ARCHITECTURE OVERVIEW
 
 ### Directory Structure
+
 ```
 lumi-platform/
 ├── packages/
@@ -328,6 +342,7 @@ lumi-platform/
 ### Data Flow Architecture
 
 **Admin Dashboard Analytics**:
+
 ```
 User Request → Next.js Admin Page (SSR) → TanStack Query
                                               ↓
@@ -341,6 +356,7 @@ Response → Q2 Format → Frontend Charts (Recharts)
 ```
 
 **Product Management Flow**:
+
 ```
 Admin Form → React Hook Form + Zod Validation
                 ↓
@@ -356,6 +372,7 @@ Optimistic UI Update → Success Toast
 ```
 
 **Real-time Order Updates**:
+
 ```
 Order Status Change → Backend API → Database Update
                                          ↓
@@ -373,6 +390,7 @@ Order Status Change → Backend API → Database Update
 ### 1. Backend: Admin Analytics API (26 items)
 
 #### 1.1 Analytics Service (12 items)
+
 - [ ] Create `src/services/analytics.service.ts` with analytics calculations
 - [ ] Implement `calculateDashboardStats()`: total sales, orders, revenue, users
 - [ ] Implement `getSalesAnalytics(period, startDate, endDate)`: daily/weekly/monthly sales
@@ -387,6 +405,7 @@ Order Status Change → Backend API → Database Update
 - [ ] Add error handling for invalid date ranges
 
 #### 1.2 Analytics Routes (8 items)
+
 - [ ] Create `src/routes/admin/analytics.routes.ts`
 - [ ] Add `GET /api/admin/analytics/dashboard`: overall stats for dashboard home
 - [ ] Add `GET /api/admin/analytics/sales?period=7d&start=&end=`: sales trends
@@ -397,6 +416,7 @@ Order Status Change → Backend API → Database Update
 - [ ] Add `GET /api/admin/analytics/conversion`: conversion funnel metrics
 
 #### 1.3 Validation & Security (6 items)
+
 - [ ] Add admin middleware to all analytics routes (S3)
 - [ ] Validate date range parameters with Zod schemas
 - [ ] Add rate limiting: 100 req/15min per admin user
@@ -405,6 +425,7 @@ Order Status Change → Backend API → Database Update
 - [ ] Add audit logging for analytics access
 
 **Example**:
+
 ```typescript
 // src/services/analytics.service.ts
 import prisma from '../config/database';
@@ -530,6 +551,7 @@ export default router;
 ### 2. Backend: Product Management API (28 items)
 
 #### 2.1 Product CRUD Routes (12 items)
+
 - [ ] Create `src/routes/admin/products.routes.ts`
 - [ ] Add `GET /api/admin/products?page=1&perPage=20&search=&category=&status=`: paginated list
 - [ ] Add `GET /api/admin/products/:id`: single product detail
@@ -544,6 +566,7 @@ export default router;
 - [ ] Add `DELETE /api/admin/products/:id/images/:imageId`: remove image
 
 #### 2.2 Inventory Management (8 items)
+
 - [ ] Add `GET /api/admin/inventory`: inventory summary
 - [ ] Add `PUT /api/admin/products/:id/stock`: update stock quantity
 - [ ] Add `POST /api/admin/products/:id/stock/history`: stock movement log
@@ -554,6 +577,7 @@ export default router;
 - [ ] Add inventory audit log
 
 #### 2.3 Validation & Security (8 items)
+
 - [ ] Add admin middleware to all product routes (S3)
 - [ ] Create ProductCreateSchema with Zod validation (S2)
 - [ ] Create ProductUpdateSchema with Zod validation (S2)
@@ -564,20 +588,29 @@ export default router;
 - [ ] Return Q2 standard format for all responses
 
 **Example**:
+
 ```typescript
 // src/routes/admin/products.routes.ts
-import { Router } from 'express';
-import { z } from 'zod';
-import validator from 'validator';
-import prisma from '../../config/database';
-import { adminMiddleware } from '../../middleware/admin.middleware';
-import { auditLog } from '../../services/audit.service';
+import { Router } from "express";
+import validator from "validator";
+import { z } from "zod";
+
+import prisma from "../../config/database";
+import { adminMiddleware } from "../../middleware/admin.middleware";
+import { auditLog } from "../../services/audit.service";
 
 const router = Router();
 
 const ProductCreateSchema = z.object({
-  name: z.string().min(3).max(255).transform(str => validator.escape(str)),
-  description: z.string().max(5000).transform(str => validator.escape(str)),
+  name: z
+    .string()
+    .min(3)
+    .max(255)
+    .transform((str) => validator.escape(str)),
+  description: z
+    .string()
+    .max(5000)
+    .transform((str) => validator.escape(str)),
   price: z.number().positive().max(999999.99),
   compareAtPrice: z.number().positive().max(999999.99).optional(),
   cost: z.number().nonnegative().max(999999.99).optional(),
@@ -585,26 +618,35 @@ const ProductCreateSchema = z.object({
   sku: z.string().max(100).optional(),
   categoryId: z.string().cuid(),
   tags: z.array(z.string().max(50)).max(20).default([]),
-  images: z.array(z.object({
-    url: z.string().url(),
-    publicId: z.string(),
-    width: z.number().positive(),
-    height: z.number().positive(),
-    format: z.string()
-  })).min(1).max(10),
-  variants: z.array(z.object({
-    name: z.string().max(100),
-    value: z.string().max(100),
-    priceAdjustment: z.number().default(0),
-    stockAdjustment: z.number().int().default(0)
-  })).optional(),
+  images: z
+    .array(
+      z.object({
+        url: z.string().url(),
+        publicId: z.string(),
+        width: z.number().positive(),
+        height: z.number().positive(),
+        format: z.string(),
+      }),
+    )
+    .min(1)
+    .max(10),
+  variants: z
+    .array(
+      z.object({
+        name: z.string().max(100),
+        value: z.string().max(100),
+        priceAdjustment: z.number().default(0),
+        stockAdjustment: z.number().int().default(0),
+      }),
+    )
+    .optional(),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
   metaTitle: z.string().max(60).optional(),
-  metaDescription: z.string().max(160).optional()
+  metaDescription: z.string().max(160).optional(),
 });
 
-router.get('/', adminMiddleware, async (req, res) => {
+router.get("/", adminMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const perPage = parseInt(req.query.perPage as string) || 20;
   const search = req.query.search as string;
@@ -614,27 +656,27 @@ router.get('/', adminMiddleware, async (req, res) => {
   const where: any = {};
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { sku: { contains: search, mode: 'insensitive' } }
+      { name: { contains: search, mode: "insensitive" } },
+      { sku: { contains: search, mode: "insensitive" } },
     ];
   }
   if (categoryId) where.categoryId = categoryId;
-  if (status === 'active') where.isActive = true;
-  if (status === 'inactive') where.isActive = false;
-  if (status === 'low-stock') where.stock = { lte: 10 };
+  if (status === "active") where.isActive = true;
+  if (status === "inactive") where.isActive = false;
+  if (status === "low-stock") where.stock = { lte: 10 };
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
       include: {
         category: { select: { name: true } },
-        _count: { select: { orderItems: true, reviews: true } }
+        _count: { select: { orderItems: true, reviews: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * perPage,
-      take: perPage
+      take: perPage,
     }),
-    prisma.product.count({ where })
+    prisma.product.count({ where }),
   ]);
 
   res.json({
@@ -647,47 +689,47 @@ router.get('/', adminMiddleware, async (req, res) => {
         page,
         perPage,
         total,
-        totalPages: Math.ceil(total / perPage)
-      }
-    }
+        totalPages: Math.ceil(total / perPage),
+      },
+    },
   });
 });
 
-router.post('/', adminMiddleware, async (req, res) => {
+router.post("/", adminMiddleware, async (req, res) => {
   const validated = ProductCreateSchema.parse(req.body);
 
   const product = await prisma.product.create({
     data: {
       ...validated,
       images: { create: validated.images },
-      variants: validated.variants ? { create: validated.variants } : undefined
+      variants: validated.variants ? { create: validated.variants } : undefined,
     },
-    include: { category: true, images: true, variants: true }
+    include: { category: true, images: true, variants: true },
   });
 
-  await auditLog('product.create', req.user.id, { productId: product.id });
+  await auditLog("product.create", req.user.id, { productId: product.id });
 
   res.status(201).json({
     success: true,
     data: { product },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
-router.post('/bulk-delete', adminMiddleware, async (req, res) => {
+router.post("/bulk-delete", adminMiddleware, async (req, res) => {
   const { ids } = z.object({ ids: z.array(z.string().cuid()).min(1) }).parse(req.body);
 
   const result = await prisma.product.updateMany({
     where: { id: { in: ids } },
-    data: { isActive: false, deletedAt: new Date() }
+    data: { isActive: false, deletedAt: new Date() },
   });
 
-  await auditLog('product.bulk-delete', req.user.id, { count: result.count, ids });
+  await auditLog("product.bulk-delete", req.user.id, { count: result.count, ids });
 
   res.json({
     success: true,
     data: { deletedCount: result.count },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
@@ -699,6 +741,7 @@ export default router;
 ### 3. Backend: Order Management API (32 items)
 
 #### 3.1 Order List & Detail Routes (10 items)
+
 - [ ] Create `src/routes/admin/orders.routes.ts`
 - [ ] Add `GET /api/admin/orders?page=1&perPage=20&status=&search=&dateFrom=&dateTo=`: paginated list
 - [ ] Add `GET /api/admin/orders/:id`: single order detail with items, user, shipping
@@ -711,6 +754,7 @@ export default router;
 - [ ] Add Q2 format with pagination metadata
 
 #### 3.2 Order Status Management (12 items)
+
 - [ ] Add `PUT /api/admin/orders/:id/status`: update order status
 - [ ] Implement status workflow: pending → confirmed → processing → shipped → delivered
 - [ ] Add `POST /api/admin/orders/:id/cancel`: cancel order with reason
@@ -725,6 +769,7 @@ export default router;
 - [ ] Add order export to CSV
 
 #### 3.3 Order Analytics (10 items)
+
 - [ ] Add `GET /api/admin/orders/stats`: order statistics (total, pending, shipped, etc.)
 - [ ] Add `GET /api/admin/orders/recent`: recent orders for dashboard
 - [ ] Calculate average order value (AOV)
@@ -737,29 +782,31 @@ export default router;
 - [ ] Return Q2 standard format for all responses
 
 **Example**:
+
 ```typescript
 // src/routes/admin/orders.routes.ts
-import { Router } from 'express';
-import { z } from 'zod';
-import prisma from '../../config/database';
-import { adminMiddleware } from '../../middleware/admin.middleware';
-import { auditLog } from '../../services/audit.service';
-import { sendOrderStatusEmail } from '../../services/email.service';
+import { Router } from "express";
+import { z } from "zod";
+
+import prisma from "../../config/database";
+import { adminMiddleware } from "../../middleware/admin.middleware";
+import { auditLog } from "../../services/audit.service";
+import { sendOrderStatusEmail } from "../../services/email.service";
 
 const router = Router();
 
 const OrderStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']),
-  notes: z.string().max(500).optional()
+  status: z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]),
+  notes: z.string().max(500).optional(),
 });
 
 const OrderShippingSchema = z.object({
   trackingNumber: z.string().max(100),
   carrier: z.string().max(100),
-  estimatedDelivery: z.string().datetime().optional()
+  estimatedDelivery: z.string().datetime().optional(),
 });
 
-router.get('/', adminMiddleware, async (req, res) => {
+router.get("/", adminMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const perPage = parseInt(req.query.perPage as string) || 20;
   const status = req.query.status as string;
@@ -771,9 +818,9 @@ router.get('/', adminMiddleware, async (req, res) => {
   if (status) where.status = status;
   if (search) {
     where.OR = [
-      { orderNumber: { contains: search, mode: 'insensitive' } },
-      { user: { name: { contains: search, mode: 'insensitive' } } },
-      { user: { email: { contains: search, mode: 'insensitive' } } }
+      { orderNumber: { contains: search, mode: "insensitive" } },
+      { user: { name: { contains: search, mode: "insensitive" } } },
+      { user: { email: { contains: search, mode: "insensitive" } } },
     ];
   }
   if (dateFrom || dateTo) {
@@ -789,16 +836,16 @@ router.get('/', adminMiddleware, async (req, res) => {
         user: { select: { name: true, email: true } },
         items: {
           include: {
-            product: { select: { name: true, images: true } }
-          }
+            product: { select: { name: true, images: true } },
+          },
         },
-        _count: { select: { items: true } }
+        _count: { select: { items: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * perPage,
-      take: perPage
+      take: perPage,
     }),
-    prisma.order.count({ where })
+    prisma.order.count({ where }),
   ]);
 
   res.json({
@@ -807,12 +854,12 @@ router.get('/', adminMiddleware, async (req, res) => {
     meta: {
       timestamp: new Date().toISOString(),
       requestId: req.id,
-      pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) }
-    }
+      pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+    },
   });
 });
 
-router.get('/:id', adminMiddleware, async (req, res) => {
+router.get("/:id", adminMiddleware, async (req, res) => {
   const order = await prisma.order.findUnique({
     where: { id: req.params.id },
     include: {
@@ -821,32 +868,32 @@ router.get('/:id', adminMiddleware, async (req, res) => {
           name: true,
           email: true,
           phone: true,
-          _count: { select: { orders: true } }
-        }
+          _count: { select: { orders: true } },
+        },
       },
       items: {
         include: {
-          product: { select: { name: true, images: true, sku: true } }
-        }
+          product: { select: { name: true, images: true, sku: true } },
+        },
       },
       shippingAddress: true,
       billingAddress: true,
-      statusHistory: { orderBy: { createdAt: 'asc' } }
-    }
+      statusHistory: { orderBy: { createdAt: "asc" } },
+    },
   });
 
   if (!order) {
-    return res.status(404).json({ success: false, error: 'Order not found' });
+    return res.status(404).json({ success: false, error: "Order not found" });
   }
 
   res.json({
     success: true,
     data: { order },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
-router.put('/:id/status', adminMiddleware, async (req, res) => {
+router.put("/:id/status", adminMiddleware, async (req, res) => {
   const validated = OrderStatusSchema.parse(req.body);
 
   const order = await prisma.$transaction(async (tx) => {
@@ -854,7 +901,7 @@ router.put('/:id/status', adminMiddleware, async (req, res) => {
     const updated = await tx.order.update({
       where: { id: req.params.id },
       data: { status: validated.status },
-      include: { user: true, items: { include: { product: true } } }
+      include: { user: true, items: { include: { product: true } } },
     });
 
     // Add to status history
@@ -863,16 +910,16 @@ router.put('/:id/status', adminMiddleware, async (req, res) => {
         orderId: updated.id,
         status: validated.status,
         notes: validated.notes,
-        changedBy: req.user.id
-      }
+        changedBy: req.user.id,
+      },
     });
 
     // If cancelled, restore inventory
-    if (validated.status === 'cancelled') {
+    if (validated.status === "cancelled") {
       for (const item of updated.items) {
         await tx.product.update({
           where: { id: item.productId },
-          data: { stock: { increment: item.quantity } }
+          data: { stock: { increment: item.quantity } },
         });
       }
     }
@@ -883,20 +930,20 @@ router.put('/:id/status', adminMiddleware, async (req, res) => {
   // Send email notification
   await sendOrderStatusEmail(order.user.email, order.orderNumber, validated.status);
 
-  await auditLog('order.status-update', req.user.id, {
+  await auditLog("order.status-update", req.user.id, {
     orderId: order.id,
     oldStatus: order.status,
-    newStatus: validated.status
+    newStatus: validated.status,
   });
 
   res.json({
     success: true,
     data: { order },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
-router.put('/:id/shipping', adminMiddleware, async (req, res) => {
+router.put("/:id/shipping", adminMiddleware, async (req, res) => {
   const validated = OrderShippingSchema.parse(req.body);
 
   const order = await prisma.order.update({
@@ -904,23 +951,25 @@ router.put('/:id/shipping', adminMiddleware, async (req, res) => {
     data: {
       trackingNumber: validated.trackingNumber,
       carrier: validated.carrier,
-      estimatedDelivery: validated.estimatedDelivery ? new Date(validated.estimatedDelivery) : undefined,
-      status: 'shipped'
+      estimatedDelivery: validated.estimatedDelivery
+        ? new Date(validated.estimatedDelivery)
+        : undefined,
+      status: "shipped",
     },
-    include: { user: true }
+    include: { user: true },
   });
 
-  await sendOrderStatusEmail(order.user.email, order.orderNumber, 'shipped', {
+  await sendOrderStatusEmail(order.user.email, order.orderNumber, "shipped", {
     trackingNumber: validated.trackingNumber,
-    carrier: validated.carrier
+    carrier: validated.carrier,
   });
 
-  await auditLog('order.shipping-update', req.user.id, { orderId: order.id });
+  await auditLog("order.shipping-update", req.user.id, { orderId: order.id });
 
   res.json({
     success: true,
     data: { order },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
@@ -932,6 +981,7 @@ export default router;
 ### 4. Backend: User Management API (24 items)
 
 #### 4.1 User List & Detail (10 items)
+
 - [ ] Create `src/routes/admin/users.routes.ts`
 - [ ] Add `GET /api/admin/users?page=1&perPage=20&role=&search=&status=`: paginated list
 - [ ] Add `GET /api/admin/users/:id`: single user detail
@@ -944,6 +994,7 @@ export default router;
 - [ ] Add admin middleware (S3) to all routes
 
 #### 4.2 User Role Management (8 items)
+
 - [ ] Add `PUT /api/admin/users/:id/role`: update user role (admin, manager, customer)
 - [ ] Add role change validation: prevent last admin removal
 - [ ] Add `PUT /api/admin/users/:id/status`: activate/deactivate user account
@@ -954,6 +1005,7 @@ export default router;
 - [ ] Add email notification on role change
 
 #### 4.3 User Activity & Analytics (6 items)
+
 - [ ] Add `GET /api/admin/users/:id/orders`: user order history
 - [ ] Add `GET /api/admin/users/:id/activity`: user activity log (logins, changes)
 - [ ] Calculate user lifetime value (LTV)
@@ -962,21 +1014,23 @@ export default router;
 - [ ] Add user export to CSV
 
 **Example**:
+
 ```typescript
 // src/routes/admin/users.routes.ts
-import { Router } from 'express';
-import { z } from 'zod';
-import prisma from '../../config/database';
-import { adminMiddleware } from '../../middleware/admin.middleware';
-import { auditLog } from '../../services/audit.service';
+import { Router } from "express";
+import { z } from "zod";
+
+import prisma from "../../config/database";
+import { adminMiddleware } from "../../middleware/admin.middleware";
+import { auditLog } from "../../services/audit.service";
 
 const router = Router();
 
 const UserRoleSchema = z.object({
-  role: z.enum(['admin', 'manager', 'customer'])
+  role: z.enum(["admin", "manager", "customer"]),
 });
 
-router.get('/', adminMiddleware, async (req, res) => {
+router.get("/", adminMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const perPage = parseInt(req.query.perPage as string) || 20;
   const role = req.query.role as string;
@@ -987,12 +1041,12 @@ router.get('/', adminMiddleware, async (req, res) => {
   if (role) where.role = role;
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } }
+      { name: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
     ];
   }
-  if (status === 'active') where.isActive = true;
-  if (status === 'inactive') where.isActive = false;
+  if (status === "active") where.isActive = true;
+  if (status === "inactive") where.isActive = false;
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -1008,23 +1062,23 @@ router.get('/', adminMiddleware, async (req, res) => {
         _count: { select: { orders: true } },
         orders: {
           select: { total: true },
-          where: { status: { in: ['confirmed', 'shipped', 'delivered'] } }
-        }
+          where: { status: { in: ["confirmed", "shipped", "delivered"] } },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       skip: (page - 1) * perPage,
-      take: perPage
+      take: perPage,
     }),
-    prisma.user.count({ where })
+    prisma.user.count({ where }),
   ]);
 
   // Calculate total spent for each user
-  const usersWithStats = users.map(user => ({
+  const usersWithStats = users.map((user) => ({
     ...user,
     totalSpent: user.orders.reduce((sum, order) => sum + order.total, 0),
     orderCount: user._count.orders,
     orders: undefined,
-    _count: undefined
+    _count: undefined,
   }));
 
   res.json({
@@ -1033,23 +1087,23 @@ router.get('/', adminMiddleware, async (req, res) => {
     meta: {
       timestamp: new Date().toISOString(),
       requestId: req.id,
-      pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) }
-    }
+      pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+    },
   });
 });
 
-router.put('/:id/role', adminMiddleware, async (req, res) => {
+router.put("/:id/role", adminMiddleware, async (req, res) => {
   const validated = UserRoleSchema.parse(req.body);
 
   // Prevent last admin removal
-  if (validated.role !== 'admin') {
-    const adminCount = await prisma.user.count({ where: { role: 'admin' } });
+  if (validated.role !== "admin") {
+    const adminCount = await prisma.user.count({ where: { role: "admin" } });
     if (adminCount === 1) {
       const targetUser = await prisma.user.findUnique({ where: { id: req.params.id } });
-      if (targetUser?.role === 'admin') {
+      if (targetUser?.role === "admin") {
         return res.status(400).json({
           success: false,
-          error: 'Cannot change role of last admin user'
+          error: "Cannot change role of last admin user",
         });
       }
     }
@@ -1058,18 +1112,18 @@ router.put('/:id/role', adminMiddleware, async (req, res) => {
   const user = await prisma.user.update({
     where: { id: req.params.id },
     data: { role: validated.role },
-    select: { id: true, name: true, email: true, role: true }
+    select: { id: true, name: true, email: true, role: true },
   });
 
-  await auditLog('user.role-change', req.user.id, {
+  await auditLog("user.role-change", req.user.id, {
     userId: user.id,
-    newRole: validated.role
+    newRole: validated.role,
   });
 
   res.json({
     success: true,
     data: { user },
-    meta: { timestamp: new Date().toISOString(), requestId: req.id }
+    meta: { timestamp: new Date().toISOString(), requestId: req.id },
   });
 });
 
@@ -1081,6 +1135,7 @@ export default router;
 ### 5. Backend: Reports & Export API (18 items)
 
 #### 5.1 Report Generation (10 items)
+
 - [ ] Create `src/routes/admin/reports.routes.ts`
 - [ ] Create `src/services/reports.service.ts`
 - [ ] Add `GET /api/admin/reports/sales?from=&to=&format=json|csv`: sales report
@@ -1093,6 +1148,7 @@ export default router;
 - [ ] Add date range validation with Zod
 
 #### 5.2 Data Export Utilities (8 items)
+
 - [ ] Create `src/utils/export.utils.ts`
 - [ ] Implement `generateCSV(data, headers)`: CSV generation
 - [ ] Implement `generateExcel(data, headers, sheetName)`: Excel generation
@@ -1103,6 +1159,7 @@ export default router;
 - [ ] Return Q2 standard format with download URL
 
 **Example**:
+
 ```typescript
 // src/utils/export.utils.ts
 import { Parser } from 'json2csv';
@@ -1222,6 +1279,7 @@ export default router;
 ### 6. Backend: Audit Logging & Monitoring (16 items)
 
 #### 6.1 Audit Service (8 items)
+
 - [ ] Create `src/services/audit.service.ts`
 - [ ] Implement `auditLog(action, userId, metadata)`: log admin actions
 - [ ] Create `AuditLog` model in Prisma schema
@@ -1232,6 +1290,7 @@ export default router;
 - [ ] Add audit log export to CSV
 
 #### 6.2 System Monitoring (8 items)
+
 - [ ] Create `src/routes/admin/system.routes.ts`
 - [ ] Add `GET /api/admin/system/health`: system health check
 - [ ] Add `GET /api/admin/system/metrics`: performance metrics (CPU, memory, response time)
@@ -1242,6 +1301,7 @@ export default router;
 - [ ] Add Redis connection metrics
 
 **Example**:
+
 ```typescript
 // prisma/schema.prisma
 model AuditLog {
@@ -1334,6 +1394,7 @@ export default router;
 ### 7. Frontend: Admin Dashboard Shell (32 items)
 
 #### 7.1 Admin Layout & Navigation (14 items)
+
 - [ ] Create `src/app/admin/layout.tsx` with RBAC check
 - [ ] Create `middleware.ts` with admin route protection (S3)
 - [ ] Create `src/components/admin/AdminShell.tsx`: layout wrapper
@@ -1350,6 +1411,7 @@ export default router;
 - [ ] Add loading skeleton for dashboard
 
 #### 7.2 Dashboard Home Page (18 items)
+
 - [ ] Create `src/app/admin/page.tsx`: dashboard home
 - [ ] Create `src/components/admin/DashboardStats.tsx`: key metrics cards
 - [ ] Display total orders, total revenue, total users, total products
@@ -1370,6 +1432,7 @@ export default router;
 - [ ] Prefetch dashboard data on server (SSR)
 
 **Example**:
+
 ```typescript
 // middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
@@ -1558,6 +1621,7 @@ export default function SalesChart({ period = '7d' }: { period?: string }) {
 ### 8. Frontend: Product Management Interface (42 items)
 
 #### 8.1 Product List Page (18 items)
+
 - [ ] Create `src/app/admin/products/page.tsx`
 - [ ] Create `src/components/admin/tables/ProductsTable.tsx`
 - [ ] Display products in table: image, name, SKU, category, price, stock, status
@@ -1578,6 +1642,7 @@ export default function SalesChart({ period = '7d' }: { period?: string }) {
 - [ ] Make table responsive (horizontal scroll on mobile)
 
 #### 8.2 Product Create/Edit Form (24 items)
+
 - [ ] Create `src/app/admin/products/new/page.tsx`: create page
 - [ ] Create `src/app/admin/products/[id]/page.tsx`: edit page
 - [ ] Create `src/components/admin/forms/ProductForm.tsx`
@@ -1604,6 +1669,7 @@ export default function SalesChart({ period = '7d' }: { period?: string }) {
 - [ ] Add unsaved changes warning (beforeunload)
 
 **Example**:
+
 ```typescript
 // src/app/admin/products/page.tsx
 'use client';
@@ -1837,6 +1903,7 @@ export default function ProductForm({ product, onSuccess }: { product?: ProductF
 ### 9. Frontend: Order Management Interface (38 items)
 
 #### 9.1 Order List Page (16 items)
+
 - [ ] Create `src/app/admin/orders/page.tsx`
 - [ ] Create `src/components/admin/tables/OrdersTable.tsx`
 - [ ] Display orders in table: order number, date, customer, status, total, items count
@@ -1855,6 +1922,7 @@ export default function ProductForm({ product, onSuccess }: { product?: ProductF
 - [ ] Add real-time updates (polling every 60s)
 
 #### 9.2 Order Detail Page (22 items)
+
 - [ ] Create `src/app/admin/orders/[id]/page.tsx`
 - [ ] Display order summary: order number, date, status, total
 - [ ] Display customer info: name, email, phone, order history count
@@ -1879,6 +1947,7 @@ export default function ProductForm({ product, onSuccess }: { product?: ProductF
 - [ ] Add breadcrumbs: Orders > Order #12345
 
 **Example**:
+
 ```typescript
 // src/app/admin/orders/[id]/page.tsx
 'use client';
@@ -2071,6 +2140,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 ### 10. Frontend: User Management Interface (26 items)
 
 #### 10.1 User List Page (14 items)
+
 - [ ] Create `src/app/admin/users/page.tsx`
 - [ ] Create `src/components/admin/tables/UsersTable.tsx`
 - [ ] Display users in table: name, email, role, status, orders count, total spent, last login
@@ -2087,6 +2157,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 - [ ] Add export to CSV button
 
 #### 10.2 User Detail Page (12 items)
+
 - [ ] Create `src/app/admin/users/[id]/page.tsx`
 - [ ] Display user info: name, email, phone, role, status, created date, last login
 - [ ] Display user stats: total orders, total spent, average order value
@@ -2101,6 +2172,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 - [ ] Prefetch user data (SSR)
 
 **Example**:
+
 ```typescript
 // src/app/admin/users/page.tsx
 'use client';
@@ -2190,6 +2262,7 @@ export default function UsersPage() {
 ### 11. Frontend: Analytics Dashboard (24 items)
 
 #### 11.1 Analytics Page (14 items)
+
 - [ ] Create `src/app/admin/analytics/page.tsx`
 - [ ] Add date range selector with presets (today, 7d, 30d, 90d, custom)
 - [ ] Create revenue analytics section with line chart
@@ -2206,6 +2279,7 @@ export default function UsersPage() {
 - [ ] Make charts responsive
 
 #### 11.2 Reports Dashboard (10 items)
+
 - [ ] Create `src/app/admin/reports/page.tsx`
 - [ ] Add report type selector: Sales, Products, Customers, Inventory
 - [ ] Add date range selector
@@ -2218,6 +2292,7 @@ export default function UsersPage() {
 - [ ] Add error handling with retry button
 
 **Example**:
+
 ```typescript
 // src/app/admin/analytics/page.tsx
 'use client';
@@ -2279,6 +2354,7 @@ export default function AnalyticsPage() {
 ### 12. Testing & Quality Assurance (36 items)
 
 #### 12.1 Backend API Tests (18 items)
+
 - [ ] Create `tests/admin/analytics.test.ts`: test analytics endpoints
 - [ ] Create `tests/admin/products.test.ts`: test product CRUD, bulk operations
 - [ ] Create `tests/admin/orders.test.ts`: test order list, detail, status updates
@@ -2299,6 +2375,7 @@ export default function AnalyticsPage() {
 - [ ] Achieve ≥85% backend test coverage
 
 #### 12.2 Frontend Component Tests (12 items)
+
 - [ ] Create `src/components/admin/__tests__/DashboardStats.test.tsx`
 - [ ] Create `src/components/admin/__tests__/ProductsTable.test.tsx`
 - [ ] Create `src/components/admin/__tests__/OrdersTable.test.tsx`
@@ -2313,6 +2390,7 @@ export default function AnalyticsPage() {
 - [ ] Achieve ≥80% frontend test coverage
 
 #### 12.3 E2E Admin Tests (6 items)
+
 - [ ] Create `e2e/admin/dashboard.spec.ts`: test dashboard load, stats display
 - [ ] Create `e2e/admin/products.spec.ts`: test product create, edit, delete flow
 - [ ] Create `e2e/admin/orders.spec.ts`: test order list, detail, status update flow
@@ -2325,6 +2403,7 @@ export default function AnalyticsPage() {
 ## 🧪 VALIDATION CRITERIA
 
 ### Security Validation (S3, S2, S4)
+
 ```bash
 # S3: RBAC Protection
 curl -H "Authorization: Bearer <customer_token>" http://localhost:3000/api/admin/analytics/dashboard
@@ -2347,6 +2426,7 @@ grep -r "api_key.*=" packages/backend/src/
 ```
 
 ### Performance Validation (P1, P2)
+
 ```bash
 # P1: Query Optimization
 # Verify queries use indexes, pagination, includes (not N+1)
@@ -2364,6 +2444,7 @@ npm run build
 ```
 
 ### Quality Validation (Q1, Q2)
+
 ```bash
 # Q1: TypeScript Strict Mode
 npx tsc --noEmit
@@ -2375,6 +2456,7 @@ curl http://localhost:3000/api/admin/products | jq '.success, .data, .meta'
 ```
 
 ### Functional Validation
+
 ```typescript
 // Analytics API
 GET /api/admin/analytics/dashboard → 200 OK, returns totalOrders, totalRevenue
@@ -2408,6 +2490,7 @@ GET /api/admin/audit → 200 OK, returns audit logs
 ## 📊 SUCCESS METRICS
 
 ### Performance Metrics
+
 - Dashboard load time <2.5s (P2)
 - Chart render time <800ms (P2)
 - API response time (P50) <200ms, (P95) <500ms (P1)
@@ -2416,6 +2499,7 @@ GET /api/admin/audit → 200 OK, returns audit logs
 - Redis cache hit rate >80% for analytics queries
 
 ### Quality Metrics
+
 - Backend test coverage ≥85%
 - Frontend test coverage ≥80%
 - TypeScript errors: 0 (Q1)
@@ -2424,6 +2508,7 @@ GET /api/admin/audit → 200 OK, returns audit logs
 - Accessibility score (axe) ≥90
 
 ### Security Metrics
+
 - All admin routes protected with S3 RBAC middleware
 - All forms validated with Zod schemas (S2)
 - No hardcoded secrets in codebase (S4)
@@ -2431,6 +2516,7 @@ GET /api/admin/audit → 200 OK, returns audit logs
 - Rate limiting active on all admin endpoints
 
 ### Functional Metrics
+
 - Product CRUD operations: 100% functional
 - Order management: 100% functional
 - User management: 100% functional
@@ -2443,34 +2529,41 @@ GET /api/admin/audit → 200 OK, returns audit logs
 ## 🚨 COMMON PITFALLS TO AVOID
 
 ### Security Anti-Patterns
+
 ❌ **WRONG**: Missing RBAC check on admin routes
+
 ```typescript
 // No middleware protection
-router.get('/api/admin/products', async (req, res) => {
+router.get("/api/admin/products", async (req, res) => {
   // Anyone can access!
 });
 ```
 
 ✅ **CORRECT**: Always use admin middleware
+
 ```typescript
-router.get('/api/admin/products', adminMiddleware, async (req, res) => {
+router.get("/api/admin/products", adminMiddleware, async (req, res) => {
   // Only admin/manager can access
 });
 ```
 
 ❌ **WRONG**: No input validation
+
 ```typescript
 const product = await prisma.product.create({ data: req.body });
 ```
 
 ✅ **CORRECT**: Zod validation + sanitization
+
 ```typescript
 const validated = ProductCreateSchema.parse(req.body);
 const product = await prisma.product.create({ data: validated });
 ```
 
 ### Performance Anti-Patterns
+
 ❌ **WRONG**: N+1 queries
+
 ```typescript
 const orders = await prisma.order.findMany();
 for (const order of orders) {
@@ -2479,19 +2572,22 @@ for (const order of orders) {
 ```
 
 ✅ **CORRECT**: Single query with includes
+
 ```typescript
 const orders = await prisma.order.findMany({
-  include: { items: { include: { product: true } } }
+  include: { items: { include: { product: true } } },
 });
 ```
 
 ❌ **WRONG**: No caching for expensive analytics
+
 ```typescript
 // Recalculates on every request
 const stats = await calculateDashboardStats();
 ```
 
 ✅ **CORRECT**: Redis caching
+
 ```typescript
 const cached = await redis.get('analytics:dashboard:stats');
 if (cached) return JSON.parse(cached);
@@ -2500,28 +2596,34 @@ await redis.set('analytics:dashboard:stats', JSON.stringify(stats), 'EX', 300);
 ```
 
 ### Quality Anti-Patterns
+
 ❌ **WRONG**: Inconsistent API responses
+
 ```typescript
 res.json({ orders: data }); // Missing success, meta
 ```
 
 ✅ **CORRECT**: Q2 standard format
+
 ```typescript
 res.json({
   success: true,
   data: { orders: data },
-  meta: { timestamp, requestId, pagination }
+  meta: { timestamp, requestId, pagination },
 });
 ```
 
 ### Frontend Anti-Patterns
+
 ❌ **WRONG**: No loading/error states
+
 ```typescript
 const { data } = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
 return <div>{data.products.map(...)}</div>; // Breaks if loading or error
 ```
 
 ✅ **CORRECT**: Handle all states
+
 ```typescript
 const { data, isLoading, error } = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
 if (isLoading) return <Skeleton />;
@@ -2534,6 +2636,7 @@ return <div>{data.products.map(...)}</div>;
 ## 📦 DELIVERABLES
 
 ### Backend Deliverables
+
 - [ ] `src/routes/admin/analytics.routes.ts` - Analytics API with Redis caching
 - [ ] `src/routes/admin/products.routes.ts` - Product CRUD + bulk operations
 - [ ] `src/routes/admin/orders.routes.ts` - Order management + status workflow
@@ -2548,6 +2651,7 @@ return <div>{data.products.map(...)}</div>;
 - [ ] `tests/admin/*.test.ts` - Backend API tests (≥85% coverage)
 
 ### Frontend Deliverables
+
 - [ ] `src/app/admin/layout.tsx` - Admin layout with RBAC guard
 - [ ] `src/app/admin/page.tsx` - Dashboard home with analytics
 - [ ] `src/app/admin/analytics/page.tsx` - Analytics dashboard
@@ -2571,6 +2675,7 @@ return <div>{data.products.map(...)}</div>;
 - [ ] `e2e/admin/*.spec.ts` - E2E tests for admin workflows
 
 ### Documentation Deliverables
+
 - [ ] API documentation for all admin endpoints (OpenAPI/Swagger)
 - [ ] Admin user guide with screenshots
 - [ ] Database schema updates (AuditLog model)
@@ -2584,6 +2689,7 @@ return <div>{data.products.map(...)}</div>;
 # Phase 9: Admin Dashboard - Completion Report
 
 ## ✅ Completed Items
+
 - Backend Analytics API: X/26 items
 - Backend Product Management: X/28 items
 - Backend Order Management: X/32 items
@@ -2600,6 +2706,7 @@ return <div>{data.products.map(...)}</div>;
 **Total Progress**: X/342 items (X%)
 
 ## 📊 Metrics Achieved
+
 - Dashboard load time: Xs
 - Chart render time: Xms
 - API response time P50: Xms, P95: Xms
@@ -2610,12 +2717,14 @@ return <div>{data.products.map(...)}</div>;
 - Lighthouse performance: X/100
 
 ## 🔒 Security Validation
+
 - S3 RBAC: ✅ All admin routes protected
 - S2 Input Sanitization: ✅ All forms validated with Zod
 - S4 No Hardcoded Secrets: ✅ All secrets in .env
 - Audit Logging: ✅ All admin actions logged
 
 ## 🎯 Functional Validation
+
 - Analytics Dashboard: ✅ Real-time stats, charts working
 - Product Management: ✅ CRUD, bulk operations functional
 - Order Management: ✅ Status updates, shipping info functional
@@ -2623,15 +2732,18 @@ return <div>{data.products.map(...)}</div>;
 - Reports: ✅ CSV/Excel export working
 
 ## 🚧 Known Issues / Technical Debt
+
 - [ ] Issue 1 description
 - [ ] Issue 2 description
 
 ## 📚 Documentation
+
 - [ ] API documentation updated
 - [ ] Admin user guide created
 - [ ] Environment variables documented
 
 ## 👥 Phase Review
+
 **Reviewed by**: [Name]
 **Date**: [Date]
 **Approved**: ✅ / ⏸️ / ❌
