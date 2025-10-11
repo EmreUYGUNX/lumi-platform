@@ -63,7 +63,7 @@ export const createTestConfig = (
       bucket: "lumi-test-bucket",
     },
     security: {
-      jwtSecret: "test-secret-ensure-length",
+      jwtSecret: "abcdefghijklmnopqrstuvwxyzABCDEF",
       cors: {
         enabled: true,
         allowedOrigins: ["http://localhost:3100"],

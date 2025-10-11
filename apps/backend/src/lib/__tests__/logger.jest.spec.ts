@@ -15,7 +15,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   SENTRY_DSN: "",
   LOG_DIRECTORY: "logs",
   LOG_MAX_SIZE: "10m",
@@ -258,5 +258,52 @@ describe("logger", () => {
       );
       errorSpy.mockRestore();
     });
+  });
+
+  it("stringifies primitive error payloads", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { logError, logger } = await loadLoggerModule();
+      const errorSpy = jest.spyOn(logger, "error");
+      logError(404, "primitive-error");
+      expect(errorSpy).toHaveBeenCalledWith(
+        "primitive-error",
+        expect.objectContaining({
+          error: { message: "404" },
+        }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  it("shuts down console transport when disabled at runtime", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        LOG_ENABLE_CONSOLE: "true",
+      },
+      async () => {
+        const { logger } = await loadLoggerModule();
+        const consoleTransport = logger.transports.find(
+          (transport) => transport.constructor?.name === "Console",
+        );
+        expect(consoleTransport).toBeDefined();
+        if (!consoleTransport) {
+          throw new Error("Console transport not initialised");
+        }
+        const closeSpy = jest.fn();
+        // eslint-disable-next-line no-param-reassign
+        (consoleTransport as { close?: () => void }).close = closeSpy;
+
+        process.env.LOG_ENABLE_CONSOLE = "false";
+        const { reloadConfiguration } = await loadConfigModule();
+        reloadConfiguration("console-disable");
+
+        expect(closeSpy).toHaveBeenCalled();
+        const hasConsole = logger.transports.some(
+          (transport) => transport.constructor?.name === "Console",
+        );
+        expect(hasConsole).toBe(false);
+      },
+    );
   });
 });

@@ -23,7 +23,7 @@ beforeAll(async () => {
       DATABASE_URL: "postgresql://localhost:5432/lumi",
       REDIS_URL: "redis://localhost:6379/0",
       STORAGE_BUCKET: "lumi-test-bucket",
-      JWT_SECRET: "test-secret-ensure-length",
+      JWT_SECRET: "abcdefghijklmnopqrstuvwxyzABCDEF",
     },
     async () => {
       ({ createApp } = await import("../app.js"));

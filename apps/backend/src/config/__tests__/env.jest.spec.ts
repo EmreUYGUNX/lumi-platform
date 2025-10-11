@@ -14,7 +14,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   SENTRY_DSN: "",
   FEATURE_FLAGS: '{"betaCheckout":true,"abTestVariant":"A"}',
   CONFIG_HOT_RELOAD: "false",
@@ -63,6 +63,18 @@ describe("environment loader", () => {
     });
   });
 
+  it("prefers the PORT variable when available", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        PORT: "4800",
+      },
+      async (env) => {
+        expect(env.appPort).toBe(4800);
+      },
+    );
+  });
+
   it("detects configuration changes on reload", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const configModule = await importConfigModule();
@@ -98,6 +110,71 @@ describe("environment loader", () => {
         const flags = getFeatureFlags();
         expect(flags.betaCheckout).toBe(true);
         expect(flags.flagZero).toBe(false);
+      },
+    );
+  });
+
+  it("prefers the generic PORT variable when provided", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        APP_PORT: "4100",
+        PORT: "5050",
+      },
+      async (env) => {
+        expect(env.appPort).toBe(5050);
+        const { getConfig } = await importConfigModule();
+        expect(getConfig().app.port).toBe(5050);
+      },
+    );
+  });
+
+  it("accepts the legacy CORS_ORIGIN allowlist", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        CORS_ORIGIN: "https://app.lumi.com,https://console.lumi.com",
+        CORS_ALLOWED_ORIGINS: "",
+      },
+      async (env) => {
+        expect(env.cors.allowedOrigins).toEqual([
+          "https://app.lumi.com",
+          "https://console.lumi.com",
+        ]);
+      },
+    );
+  });
+
+  it("rejects invalid PORT definitions", async () => {
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          PORT: "abc",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("PORT must be a positive integer");
+
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          PORT: "70000",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("PORT must be between 1 and 65535");
+  });
+
+  it("ignores empty PORT values when provided as whitespace", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        PORT: "   ",
+      },
+      async (env) => {
+        expect(env.appPort).toBe(Number(BASE_ENV.APP_PORT));
       },
     );
   });
