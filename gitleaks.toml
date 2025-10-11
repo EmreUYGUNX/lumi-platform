@@ -2,3 +2,15 @@
   commits = [
     "deb404c5a470f6e05d5cbbfbb9435f41495faa12",
   ]
+  description = "Ignore generated and dependency artifacts"
+  paths = [
+    '''^node_modules/''',
+    '''^dist/''',
+    '''^coverage/''',
+    '''^.next/''',
+    '''^out/''',
+    '''^tmp/''',
+    '''^\.turbo/''',
+    '''^apps/.*/dist/''',
+    '''^packages/.*/dist/'''
+  ]
