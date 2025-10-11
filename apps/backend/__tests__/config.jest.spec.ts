@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 const REQUIRED_ENV = {
   APP_NAME: "Lumi",
   API_BASE_URL: "http://localhost:4000",
@@ -7,7 +8,7 @@ const REQUIRED_ENV = {
   DATABASE_URL: "postgresql://tester:secret@localhost:5432/test",
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "lumi-test",
-  JWT_SECRET: "unit-test-secret",
+  JWT_SECRET: "12345678901234567890123456789012",
 };
 
 let originalEnv: NodeJS.ProcessEnv;

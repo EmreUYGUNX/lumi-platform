@@ -74,23 +74,72 @@ const optionalString = (value: unknown) => {
   return trimmed === "" ? undefined : trimmed;
 };
 
+const parseOptionalPort = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    if (!/^\d+$/.test(trimmed)) {
+      throw new Error("PORT must be a positive integer");
+    }
+
+    return Number.parseInt(trimmed, 10);
+  }
+
+  throw new Error("PORT must be a number or numeric string");
+};
+
+const validatePortRange = (
+  port: number | undefined,
+  ctx: z.RefinementCtx,
+  pathSegments: (string | number)[],
+) => {
+  if (port === undefined) {
+    return;
+  }
+
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "PORT must be between 1 and 65535",
+      path: pathSegments,
+    });
+  }
+};
+
 const EnvSchema = z
   .object({
     NODE_ENV: z.enum(NODE_ENVS).default("development"),
     APP_NAME: z.string().min(1, "APP_NAME is required"),
     APP_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+    PORT: z
+      .any()
+      .transform(parseOptionalPort)
+      .superRefine((value, ctx) => validatePortRange(value, ctx, ["PORT"])),
     API_BASE_URL: z.string().url("API_BASE_URL must be a valid URL"),
     FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
     REDIS_URL: z.string().min(1, "REDIS_URL is required"),
     STORAGE_BUCKET: z.string().min(1, "STORAGE_BUCKET is required"),
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
-    JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
+    JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
     CORS_ENABLED: z
       .any()
       .transform((value) => booleanTransformer(value, true))
       .pipe(z.boolean()),
     CORS_ALLOWED_ORIGINS: z.string().default(DEFAULT_CORS_ALLOWED_ORIGINS),
+    CORS_ORIGIN: z.string().optional().transform(optionalString),
     CORS_ALLOWED_METHODS: z.string().default("GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS"),
     CORS_ALLOWED_HEADERS: z.string().default(DEFAULT_CORS_ALLOWED_HEADERS),
     CORS_EXPOSED_HEADERS: z.string().default("X-Request-Id"),
@@ -322,7 +371,7 @@ const parseFeatureFlags = (raw: string): FeatureFlagMap => {
 const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => ({
   nodeEnv: parsed.NODE_ENV,
   appName: parsed.APP_NAME,
-  appPort: parsed.APP_PORT,
+  appPort: parsed.PORT ?? parsed.APP_PORT,
   apiBaseUrl: parsed.API_BASE_URL,
   frontendUrl: parsed.FRONTEND_URL,
   databaseUrl: parsed.DATABASE_URL,
@@ -332,7 +381,9 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   jwtSecret: parsed.JWT_SECRET,
   cors: {
     enabled: parsed.CORS_ENABLED,
-    allowedOrigins: csvTransformer(parsed.CORS_ALLOWED_ORIGINS, [...DEFAULT_CORS_ORIGINS]),
+    allowedOrigins: csvTransformer(parsed.CORS_ORIGIN ?? parsed.CORS_ALLOWED_ORIGINS, [
+      ...DEFAULT_CORS_ORIGINS,
+    ]),
     allowedMethods: csvTransformer(parsed.CORS_ALLOWED_METHODS, [...DEFAULT_CORS_METHODS]),
     allowedHeaders: csvTransformer(parsed.CORS_ALLOWED_HEADERS, [...DEFAULT_CORS_HEADERS]),
     exposedHeaders: csvTransformer(parsed.CORS_EXPOSED_HEADERS, [...DEFAULT_CORS_EXPOSED_HEADERS]),
