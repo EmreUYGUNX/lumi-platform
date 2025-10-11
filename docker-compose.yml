@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-logging: &default-logging
   driver: "json-file"
   options:
@@ -45,7 +43,8 @@ services:
       CONFIG_HOT_RELOAD: "true"
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: 250
-      NODE_OPTIONS: "--enable-source-maps --inspect=0.0.0.0:9229"
+      NODE_OPTIONS: "--enable-source-maps"
+      BACKEND_INSPECT_PORT: ${BACKEND_INSPECT_PORT:-9229}
     volumes:
       - .:/workspace:delegated
       - backend_node_modules:/workspace/node_modules
@@ -54,6 +53,14 @@ services:
     ports:
       - "4000:4000"
       - "9229:9229"
+    command:
+      - sh
+      - -c
+      - >
+        pnpm install --filter @lumi/backend... --frozen-lockfile &&
+        cd apps/backend &&
+        BACKEND_DEBUG_PORT=$${BACKEND_INSPECT_PORT:-9229} &&
+        node --inspect-port=$${BACKEND_DEBUG_PORT} --inspect=0.0.0.0 /workspace/node_modules/tsx/dist/cli.mjs watch src/index.ts
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,13 +104,11 @@ services:
       NODE_ENV: development
       PORT: 3000
       NEXT_PUBLIC_API_BASE_URL: http://backend:4000
-      NODE_OPTIONS: "--inspect=0.0.0.0:9230"
+      FRONTEND_INSPECT_PORT: ${FRONTEND_INSPECT_PORT:-9230}
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: 100
       WATCHPACK_POLLING: "true"
       WATCHPACK_POLLING_INTERVAL: 100
-    command:
-      ["pnpm", "--filter", "@lumi/frontend", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
     volumes:
       - .:/workspace:delegated
       - frontend_node_modules:/workspace/node_modules
@@ -112,6 +117,14 @@ services:
     ports:
       - "3000:3000"
       - "9230:9230"
+    command:
+      - sh
+      - -c
+      - >
+        pnpm install --filter @lumi/frontend... --frozen-lockfile &&
+        cd apps/frontend &&
+        FRONTEND_DEBUG_PORT=$${FRONTEND_INSPECT_PORT:-9230} &&
+        node --inspect-port=$${FRONTEND_DEBUG_PORT} --inspect=0.0.0.0 /workspace/node_modules/next/dist/bin/next dev --hostname 0.0.0.0 --port $${PORT:-3000}
     depends_on:
       backend:
         condition: service_healthy
@@ -233,10 +246,9 @@ services:
       - "--port=8080"
       - "--docker_only=true"
     volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
+      - /etc/machine-id:/etc/machine-id:ro
     ports:
       - "8080:8080"
     healthcheck:

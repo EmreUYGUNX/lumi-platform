@@ -35,10 +35,10 @@ COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
 RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
   pnpm install --filter @lumi/backend... --frozen-lockfile
-RUN chown -R lumi:nodejs /workspace
-USER lumi
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@lumi/backend", "dev"]
+ENV PNPM_YES=true \
+  PNPM_NON_INTERACTIVE=true
+CMD ["sh", "-c", "pnpm install --filter @lumi/backend... --frozen-lockfile && pnpm --filter @lumi/backend dev"]
 
 FROM base AS build
 
