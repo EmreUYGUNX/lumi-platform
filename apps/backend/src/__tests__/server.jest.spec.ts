@@ -488,15 +488,30 @@ describe("startServer", () => {
       return controller.server;
     });
 
-    const initialErrorCalls = errorSpy.mock.calls.length;
+    try {
+      const initialErrorCalls = errorSpy.mock.calls.length;
 
-    await controller.shutdown({ reason: "close-failure" });
+      await controller.shutdown({ reason: "close-failure" });
 
-    expect(errorSpy.mock.calls.length).toBeGreaterThan(initialErrorCalls);
-    const lastErrorCall = errorSpy.mock.calls.at(-1);
-    expect(lastErrorCall?.[0]).toBe("HTTP server close failed");
+      expect(errorSpy.mock.calls.length).toBeGreaterThan(initialErrorCalls);
+      const lastErrorCall = errorSpy.mock.calls.at(-1);
+      expect(lastErrorCall?.[0]).toBe("HTTP server close failed");
+    } finally {
+      closeSpy.mockRestore();
 
-    closeSpy.mockRestore();
+      if (controller.server.listening) {
+        await new Promise<void>((resolve, reject) => {
+          controller.server.close((error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+
+            resolve();
+          });
+        });
+      }
+    }
   });
 
   it("sets exit code to zero when exitAfterShutdown is requested without an error", () => {
