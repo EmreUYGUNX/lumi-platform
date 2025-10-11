@@ -69,12 +69,13 @@ describe("startServer", () => {
         DATABASE_URL: "postgresql://localhost:5432/lumi",
         REDIS_URL: "redis://localhost:6379/0",
         STORAGE_BUCKET: "lumi-test-bucket",
-        JWT_SECRET: "test-secret-ensure-length",
+        JWT_SECRET: "test-secret-ensure-length-32chars!!",
       },
       async () => {
         const serverModule = await import("../server.js");
         cachedStartServer = serverModule.startServer;
         serverInternalsRef = serverModule.serverInternals;
+        ({ startServer: cachedStartServer } = await import("../server.js"));
         const loggerModule = await import("../lib/logger.js");
         loggerInstance = loggerModule.logger;
       },
