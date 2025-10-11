@@ -11,6 +11,8 @@ overrides:
   "@opentelemetry/instrumentation": 0.57.2
   "@opentelemetry/semantic-conventions": 1.37.0
   "@types/pg": 8.15.5
+  body-parser: 1.20.3
+  mime: 1.6.0
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -6513,14 +6515,6 @@ packages:
         integrity: sha512-x0Vn8spI+wuJ1O6S7gnbaQg8Pxh4NNHb7KSINmEWKiPE4RKOplvijn+NkmYmmRgP68mc70j2EbeTFRsrswaQeg==,
       }
     engines: { node: ">=4" }
-    hasBin: true
-
-  mime@2.6.0:
-    resolution:
-      {
-        integrity: sha512-USPkMeET31rOMiarsBNIHZKLGgvKc/LrjofAnBlOttf5ajRvqiRA8QsenbcooctK6d6Ts6aqZXBA+XbkKthiQg==,
-      }
-    engines: { node: ">=4.0.0" }
     hasBin: true
 
   mimic-fn@2.1.0:
@@ -13469,8 +13463,6 @@ snapshots:
 
   mime@1.6.0: {}
 
-  mime@2.6.0: {}
-
   mimic-fn@2.1.0: {}
 
   mimic-fn@4.0.0: {}
@@ -14512,7 +14504,7 @@ snapshots:
       form-data: 4.0.4
       formidable: 2.1.5
       methods: 1.1.2
-      mime: 2.6.0
+      mime: 1.6.0
       qs: 6.14.0
       semver: 7.7.3
     transitivePeerDependencies:

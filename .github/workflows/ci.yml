@@ -183,11 +183,18 @@ jobs:
         run: pnpm deps:peers
       - name: Secretlint scan
         run: pnpm security:secrets
+      - name: Install Gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+          mkdir -p "$HOME/.local/bin"
+          mv gitleaks "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          rm gitleaks.tar.gz
       - name: Secret scanning
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+        run: gitleaks detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
       - name: Evaluate SARIF output
         id: gitleaks_report
         run: |
