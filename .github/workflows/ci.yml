@@ -194,7 +194,7 @@ jobs:
           rm gitleaks.tar.gz
       - name: Secret scanning
         id: gitleaks
-        run: gitleaks detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+        run: gitleaks detect --no-banner --redact --config gitleaks.toml --report-format sarif --report-path gitleaks.sarif
       - name: Evaluate SARIF output
         id: gitleaks_report
         run: |
