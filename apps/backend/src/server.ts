@@ -391,3 +391,14 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Ser
     shutdown: (shutdownOptions) => executeShutdown({ ...shutdownOptions }),
   };
 };
+
+/**
+ * @internal Exposes selected helpers strictly for unit testing.
+ */
+export const serverInternals = {
+  createServerClosePromise,
+  logServerAddress,
+  drainConnectionsSafely,
+  setExitCodeIfNeeded,
+  registerSignalHandlers,
+};
