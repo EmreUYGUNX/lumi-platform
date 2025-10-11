@@ -133,6 +133,40 @@ describe("environment loader", () => {
     );
   });
 
+  it("rejects invalid PORT definitions", async () => {
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          PORT: "abc",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("PORT must be a positive integer");
+
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          PORT: "70000",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("PORT must be between 1 and 65535");
+  });
+
+  it("ignores empty PORT values when provided as whitespace", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        PORT: "   ",
+      },
+      async (env) => {
+        expect(env.appPort).toBe(Number(BASE_ENV.APP_PORT));
+      },
+    );
+  });
+
   it("falls back to empty feature flags when parsing fails", async () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
