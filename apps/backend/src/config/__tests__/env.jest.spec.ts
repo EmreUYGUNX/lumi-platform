@@ -42,7 +42,10 @@ describe("environment loader", () => {
       expect(env.metricsEnabled).toBe(true);
       expect(env.cors.allowedOrigins).toContain("http://localhost:3000");
       expect(env.securityHeaders.enabled).toBe(true);
-      expect(env.rateLimit.points).toBe(120);
+      expect(env.rateLimit.points).toBe(100);
+      expect(env.rateLimit.durationSeconds).toBe(900);
+      expect(env.rateLimit.routes.auth.points).toBe(5);
+      expect(env.rateLimit.routes.auth.durationSeconds).toBe(900);
       expect(env.validation.maxBodySizeKb).toBe(512);
 
       const { getConfig, isFeatureEnabled, getFeatureFlags } = await importConfigModule();
@@ -298,6 +301,9 @@ describe("environment loader", () => {
         RATE_LIMIT_DURATION: "120",
         RATE_LIMIT_STRATEGY: "redis",
         RATE_LIMIT_REDIS_URL: "redis://cache:6380/0",
+        RATE_LIMIT_AUTH_POINTS: "10",
+        RATE_LIMIT_AUTH_DURATION: "300",
+        RATE_LIMIT_AUTH_BLOCK_DURATION: "1200",
         VALIDATION_MAX_BODY_KB: "256",
       },
       async (env) => {
@@ -307,6 +313,9 @@ describe("environment loader", () => {
         expect(env.rateLimit.points).toBe(20);
         expect(env.rateLimit.durationSeconds).toBe(120);
         expect(env.rateLimit.redis?.url).toBe("redis://cache:6380/0");
+        expect(env.rateLimit.routes.auth.points).toBe(10);
+        expect(env.rateLimit.routes.auth.durationSeconds).toBe(300);
+        expect(env.rateLimit.routes.auth.blockDurationSeconds).toBe(1200);
         expect(env.securityHeaders.expectCt.reportUri).toBe("https://ct.lumi.example/report");
         expect(env.cors.exposedHeaders).toEqual(["X-Request-Id"]);
         expect(env.validation.maxBodySizeKb).toBe(256);

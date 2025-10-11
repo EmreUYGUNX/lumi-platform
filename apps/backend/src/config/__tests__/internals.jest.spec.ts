@@ -65,6 +65,13 @@ const createSecuritySection = (): ApplicationConfig["security"] => ({
     durationSeconds: 60,
     blockDurationSeconds: 300,
     strategy: "memory",
+    routes: {
+      auth: {
+        points: 5,
+        durationSeconds: 900,
+        blockDurationSeconds: 900,
+      },
+    },
   },
   validation: {
     strict: true,

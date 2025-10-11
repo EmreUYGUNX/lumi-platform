@@ -44,6 +44,12 @@ export interface SecurityHeadersConfig {
 
 export type RateLimitStrategy = "memory" | "redis";
 
+export interface RateLimitRouteConfig {
+  points: number;
+  durationSeconds: number;
+  blockDurationSeconds: number;
+}
+
 export interface RateLimitConfig {
   enabled: boolean;
   keyPrefix: string;
@@ -54,6 +60,9 @@ export interface RateLimitConfig {
   inmemoryBlockOnConsumed?: number;
   redis?: {
     url: string;
+  };
+  routes: {
+    auth: RateLimitRouteConfig;
   };
 }
 

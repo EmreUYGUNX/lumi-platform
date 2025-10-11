@@ -99,10 +99,17 @@ export const createTestConfig = (
       rateLimit: {
         enabled: true,
         keyPrefix: "lumi:test",
-        points: 120,
-        durationSeconds: 60,
-        blockDurationSeconds: 300,
+        points: 100,
+        durationSeconds: 900,
+        blockDurationSeconds: 900,
         strategy: "memory",
+        routes: {
+          auth: {
+            points: 5,
+            durationSeconds: 900,
+            blockDurationSeconds: 900,
+          },
+        },
       },
       validation: {
         strict: true,
