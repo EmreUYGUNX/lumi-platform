@@ -63,6 +63,18 @@ describe("environment loader", () => {
     });
   });
 
+  it("prefers the PORT variable when available", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        PORT: "4800",
+      },
+      async (env) => {
+        expect(env.appPort).toBe(4800);
+      },
+    );
+  });
+
   it("detects configuration changes on reload", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const configModule = await importConfigModule();
