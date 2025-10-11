@@ -13,7 +13,7 @@ const REQUIRED_ENV = {
   REDIS_URL: "redis://localhost:6379/0",
   STORAGE_BUCKET: "lumi-testing",
   LOG_LEVEL: "info",
-  JWT_SECRET: "unit-test-secret-1234",
+  JWT_SECRET: "12345678901234567890123456789012",
   SENTRY_DSN: "",
   FEATURE_FLAGS: '{"betaCheckout":true}',
   CONFIG_HOT_RELOAD: "false",
@@ -27,7 +27,7 @@ interface ConfigInternals {
 }
 
 const createSecuritySection = (): ApplicationConfig["security"] => ({
-  jwtSecret: "development-secret".padEnd(16, "x"),
+  jwtSecret: "development-secret".padEnd(32, "x"),
   cors: {
     enabled: true,
     allowedOrigins: ["http://localhost:3000"],
