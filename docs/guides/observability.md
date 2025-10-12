@@ -84,6 +84,37 @@ Import the pre-built Grafana dashboard (`ops/monitoring/dashboards/backend-overv
 - The uptime check enforces a configurable warm-up window (`HEALTH_UPTIME_GRACE_PERIOD`).
 - `evaluateHealth()` returns a full snapshot including component details and severity.
 
+### Kubernetes Probes
+
+- `/api/health/live` — lightweight liveness probe. Always returns `200` unless the process is unresponsive.
+- `/api/health/ready` — readiness gate. Returns `503` when any dependency reports `status !== "healthy"` (e.g. PostgreSQL or Redis unavailable, warm-up window active, or health check timeout).
+- `/api/health` — comprehensive diagnostics (uptime, CPU/memory stats, dependency breakdown, response latency) for observability dashboards or on-call tooling.
+
+Example deployment snippet:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /api/health/live
+    port: 4000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 2
+
+readinessProbe:
+  httpGet:
+    path: /api/health/ready
+    port: 4000
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+```
+
+> **Degraded States**
+>
+> Health checks return structured component summaries with `status` values (`healthy`, `degraded`, `unhealthy`). Degraded components keep `/api/health` at `200` for diagnostics while forcing `/api/health/ready` to `503`, preventing pods from receiving new traffic until dependencies stabilise.
+
 ## Performance Monitoring
 
 - Event loop latency and process memory stats are sampled every 10 seconds by `observability/performance.ts`.
