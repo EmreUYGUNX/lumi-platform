@@ -59,6 +59,7 @@ const allowedPatterns = [
   /^parse-json$/,
   /^json-schema-traverse$/,
   /^json5$/,
+  /^jsonpath-plus$/,
   /^locate-path$/,
   /^lru-cache$/,
   /^@types\/estree$/,
