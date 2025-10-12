@@ -78,7 +78,7 @@ const createTimeoutError = (service: string, timeoutMs: number) => {
   return error;
 };
 
-const connectTcp = (target: DependencyTarget, timeoutMs: number): Promise<void> =>
+const connectTcpNative = (target: DependencyTarget, timeoutMs: number): Promise<void> =>
   new Promise((resolve, reject) => {
     const socket = createConnection({ host: target.host, port: target.port });
     let isSettled = false;
@@ -118,6 +118,12 @@ const connectTcp = (target: DependencyTarget, timeoutMs: number): Promise<void> 
     socket.setTimeout(timeoutMs, onTimeout);
     socket.unref?.();
   });
+
+let connectTcp = connectTcpNative;
+
+const setConnectTcp = (override?: typeof connectTcpNative) => {
+  connectTcp = override ?? connectTcpNative;
+};
 
 const withLatencyMeasurement = async <TResult>(
   execute: () => Promise<TResult>,
@@ -231,6 +237,12 @@ const ensureHealthChecksRegistered = () => {
 const roundTo = (value: number, precision: number) => {
   const factor = 10 ** precision;
   return Math.round(value * factor) / factor;
+};
+
+const resetInternalState = () => {
+  dependencyChecksRegistered = false;
+  activeConfig = undefined;
+  setConnectTcp();
 };
 
 const captureProcessMetrics = () => {
@@ -377,4 +389,15 @@ export const createHealthRouter = (config: ApplicationConfig): ExpressRouter => 
   router.get("/health/live", createLivenessHandler(resolveConfig));
 
   return router;
+};
+
+export const testingHarness = {
+  formatError,
+  parseTarget,
+  createDependencyCheck,
+  dependencyConfig: DEPENDENCY_CONFIG,
+  setConnectTcp,
+  resetConnectTcp: () => setConnectTcp(),
+  createTimeoutError,
+  resetState: resetInternalState,
 };
