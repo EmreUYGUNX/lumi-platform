@@ -110,6 +110,7 @@ const allowedPatterns = [
   /^wrap-ansi$/,
   /^ws$/,
   /^unicorn-magic$/,
+  /^yargs$/,
   /^webidl-conversions$/,
   /^whatwg-url$/,
   /^yaml$/,
