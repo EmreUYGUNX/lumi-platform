@@ -86,6 +86,46 @@ const formatUnknownError = (error: unknown) =>
     ? { name: error.name, message: error.message }
     : { message: String(error) };
 
+/**
+ * @openapi
+ * /internal/metrics:
+ *   get:
+ *     summary: Export Prometheus metrics snapshot
+ *     description: >
+ *       Streams Prometheus-compatible metrics. The endpoint requires Basic authentication when
+ *       enabled in configuration and is intended for platform observability tooling.
+ *     tags:
+ *       - Observability
+ *     security:
+ *       - basicAuth: []
+ *     responses:
+ *       '200':
+ *         description: OpenMetrics stream containing the latest metrics.
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *       '204':
+ *         description: Metrics collection enabled but no datapoints have been recorded yet.
+ *       '401':
+ *         description: Authentication is required to access metrics.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ *       '503':
+ *         description: Metrics collection is disabled in the active configuration.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ *       '500':
+ *         description: Failed to collect the metrics snapshot.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ */
 const metricsHandler: RequestHandler = asyncHandler(async (_req, res) => {
   if (!isMetricsCollectionEnabled()) {
     res.status(503).json(

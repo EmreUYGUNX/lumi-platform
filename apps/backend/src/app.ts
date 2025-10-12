@@ -1,9 +1,16 @@
-import express, { type ErrorRequestHandler, type Express, type RequestHandler } from "express";
+import express, {
+  type ErrorRequestHandler,
+  type Express,
+  type RequestHandler,
+  Router,
+} from "express";
 import "express-async-errors";
+import swaggerUi from "swagger-ui-express";
 
 import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig } from "./config/index.js";
+import { createOpenApiDocument, getSwaggerUiOptions } from "./config/swagger.js";
 import { registerErrorHandlers } from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
 import { createApiRouter } from "./routes/index.js";
@@ -42,6 +49,20 @@ export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Ex
   app.disable("x-powered-by");
 
   registerMiddleware(app, config);
+
+  const resolveConfig = (): ApplicationConfig => (app.locals.config as ApplicationConfig) ?? config;
+
+  const docsRouter = Router();
+  docsRouter.use("/", swaggerUi.serve);
+  docsRouter.get("/", swaggerUi.setup(undefined, getSwaggerUiOptions(config)));
+  docsRouter.get("/openapi.json", (_req, res) => {
+    const document = createOpenApiDocument(resolveConfig());
+    res.setHeader("Cache-Control", "no-store");
+    res.json(document);
+  });
+  app.use("/api/docs", docsRouter);
+  app.set("buildOpenApiDocument", () => createOpenApiDocument(resolveConfig()));
+
   const registerApiRoute = createRouteRegistrar(routeRegistry, "/api");
   const registerInternalRoute = createRouteRegistrar(routeRegistry, "/internal");
 

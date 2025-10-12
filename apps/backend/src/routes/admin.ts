@@ -16,6 +16,80 @@ interface AdminRouterOptions {
   registerRoute?: RouteRegistrar;
 }
 
+/**
+ * @openapi
+ * /api/v1/admin/users:
+ *   get:
+ *     summary: List platform users (placeholder)
+ *     description: >
+ *       Administrative endpoints are guarded until RBAC is introduced. Every request receives a
+ *       403 Forbidden response while access controls are being implemented.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *       - serviceToken: []
+ *     responses:
+ *       '403':
+ *         description: Administrator privileges are required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ *   post:
+ *     summary: Create a platform user (placeholder)
+ *     description: >
+ *       Placeholder endpoint that will create a platform operator once RBAC is delivered. Currently
+ *       responds with 403 Forbidden to prevent accidental exposure.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *       - serviceToken: []
+ *     responses:
+ *       '403':
+ *         description: Administrator privileges are required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ * /api/v1/admin/audit-log:
+ *   get:
+ *     summary: Retrieve audit log entries (placeholder)
+ *     description: >
+ *       Enterprise audit trails will be exposed here after RBAC implementation. Access is locked
+ *       down until the authentication layer is available.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *       - serviceToken: []
+ *     responses:
+ *       '403':
+ *         description: Administrator privileges are required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ * /api/v1/admin/reports/sales:
+ *   get:
+ *     summary: Generate sales report (placeholder)
+ *     description: >
+ *       Reserved endpoint for future sales reporting capabilities. Always returns 403 while the
+ *       administrative surface is under construction.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *       - serviceToken: []
+ *     responses:
+ *       '403':
+ *         description: Administrator privileges are required.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ */
 const adminLogger = createChildLogger("routes:admin");
 
 export const ADMIN_ROUTE_PROTECTION_STRATEGY =
