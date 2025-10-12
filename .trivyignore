@@ -12,3 +12,6 @@ CVE-2024-24790
 CVE-2023-45288
 CVE-2024-34156
 CVE-2025-47907
+# @redis/json shares the same version scheme as the deprecated `json` CLI.
+# Trivy maps it to CVE-2020-7712, but the redis module is unaffected.
+CVE-2020-7712
