@@ -399,7 +399,13 @@ describe("logger", () => {
     );
 
     if (existsSync(tempDirectory)) {
-      rmSync(tempDirectory, { recursive: true, force: true });
+      try {
+        rmSync(tempDirectory, { recursive: true, force: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw error;
+        }
+      }
     }
     jest.resetModules();
   });
