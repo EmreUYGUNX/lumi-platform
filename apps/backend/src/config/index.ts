@@ -92,6 +92,11 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
         zippedArchive: true,
       },
       consoleEnabled: env.logConsoleEnabled,
+      request: {
+        sampleRate: env.logRequestSampleRate,
+        maxBodyLength: env.logRequestMaxBodyLength,
+        redactFields: env.logRequestRedactFields,
+      },
     },
     metrics: {
       enabled: env.metricsEnabled,

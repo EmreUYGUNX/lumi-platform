@@ -53,6 +53,9 @@ describe("environment loader", () => {
       expect(config.app.port).toBe(4500);
       expect(config.observability.logs.directory).toBe("logs");
       expect(config.observability.logs.rotation.maxFiles).toBe("14d");
+      expect(config.observability.logs.request.sampleRate).toBe(1);
+      expect(config.observability.logs.request.maxBodyLength).toBe(2048);
+      expect(config.observability.logs.request.redactFields).toContain("password");
       expect(config.observability.metrics.defaultMetricsInterval).toBe(5000);
       expect(config.observability.alerting.severityThreshold).toBe("error");
       expect(config.security.cors.allowedOrigins).toContain("http://localhost:3000");
@@ -76,6 +79,28 @@ describe("environment loader", () => {
         expect(env.appPort).toBe(4800);
       },
     );
+  });
+
+  it("rejects invalid request log sampling rates", async () => {
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          LOG_REQUEST_SAMPLE_RATE: "1.2",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("LOG_REQUEST_SAMPLE_RATE must be between 0 and 1");
+
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          LOG_REQUEST_SAMPLE_RATE: "-0.5",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("LOG_REQUEST_SAMPLE_RATE must be between 0 and 1");
   });
 
   it("detects configuration changes on reload", async () => {
@@ -356,6 +381,9 @@ describe("environment loader", () => {
         LOG_MAX_SIZE: "50m",
         LOG_MAX_FILES: "30d",
         LOG_ENABLE_CONSOLE: "false",
+        LOG_REQUEST_SAMPLE_RATE: "0.25",
+        LOG_REQUEST_MAX_BODY_LENGTH: "1024",
+        LOG_REQUEST_REDACT_FIELDS: "password,ssn,apiKey",
         METRICS_ENABLED: "false",
         ALERTING_ENABLED: "true",
         ALERTING_WEBHOOK_URL: "https://hooks.example.com/alerts",
@@ -367,6 +395,11 @@ describe("environment loader", () => {
         const config = getConfig();
         expect(config.observability.logs.directory).toBe("custom-logs");
         expect(config.observability.logs.consoleEnabled).toBe(false);
+        expect(config.observability.logs.request).toEqual({
+          sampleRate: 0.25,
+          maxBodyLength: 1024,
+          redactFields: ["password", "ssn", "apikey"],
+        });
         expect(config.observability.metrics.enabled).toBe(false);
         expect(config.observability.alerting).toMatchObject({
           enabled: true,

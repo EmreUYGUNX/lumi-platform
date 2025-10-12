@@ -134,6 +134,11 @@ describe("configuration internals", () => {
             zippedArchive: true,
           },
           consoleEnabled: true,
+          request: {
+            sampleRate: 1,
+            maxBodyLength: 2048,
+            redactFields: ["password", "token"],
+          },
         },
         metrics: {
           enabled: true,
@@ -183,6 +188,11 @@ describe("configuration internals", () => {
             zippedArchive: true,
           },
           consoleEnabled: true,
+          request: {
+            sampleRate: 1,
+            maxBodyLength: 2048,
+            redactFields: ["password", "token"],
+          },
         },
         metrics: {
           enabled: true,

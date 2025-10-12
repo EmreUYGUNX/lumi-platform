@@ -34,6 +34,18 @@ const CROSS_ORIGIN_OPENER_OPTIONS = [
 const CROSS_ORIGIN_RESOURCE_OPTIONS = ["same-origin", "same-site", "cross-origin"] as const;
 const DEFAULT_COOP = CROSS_ORIGIN_OPENER_OPTIONS[0];
 const DEFAULT_CORP = CROSS_ORIGIN_RESOURCE_OPTIONS[1];
+const DEFAULT_REQUEST_REDACT_FIELDS = [
+  "password",
+  "pass",
+  "token",
+  "secret",
+  "authorization",
+  "apikey",
+  "refreshToken",
+  "accessToken",
+  "clientSecret",
+  "creditCard",
+] as const;
 const hasLength = (value: string) => value.length > 0;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
@@ -72,6 +84,18 @@ const csvTransformer = (value: unknown, fallback: string[]): string[] => {
 const optionalString = (value: unknown) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
   return trimmed === "" ? undefined : trimmed;
+};
+
+const normaliseRedactFields = (raw: string[]): string[] => {
+  const unique = new Set<string>();
+  raw.forEach((value) => {
+    const normalised = value.trim().toLowerCase();
+    if (normalised.length > 0) {
+      unique.add(normalised);
+    }
+  });
+
+  return [...unique];
 };
 
 const parseOptionalPort = (value: unknown): number | undefined => {
@@ -259,6 +283,18 @@ const EnvSchema = z
       .any()
       .transform((value) => booleanTransformer(value, true))
       .pipe(z.boolean()),
+    LOG_REQUEST_SAMPLE_RATE: z.coerce
+      .number()
+      .min(0, "LOG_REQUEST_SAMPLE_RATE must be between 0 and 1")
+      .max(1, "LOG_REQUEST_SAMPLE_RATE must be between 0 and 1")
+      .default(1),
+    LOG_REQUEST_MAX_BODY_LENGTH: z.coerce
+      .number()
+      .int()
+      .min(0, "LOG_REQUEST_MAX_BODY_LENGTH must not be negative")
+      .max(65_536, "LOG_REQUEST_MAX_BODY_LENGTH must not exceed 65536 bytes")
+      .default(2048),
+    LOG_REQUEST_REDACT_FIELDS: z.string().default(DEFAULT_REQUEST_REDACT_FIELDS.join(",")),
     METRICS_ENABLED: z
       .any()
       .transform((value) => booleanTransformer(value, true))
@@ -458,6 +494,11 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   logMaxSize: parsed.LOG_MAX_SIZE,
   logMaxFiles: parsed.LOG_MAX_FILES,
   logConsoleEnabled: parsed.LOG_ENABLE_CONSOLE,
+  logRequestSampleRate: parsed.LOG_REQUEST_SAMPLE_RATE,
+  logRequestMaxBodyLength: parsed.LOG_REQUEST_MAX_BODY_LENGTH,
+  logRequestRedactFields: normaliseRedactFields(
+    csvTransformer(parsed.LOG_REQUEST_REDACT_FIELDS, [...DEFAULT_REQUEST_REDACT_FIELDS]),
+  ),
   metricsEnabled: parsed.METRICS_ENABLED,
   metricsEndpoint: parsed.METRICS_ENDPOINT,
   metricsPrefix: parsed.METRICS_PREFIX,

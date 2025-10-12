@@ -35,7 +35,7 @@ const contextStorage = new AsyncLocalStorage<LoggerContext>();
 const externalTransports = new Map<string, TransportStream>();
 
 let consoleTransport: transports.ConsoleTransportInstance | undefined;
-let rotationTransport: DailyRotateFile | undefined;
+let rotationTransports: Partial<Record<"combined" | "error", DailyRotateFile>> = {};
 
 const ensureDirectoryExists = (directory: string) => {
   // eslint-disable-next-line security/detect-non-literal-fs-filename
@@ -43,6 +43,13 @@ const ensureDirectoryExists = (directory: string) => {
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     mkdirSync(directory, { recursive: true });
   }
+};
+
+const closeRotationTransports = () => {
+  Object.values(rotationTransports).forEach((transport) => {
+    transport?.close?.();
+  });
+  rotationTransports = {};
 };
 
 const appendContextFormat = format((info) => {
@@ -87,14 +94,46 @@ const normaliseError = (input: unknown): Record<string, unknown> => {
   return { message: String(input) };
 };
 
-const buildLogFormat = (): Logform.Format =>
+const METADATA_EXCLUDE_FIELDS = ["timestamp", "level", "message", "context", "requestId"] as const;
+
+const buildBaseFormat = (): Logform.Format =>
   format.combine(
     appendContextFormat(),
     format.timestamp(),
     format.errors({ stack: true }),
-    format.metadata({ fillExcept: ["timestamp", "level", "message", "context", "requestId"] }),
-    format.json(),
+    format.metadata({ fillExcept: [...METADATA_EXCLUDE_FIELDS] }),
   );
+
+const buildConsoleFormat = (config: ApplicationConfig): Logform.Format => {
+  const isPrettyMode = config.app.environment === "development" && !config.runtime.ci;
+
+  if (!isPrettyMode) {
+    return format.json();
+  }
+
+  return format.combine(
+    format.colorize({ all: true }),
+    format.printf(({ timestamp, level, message, requestId, context, metadata, ...rest }) => {
+      const parts = [`${timestamp as string} ${level as string}`, message as string];
+      if (requestId) {
+        parts.push(`[request:${requestId as string}]`);
+      }
+
+      const contextPayload = { ...(context as Record<string, unknown> | undefined) };
+
+      const additional = {
+        ...contextPayload,
+        ...(metadata as Record<string, unknown> | undefined),
+        ...rest,
+      };
+
+      const serialisable =
+        Object.keys(additional).length > 0 ? ` ${JSON.stringify(additional)}` : "";
+
+      return parts.join(" ") + serialisable;
+    }),
+  );
+};
 
 const buildTransports = (config: ApplicationConfig): TransportStream[] => {
   const transportList: TransportStream[] = [];
@@ -104,8 +143,12 @@ const buildTransports = (config: ApplicationConfig): TransportStream[] => {
   if (logs.consoleEnabled) {
     if (consoleTransport) {
       consoleTransport.level = activeLevel;
+      consoleTransport.format = buildConsoleFormat(config);
     } else {
-      consoleTransport = new transports.Console({ level: activeLevel });
+      consoleTransport = new transports.Console({
+        level: activeLevel,
+        format: buildConsoleFormat(config),
+      });
     }
     transportList.push(consoleTransport);
   } else if (consoleTransport) {
@@ -119,24 +162,36 @@ const buildTransports = (config: ApplicationConfig): TransportStream[] => {
     const directory = path.resolve(process.cwd(), logs.directory);
     ensureDirectoryExists(directory);
 
-    const filename = `${config.app.name.toLowerCase()}-%DATE%.log`;
+    const baseName = config.app.name.toLowerCase().replaceAll(/\s+/g, "-");
 
-    rotationTransport?.close?.();
+    closeRotationTransports();
 
-    rotationTransport = new DailyRotateFile({
+    const rotationOptions = {
       dirname: directory,
-      filename,
       datePattern: "YYYY-MM-DD",
       maxSize: logs.rotation.maxSize,
       maxFiles: logs.rotation.maxFiles,
       zippedArchive: logs.rotation.zippedArchive,
+    } as const;
+
+    const combined = new DailyRotateFile({
+      ...rotationOptions,
+      filename: `${baseName}-combined-%DATE%.log`,
       level: activeLevel,
+      format: format.json(),
     });
 
-    transportList.push(rotationTransport);
-  } else if (rotationTransport) {
-    rotationTransport.close?.();
-    rotationTransport = undefined;
+    const errorOnly = new DailyRotateFile({
+      ...rotationOptions,
+      filename: `${baseName}-error-%DATE%.log`,
+      level: "error",
+      format: format.json(),
+    });
+
+    rotationTransports = { combined, error: errorOnly };
+    transportList.push(combined, errorOnly);
+  } else {
+    closeRotationTransports();
   }
 
   externalTransports.forEach((transport) => {
@@ -151,7 +206,7 @@ const buildTransports = (config: ApplicationConfig): TransportStream[] => {
 const createLoggerDescriptor = (config: ApplicationConfig) => ({
   level: config.app.logLevel,
   levels: LOG_LEVEL_PRIORITIES,
-  format: buildLogFormat(),
+  format: buildBaseFormat(),
   defaultMeta: {
     service: config.app.name,
     environment: config.app.environment,
@@ -220,7 +275,14 @@ export const extractStructuredLog = (
 ): Record<string, unknown> | undefined => {
   const serialised = Reflect.get(payload, messageSymbol);
   if (typeof serialised !== "string") {
-    return undefined;
+    if (!payload || Object.keys(payload).length === 0) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
   }
 
   try {

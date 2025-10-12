@@ -128,6 +128,22 @@ export const createTestConfig = (
           zippedArchive: true,
         },
         consoleEnabled: true,
+        request: {
+          sampleRate: 1,
+          maxBodyLength: 2048,
+          redactFields: [
+            "password",
+            "pass",
+            "token",
+            "secret",
+            "authorization",
+            "apikey",
+            "refreshtoken",
+            "accesstoken",
+            "clientsecret",
+            "creditcard",
+          ],
+        },
       },
       metrics: {
         enabled: true,
