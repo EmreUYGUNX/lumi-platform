@@ -1,5 +1,7 @@
+import { logError } from "../lib/logger.js";
 import { recordUptimeNow } from "./metrics.js";
 import { startPerformanceMonitoring } from "./performance.js";
+import { initializeSentry } from "./sentry.js";
 
 export {
   metricsRegistry,
@@ -39,7 +41,7 @@ export {
   type AlertPayload,
 } from "./alerts.js";
 
-export { getSentryInstance, isSentryEnabled } from "./sentry.js";
+export { getSentryInstance, isSentryEnabled, setSentryUser } from "./sentry.js";
 
 let bootstrapComplete = false;
 
@@ -49,6 +51,9 @@ export const initializeObservability = () => {
   }
 
   bootstrapComplete = true;
+  initializeSentry().catch((error: unknown) => {
+    logError(error, "Failed to initialise Sentry telemetry during observability bootstrap");
+  });
   startPerformanceMonitoring();
   recordUptimeNow();
 };

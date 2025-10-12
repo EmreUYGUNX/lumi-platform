@@ -76,6 +76,8 @@ describe("observability bootstrap", () => {
     jest.doMock("../sentry.js", () => ({
       getSentryInstance: jest.fn(() => ({ flush: jest.fn() })),
       isSentryEnabled: jest.fn(() => false),
+      initializeSentry: jest.fn(() => Promise.resolve()),
+      setSentryUser: jest.fn(),
     }));
 
     await withTemporaryEnvironment(BASE_ENV, async () => {

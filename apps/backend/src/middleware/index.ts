@@ -6,9 +6,11 @@ import hpp from "hpp";
 
 import type { ApplicationConfig } from "@lumi/types";
 
+import { createSentryRequestMiddleware } from "../lib/sentry.js";
 import { createCorsMiddleware } from "./cors.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
 import { createRequestIdMiddleware } from "./requestId.js";
+import { createRequestLoggingMiddleware } from "./requestLogger.js";
 import { createSanitizationMiddleware } from "./sanitize.js";
 import { createSecurityMiddleware } from "./security.js";
 
@@ -17,6 +19,7 @@ const COMPRESSION_THRESHOLD_BYTES = 1024;
 
 export const registerMiddleware = (app: Express, config: ApplicationConfig): void => {
   app.use(createRequestIdMiddleware());
+  app.use(createSentryRequestMiddleware());
 
   const securityMiddlewares = createSecurityMiddleware(config.security.headers);
   securityMiddlewares.forEach((middleware) => app.use(middleware));
@@ -49,4 +52,8 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
 
   const sanitizationMiddleware = createSanitizationMiddleware(config.security.validation);
   sanitizationMiddleware.forEach((middleware) => app.use(middleware));
+
+  const requestLogger = createRequestLoggingMiddleware(config);
+
+  app.use(requestLogger);
 };

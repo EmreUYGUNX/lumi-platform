@@ -79,10 +79,17 @@ export interface LogRotationConfig {
   zippedArchive: boolean;
 }
 
+export interface RequestLoggingConfig {
+  sampleRate: number;
+  maxBodyLength: number;
+  redactFields: string[];
+}
+
 export interface LogTransportConfig {
   directory: string;
   rotation: LogRotationConfig;
   consoleEnabled: boolean;
+  request: RequestLoggingConfig;
 }
 
 export interface MetricsConfig {
@@ -123,6 +130,9 @@ export interface ResolvedEnvironment {
   logMaxSize: string;
   logMaxFiles: string;
   logConsoleEnabled: boolean;
+  logRequestSampleRate: number;
+  logRequestMaxBodyLength: number;
+  logRequestRedactFields: string[];
   metricsEnabled: boolean;
   metricsEndpoint: string;
   metricsPrefix?: string;

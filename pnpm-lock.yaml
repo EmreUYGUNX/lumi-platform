@@ -277,6 +277,12 @@ importers:
       "@types/node":
         specifier: ^20.12.7
         version: 20.19.19
+      "@types/supertest":
+        specifier: ^2.0.16
+        version: 2.0.16
+      supertest:
+        specifier: ^6.3.4
+        version: 6.3.4
       vitest:
         specifier: ^1.5.0
         version: 1.6.1(@types/node@20.19.19)(jsdom@20.0.3)
