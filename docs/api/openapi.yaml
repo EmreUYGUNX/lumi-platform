@@ -2,8 +2,7 @@ openapi: 3.1.0
 info:
   title: Lumi Backend API
   version: 1.0.0
-  description:
-    Express API baseline for the Lumi commerce platform. The documentation reflects the Phase 1 middleware and
+  description: Express API baseline for the Lumi commerce platform. The documentation reflects the Phase 1 middleware and
     health endpoints.
   contact:
     name: Lumi Platform Engineering
@@ -20,8 +19,7 @@ tags:
   - name: Observability
     description: Internal observability surfaces including metrics and diagnostics.
   - name: Admin
-    description:
-      Administrative endpoints reserved for authorised operators. Currently guarded with strict 403 responses
+    description: Administrative endpoints reserved for authorised operators. Currently guarded with strict 403 responses
       until RBAC is implemented.
 components:
   securitySchemes:
