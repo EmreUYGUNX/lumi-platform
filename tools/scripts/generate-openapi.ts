@@ -129,10 +129,9 @@ const main = async () => {
   console.log(`OpenAPI specification written to ${path.relative(process.cwd(), OUTPUT_PATH)}`);
 };
 
-try {
-  await main();
-} catch (error) {
+// eslint-disable-next-line unicorn/prefer-top-level-await
+main().catch((error) => {
   // eslint-disable-next-line no-console -- Script feedback.
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
-}
+});
