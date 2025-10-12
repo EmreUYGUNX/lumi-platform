@@ -4,6 +4,7 @@ import { Router } from "express";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
+import { errorResponse } from "../lib/response.js";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
@@ -33,23 +34,22 @@ const registerAdminRoute = (
 const createForbiddenHandler =
   (resource: string): RequestHandler =>
   (req, res) => {
-    const responseBody = {
-      success: false as const,
-      error: {
-        code: "FORBIDDEN" as const,
-        message: "Administrator privileges required.",
-        details: {
-          resource,
-          reason: "Authentication and authorisation not yet implemented for admin routes.",
-          remediation: "Authenticate with an administrator account once RBAC is available.",
+    res.status(403).json(
+      errorResponse(
+        {
+          code: "FORBIDDEN",
+          message: "Administrator privileges required.",
+          details: {
+            resource,
+            reason: "Authentication and authorisation not yet implemented for admin routes.",
+            remediation: "Authenticate with an administrator account once RBAC is available.",
+          },
         },
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    };
-
-    res.status(403).json(responseBody);
+        {
+          timestamp: new Date().toISOString(),
+        },
+      ),
+    );
 
     adminLogger.warn("Blocked unauthorised admin access attempt", {
       resource,
