@@ -66,7 +66,7 @@ describe("global error handling middleware", () => {
   it("returns 405 with allowed methods for disallowed verb", async () => {
     const app = createApp({ config: createTestConfig() });
 
-    const response = await request(app).post("/api/health").expect(405);
+    const response = await request(app).post("/api/v1/health").expect(405);
 
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe("METHOD_NOT_ALLOWED");
@@ -97,15 +97,15 @@ describe("global error handling middleware", () => {
     const registry = app.get("routeRegistry");
 
     if (registry) {
-      registerRoute(registry, "GET", "/api/error-trigger");
+      registerRoute(registry, "GET", "/api/v1/error-trigger");
     }
 
-    app.get("/api/error-trigger", () => {
+    app.get("/api/v1/error-trigger", () => {
       throw new Error("boom");
     });
     triggerRefresh(app);
 
-    const response = await request(app).get("/api/error-trigger").expect(500);
+    const response = await request(app).get("/api/v1/error-trigger").expect(500);
 
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
@@ -120,15 +120,15 @@ describe("global error handling middleware", () => {
     const registry = app.get("routeRegistry");
 
     if (registry) {
-      registerRoute(registry, "GET", "/api/async-error");
+      registerRoute(registry, "GET", "/api/v1/async-error");
     }
 
-    app.get("/api/async-error", async () => {
+    app.get("/api/v1/async-error", async () => {
       throw new Error("async failure");
     });
     triggerRefresh(app);
 
-    const response = await request(app).get("/api/async-error").expect(500);
+    const response = await request(app).get("/api/v1/async-error").expect(500);
 
     expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
   });
@@ -138,17 +138,17 @@ describe("global error handling middleware", () => {
     const registry = app.get("routeRegistry");
 
     if (registry) {
-      registerRoute(registry, "GET", "/api/validation-error");
+      registerRoute(registry, "GET", "/api/v1/validation-error");
     }
 
-    app.get("/api/validation-error", () => {
+    app.get("/api/v1/validation-error", () => {
       throw new ValidationError("Invalid payload", {
         issues: [{ path: "email", message: "Invalid email" }],
       });
     });
     triggerRefresh(app);
 
-    const response = await request(app).get("/api/validation-error").expect(400);
+    const response = await request(app).get("/api/v1/validation-error").expect(400);
 
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
     expect(response.body.error.details.issues).toEqual([
@@ -176,10 +176,10 @@ describe("global error handling middleware", () => {
     const registry = app.get("routeRegistry");
 
     if (registry) {
-      registerRoute(registry, "GET", "/api/dev-error");
+      registerRoute(registry, "GET", "/api/v1/dev-error");
     }
 
-    app.get("/api/dev-error", () => {
+    app.get("/api/v1/dev-error", () => {
       const error: AppError = new ValidationError("Invalid payload", {
         issues: [{ path: "name", message: "Required" }],
       });
@@ -188,7 +188,7 @@ describe("global error handling middleware", () => {
     });
     triggerRefresh(app);
 
-    const response = await request(app).get("/api/dev-error").expect(400);
+    const response = await request(app).get("/api/v1/dev-error").expect(400);
 
     expect(response.body.error.stack).toBe("custom-stack");
   });
@@ -300,8 +300,8 @@ describe("global error handling middleware", () => {
         app,
         method: "DELETE",
         baseUrl: "",
-        path: "/api/health",
-        originalUrl: "/api/health",
+        path: "/api/v1/health",
+        originalUrl: "/api/v1/health",
       } as unknown as Request,
       {
         headersSent: true,
