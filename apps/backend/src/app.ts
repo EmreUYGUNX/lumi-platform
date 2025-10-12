@@ -4,6 +4,7 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig } from "./config/index.js";
 import { registerMiddleware } from "./middleware/index.js";
+import { createHealthRouter } from "./routes/health.js";
 import { createInternalRouter } from "./routes/internal.js";
 
 export interface CreateAppOptions {
@@ -31,6 +32,7 @@ export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Ex
   app.disable("x-powered-by");
 
   registerMiddleware(app, config);
+  app.use("/api", createHealthRouter(config));
   app.use("/internal", createInternalRouter(config));
 
   return app;
