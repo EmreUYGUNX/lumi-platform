@@ -10,6 +10,7 @@ info:
     email: engineering@lumi.example
   license:
     name: Proprietary - Lumi Internal Use Only
+    identifier: LicenseRef-Lumi-Internal
 servers:
   - url: http://localhost:4100/api
     description: Primary API entrypoint

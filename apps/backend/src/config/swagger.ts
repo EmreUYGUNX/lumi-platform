@@ -400,6 +400,7 @@ const buildSwaggerDefinition = (config: ApplicationConfig): OpenApi31.Document =
     },
     license: {
       name: "Proprietary - Lumi Internal Use Only",
+      identifier: "LicenseRef-Lumi-Internal",
     },
   },
   servers: buildServers(config),
