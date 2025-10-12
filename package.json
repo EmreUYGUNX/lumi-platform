@@ -149,7 +149,7 @@
       "@stoplight/better-ajv-errors": "1.0.1",
       "@stoplight/spectral-formats": "1.5.0",
       "@stoplight/spectral-functions": "1.7.2",
-      "jsonpath-plus": "10.0.3"
+      "jsonpath-plus": "10.3.0"
     },
     "packageExtensions": {
       "react-dom@*": {

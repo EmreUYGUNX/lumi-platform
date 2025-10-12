@@ -26,7 +26,7 @@ overrides:
   "@stoplight/better-ajv-errors": 1.0.1
   "@stoplight/spectral-formats": 1.5.0
   "@stoplight/spectral-functions": 1.7.2
-  jsonpath-plus: 10.0.3
+  jsonpath-plus: 10.3.0
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -6885,10 +6885,10 @@ packages:
       }
     engines: { "0": node >= 0.2.0 }
 
-  jsonpath-plus@10.0.3:
+  jsonpath-plus@10.3.0:
     resolution:
       {
-        integrity: sha512-d35qqWROJnJqZrwptBJZfNPfKZwJtD0eZdXKYHhJu7gDBMsGUo6mUXevK7Zzu/Lz1jpjCF7l6btyHHt5DSoreg==,
+        integrity: sha512-8TNmfeTCk2Le33A3vRRwtuworG/L5RrgMvdjhKZxvyShO+mBu2fP50OWUjRLNtvw344DdDarFh9buFAZs5ujeA==,
       }
     engines: { node: ">=18.0.0" }
     hasBin: true
@@ -11657,7 +11657,7 @@ snapshots:
       ajv-errors: 3.0.0(ajv@8.17.1)
       ajv-formats: 2.1.1
       es-aggregate-error: 1.0.14
-      jsonpath-plus: 10.0.3
+      jsonpath-plus: 10.3.0
       lodash: 4.17.21
       lodash.topath: 4.5.2
       minimatch: 3.1.2
@@ -14785,7 +14785,7 @@ snapshots:
 
   jsonparse@1.3.1: {}
 
-  jsonpath-plus@10.0.3:
+  jsonpath-plus@10.3.0:
     dependencies:
       "@jsep-plugin/assignment": 1.3.0(jsep@1.4.0)
       "@jsep-plugin/regex": 1.0.4(jsep@1.4.0)
@@ -15088,7 +15088,7 @@ snapshots:
       astring: 1.9.0
       jsep: 1.4.0
     optionalDependencies:
-      jsonpath-plus: 10.0.3
+      jsonpath-plus: 10.3.0
       lodash.topath: 4.5.2
 
   node-fetch@2.7.0:
