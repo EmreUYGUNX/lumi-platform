@@ -155,13 +155,31 @@ const normalisePath = (path: string): string => {
   return path.startsWith("/") ? path : `/${path}`;
 };
 
-export const createInternalRouter = (config: ApplicationConfig): Router => {
+interface InternalRouterOptions {
+  registerRoute?: (method: string, path: string) => void;
+}
+
+const registerInternalRoute = (
+  registerRoute: ((method: string, path: string) => void) | undefined,
+  method: string,
+  path: string,
+) => {
+  registerRoute?.(method, path);
+};
+
+export const createInternalRouter = (
+  config: ApplicationConfig,
+  options: InternalRouterOptions = {},
+): Router => {
   const router = Router();
   const metricsPath = normalisePath(config.observability.metrics.endpoint);
   const metricsAuthMiddleware = createMetricsAuthMiddleware(config);
 
   router.get(metricsPath, metricsAuthMiddleware, metricsHandler);
+  registerInternalRoute(options.registerRoute, "GET", metricsPath);
+
   router.get("/health", createHealthHandler(config));
+  registerInternalRoute(options.registerRoute, "GET", "/health");
 
   return router;
 };

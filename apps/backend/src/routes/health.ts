@@ -377,7 +377,22 @@ const createLivenessHandler =
     );
   };
 
-export const createHealthRouter = (config: ApplicationConfig): ExpressRouter => {
+interface HealthRouterOptions {
+  registerRoute?: (method: string, path: string) => void;
+}
+
+const registerHealthRoute = (
+  registerRoute: ((method: string, path: string) => void) | undefined,
+  method: string,
+  path: string,
+) => {
+  registerRoute?.(method, path);
+};
+
+export const createHealthRouter = (
+  config: ApplicationConfig,
+  options: HealthRouterOptions = {},
+): ExpressRouter => {
   activeConfig = config;
   ensureHealthChecksRegistered();
 
@@ -385,8 +400,13 @@ export const createHealthRouter = (config: ApplicationConfig): ExpressRouter => 
 
   const router = Router();
   router.get("/health", createComprehensiveHealthHandler(resolveConfig));
+  registerHealthRoute(options.registerRoute, "GET", "/health");
+
   router.get("/health/ready", createReadinessHandler(resolveConfig));
+  registerHealthRoute(options.registerRoute, "GET", "/health/ready");
+
   router.get("/health/live", createLivenessHandler(resolveConfig));
+  registerHealthRoute(options.registerRoute, "GET", "/health/live");
 
   return router;
 };
