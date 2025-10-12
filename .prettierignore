@@ -8,3 +8,4 @@ coverage/
 .cache/
 .husky/_/
 *.log
+docs/api/openapi.yaml

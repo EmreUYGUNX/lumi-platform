@@ -269,6 +269,62 @@ const captureProcessMetrics = () => {
   };
 };
 
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     summary: Retrieve comprehensive service health
+ *     description: >
+ *       Aggregates component health checks, latency measurements, and process diagnostics to
+ *       provide a production-grade snapshot of the service state.
+ *     tags:
+ *       - Health
+ *     responses:
+ *       '200':
+ *         description: Service health snapshot available.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthComprehensiveResponse'
+ *       '500':
+ *         description: Failed to evaluate health checks or collect metrics.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ * /api/v1/health/ready:
+ *   get:
+ *     summary: Readiness probe
+ *     description: Evaluates dependency health to determine whether the service can accept traffic.
+ *     tags:
+ *       - Health
+ *     responses:
+ *       '200':
+ *         description: Service is ready to accept traffic.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthReadinessResponse'
+ *       '503':
+ *         description: One or more dependencies are unhealthy; traffic should not yet be routed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardErrorResponse'
+ * /api/v1/health/live:
+ *   get:
+ *     summary: Liveness probe
+ *     description: Lightweight probe used by orchestrators to confirm the process is responsive.
+ *     tags:
+ *       - Health
+ *     responses:
+ *       '200':
+ *         description: Service process is healthy and responsive.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthLivenessResponse'
+ */
 const createComprehensiveHealthHandler = (
   configResolver: () => ApplicationConfig,
 ): RequestHandler =>

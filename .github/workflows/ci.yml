@@ -78,6 +78,8 @@ jobs:
             ${{ runner.os }}-turbo-
       - name: Run lint (parallel)
         run: pnpm exec turbo run lint --concurrency=50%
+      - name: Validate OpenAPI specification
+        run: pnpm docs:openapi:lint
 
   typecheck:
     name: Typecheck (Node ${{ matrix.node }})

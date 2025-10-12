@@ -18,7 +18,8 @@ This directory hosts the API specifications, endpoint references, and integratio
 ## Tooling
 
 - Use `pnpm exec openapi-generator-cli` (to be added in Phase 1) for client SDK generation.
-- Validate specs using Spectral or similar linting before committing.
+- Generate the canonical spec with `pnpm docs:openapi:generate` and keep it committed.
+- Validate specs using Spectral (`pnpm docs:openapi:lint`) before committing.
 
 ## Next Steps
 

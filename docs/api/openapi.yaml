@@ -1,0 +1,447 @@
+openapi: 3.1.0
+info:
+  title: Lumi Backend API
+  version: 1.0.0
+  description: Express API baseline for the Lumi commerce platform. The documentation reflects the Phase 1 middleware and
+    health endpoints.
+  contact:
+    name: Lumi Platform Engineering
+    email: engineering@lumi.example
+  license:
+    name: Proprietary - Lumi Internal Use Only
+    identifier: LicenseRef-Lumi-Internal
+servers:
+  - url: http://localhost:4100/api
+    description: Primary API entrypoint
+tags:
+  - name: Health
+    description: Service health and readiness checks.
+  - name: Observability
+    description: Internal observability surfaces including metrics and diagnostics.
+  - name: Admin
+    description: Administrative endpoints reserved for authorised operators. Currently guarded with strict 403 responses
+      until RBAC is implemented.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Reserved for authenticated endpoints. Full RBAC enforcement will arrive in Phase 3.
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Used for internal-only endpoints such as metrics collection.
+    serviceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: Service-to-service authentication placeholder. Exact contract will be finalised in Phase 2.
+  schemas:
+    StandardSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+          description: Indicates the request completed successfully.
+        data:
+          description: Response payload specific to the request.
+        meta:
+          type: object
+          additionalProperties: true
+          description: Optional metadata contextualising the response.
+    ErrorDetails:
+      type: object
+      additionalProperties: true
+      description: Additional information to help diagnose the failure.
+    StandardError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          examples:
+            - FORBIDDEN
+            - UNAUTHORIZED
+        message:
+          type: string
+          description: Human readable summary of the error.
+          examples:
+            - Administrator privileges required.
+        details:
+          $ref: "#/components/schemas/ErrorDetails"
+    StandardErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum:
+            - false
+          description: Indicates the request failed.
+        error:
+          $ref: "#/components/schemas/StandardError"
+        meta:
+          type: object
+          additionalProperties: true
+          description: Optional metadata contextualising the error.
+    HealthComponent:
+      type: object
+      required:
+        - status
+        - summary
+        - observedAt
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Component health status derived from the latest probe.
+        summary:
+          type: string
+          description: High level description of the component state.
+        details:
+          type: object
+          additionalProperties: true
+          description: Detailed diagnostic data supplied by the component probe.
+        severity:
+          type: string
+          enum:
+            - info
+            - warn
+            - error
+            - fatal
+          description: Recommended alerting severity for the reported state.
+        observedAt:
+          type: string
+          format: date-time
+          description: UTC timestamp when the component was evaluated.
+    HealthSnapshot:
+      type: object
+      required:
+        - status
+        - uptimeSeconds
+        - timestamp
+        - components
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Overall system health derived from the individual component states.
+        uptimeSeconds:
+          type: number
+          format: double
+          description: Node.js process uptime at the time of the snapshot.
+        responseTimeMs:
+          type: number
+          format: double
+          description: Time taken to evaluate all health checks, in milliseconds.
+        timestamp:
+          type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was generated.
+        components:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/HealthComponent"
+          description: Collection of component health summaries keyed by identifier.
+        metrics:
+          type: object
+          properties:
+            memory:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+              description: Per-segment memory usage in bytes.
+            cpu:
+              type: object
+              properties:
+                userMs:
+                  type: number
+                  format: double
+                systemMs:
+                  type: number
+                  format: double
+            load:
+              type: object
+              properties:
+                averages:
+                  type: array
+                  items:
+                    type: number
+                    format: double
+                  minItems: 3
+                  maxItems: 3
+                  description: 1, 5, and 15 minute load averages.
+    HealthResponseMeta:
+      type: object
+      properties:
+        environment:
+          type: string
+        service:
+          type: string
+        check:
+          type: string
+          description: Identifier for the health check variant.
+        generatedAt:
+          type: string
+          format: date-time
+          description: Timestamp representing when the metadata snapshot was captured.
+    HealthComprehensiveResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthSnapshot"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - comprehensive
+    HealthReadinessData:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+    HealthReadinessResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthReadinessData"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - readiness
+    HealthLivenessData:
+      type: object
+      required:
+        - status
+        - uptimeSeconds
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+        uptimeSeconds:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+    HealthLivenessResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthLivenessData"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - liveness
+paths:
+  /api/v1/admin/users:
+    get:
+      summary: List platform users (placeholder)
+      description: >
+        Administrative endpoints are guarded until RBAC is introduced. Every request receives a 403 Forbidden response
+        while access controls are being implemented.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "403":
+          description: Administrator privileges are required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+    post:
+      summary: Create a platform user (placeholder)
+      description: >
+        Placeholder endpoint that will create a platform operator once RBAC is delivered. Currently responds with 403
+        Forbidden to prevent accidental exposure.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "403":
+          description: Administrator privileges are required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/audit-log:
+    get:
+      summary: Retrieve audit log entries (placeholder)
+      description: >
+        Enterprise audit trails will be exposed here after RBAC implementation. Access is locked down until the
+        authentication layer is available.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "403":
+          description: Administrator privileges are required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/reports/sales:
+    get:
+      summary: Generate sales report (placeholder)
+      description: >
+        Reserved endpoint for future sales reporting capabilities. Always returns 403 while the administrative surface
+        is under construction.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "403":
+          description: Administrator privileges are required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health:
+    get:
+      summary: Retrieve comprehensive service health
+      description: >
+        Aggregates component health checks, latency measurements, and process diagnostics to provide a production-grade
+        snapshot of the service state.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service health snapshot available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthComprehensiveResponse"
+        "500":
+          description: Failed to evaluate health checks or collect metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health/ready:
+    get:
+      summary: Readiness probe
+      description: Evaluates dependency health to determine whether the service can accept traffic.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is ready to accept traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReadinessResponse"
+        "503":
+          description: One or more dependencies are unhealthy; traffic should not yet be routed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health/live:
+    get:
+      summary: Liveness probe
+      description: Lightweight probe used by orchestrators to confirm the process is responsive.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service process is healthy and responsive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLivenessResponse"
+  /internal/metrics:
+    get:
+      summary: Export Prometheus metrics snapshot
+      description: >
+        Streams Prometheus-compatible metrics. The endpoint requires Basic authentication when enabled in configuration
+        and is intended for platform observability tooling.
+      tags:
+        - Observability
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: OpenMetrics stream containing the latest metrics.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "204":
+          description: Metrics collection enabled but no datapoints have been recorded yet.
+        "401":
+          description: Authentication is required to access metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "500":
+          description: Failed to collect the metrics snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "503":
+          description: Metrics collection is disabled in the active configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
