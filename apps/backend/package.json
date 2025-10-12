@@ -42,16 +42,18 @@
     "xss-clean": "^0.1.4",
     "zod": "^3.23.8"
   },
-"devDependencies": {
+  "devDependencies": {
     "@jest/globals": "^29.7.0",
-    "@types/compression": "^1.7.5",
-    "@types/cookie-parser": "^1.4.6",
-    "@types/cors": "^2.8.16",
+    "@lumi/testing": "workspace:*",
+    "@types/compression": "^1.8.1",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
-    "@types/express-mongo-sanitize": "^2.1.0",
-    "@types/jest": "^28.12.7",
-    "@types/supertest": "^2.16",
-    "supertest": "^6.3.4",
+    "@types/express-mongo-sanitize": "^2.1.2",
+    "@types/hpp": "^0.2.6",
     "@types/node": "^20.12.7",
-    "jest": "^1.5.0"
+    "@types/supertest": "^2.0.16",
+    "supertest": "^6.3.4",
+    "vitest": "^1.5.0"
   }
+}
