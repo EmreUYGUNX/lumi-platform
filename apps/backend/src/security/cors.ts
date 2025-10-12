@@ -3,27 +3,29 @@ import type { ApplicationConfig } from "@lumi/types";
 
 export interface BackendCorsOptions {
   enabled: boolean;
-  origin: string[] | "*";
+  origin: string[];
   methods: string[];
   allowedHeaders: string[];
   exposedHeaders: string[];
   credentials: boolean;
   maxAge: number;
+  unsafeWildcardDetected: boolean;
 }
 
 export const buildCorsOptions = (
   config: ApplicationConfig["security"]["cors"],
 ): BackendCorsOptions => {
   const normalised = normalizeCorsConfig(config);
-  const origin = normalised.allowedOrigins.includes("*") ? "*" : normalised.allowedOrigins;
+  const unsafeWildcardDetected = config.allowedOrigins.some((origin) => origin.trim() === "*");
 
   return {
     enabled: normalised.enabled,
-    origin,
+    origin: normalised.allowedOrigins,
     methods: normalised.allowedMethods,
     allowedHeaders: normalised.allowedHeaders,
     exposedHeaders: normalised.exposedHeaders,
     credentials: normalised.allowCredentials,
     maxAge: normalised.maxAgeSeconds,
+    unsafeWildcardDetected,
   };
 };

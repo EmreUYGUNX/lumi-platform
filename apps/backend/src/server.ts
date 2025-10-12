@@ -346,6 +346,14 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Ser
     const closePromise = createServerClosePromise(server);
 
     await drainConnectionsSafely(connectionTracker, shutdownTimeoutMs);
+    const rateLimiterCleanup = app.get("rateLimiterCleanup") as (() => Promise<void>) | undefined;
+    if (typeof rateLimiterCleanup === "function") {
+      try {
+        await rateLimiterCleanup();
+      } catch (cleanupError) {
+        logger.warn("Rate limiter cleanup failed during shutdown", { error: cleanupError });
+      }
+    }
     await waitForServerClose(closePromise);
 
     listenerRegistry.cleanup();

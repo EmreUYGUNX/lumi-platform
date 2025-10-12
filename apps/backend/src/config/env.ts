@@ -202,17 +202,32 @@ const EnvSchema = z
       .number()
       .int()
       .min(1, "RATE_LIMIT_POINTS must be at least 1")
-      .default(120),
+      .default(100),
     RATE_LIMIT_DURATION: z.coerce
       .number()
       .int()
       .min(1, "RATE_LIMIT_DURATION must be at least 1 second")
-      .default(60),
+      .default(900),
     RATE_LIMIT_BLOCK_DURATION: z.coerce
       .number()
       .int()
       .min(0, "RATE_LIMIT_BLOCK_DURATION must not be negative")
-      .default(300),
+      .default(900),
+    RATE_LIMIT_AUTH_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_POINTS must be at least 1")
+      .default(5),
+    RATE_LIMIT_AUTH_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_DURATION must be at least 1 second")
+      .default(900),
+    RATE_LIMIT_AUTH_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_BLOCK_DURATION must not be negative")
+      .default(900),
     RATE_LIMIT_KEY_PREFIX: z.string().default("lumi:rate-limit"),
     RATE_LIMIT_REDIS_URL: z.string().optional().transform(optionalString),
     VALIDATION_STRICT: z
@@ -424,6 +439,13 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
             url: parsed.RATE_LIMIT_REDIS_URL,
           }
         : undefined,
+    routes: {
+      auth: {
+        points: parsed.RATE_LIMIT_AUTH_POINTS,
+        durationSeconds: parsed.RATE_LIMIT_AUTH_DURATION,
+        blockDurationSeconds: parsed.RATE_LIMIT_AUTH_BLOCK_DURATION,
+      },
+    },
   },
   validation: {
     strict: parsed.VALIDATION_STRICT,

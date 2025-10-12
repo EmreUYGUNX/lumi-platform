@@ -40,6 +40,13 @@ export const createSecurityConfig = (): ApplicationConfig["security"] => ({
     blockDurationSeconds: 60,
     strategy: "memory",
     inmemoryBlockOnConsumed: 0,
+    routes: {
+      auth: {
+        points: 1,
+        durationSeconds: 60,
+        blockDurationSeconds: 300,
+      },
+    },
   },
   validation: {
     strict: false,

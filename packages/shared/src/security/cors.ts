@@ -16,7 +16,7 @@ export interface NormalizedCorsConfig extends CorsConfig {
 export const normalizeCorsConfig = (config: CorsConfig): NormalizedCorsConfig => ({
   ...config,
   allowedOrigins: unique(config.allowedOrigins.map((origin) => normaliseOrigin(origin))).filter(
-    (value) => value.length > 0,
+    (value) => value.length > 0 && value !== "*",
   ),
   allowedMethods: unique(config.allowedMethods.map((method) => normaliseMethod(method))).filter(
     (value) => value.length > 0,
@@ -33,10 +33,6 @@ export const isOriginAllowed = (origin: string | undefined, config: CorsConfig):
   const normalised = normalizeCorsConfig(config);
 
   if (!normalised.enabled || !origin) {
-    return true;
-  }
-
-  if (normalised.allowedOrigins.includes("*")) {
     return true;
   }
 

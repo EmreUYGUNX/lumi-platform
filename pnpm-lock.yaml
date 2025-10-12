@@ -13,6 +13,8 @@ overrides:
   "@types/pg": 8.15.5
   body-parser: 1.20.3
   mime: 1.6.0
+  cookie: 0.7.2
+  negotiator: 0.6.4
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -190,6 +192,15 @@ importers:
       "@sentry/node":
         specifier: ^8.47.0
         version: 8.55.0
+      compression:
+        specifier: ^1.8.1
+        version: 1.8.1
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -199,12 +210,30 @@ importers:
       express:
         specifier: ^4.19.2
         version: 4.21.2
+      express-mongo-sanitize:
+        specifier: ^2.2.0
+        version: 2.2.0
+      express-rate-limit:
+        specifier: ^8.1.0
+        version: 8.1.0(express@4.21.2)
+      helmet:
+        specifier: ^8.1.0
+        version: 8.1.0
+      hpp:
+        specifier: ^0.2.3
+        version: 0.2.3
       prom-client:
         specifier: ^15.1.2
         version: 15.1.3
+      rate-limit-redis:
+        specifier: ^4.2.2
+        version: 4.2.2(express-rate-limit@8.1.0(express@4.21.2))
       rate-limiter-flexible:
         specifier: ^3.0.5
         version: 3.0.6
+      redis:
+        specifier: ^5.8.3
+        version: 5.8.3
       winston:
         specifier: ^3.13.0
         version: 3.18.3
@@ -214,6 +243,9 @@ importers:
       winston-transport:
         specifier: ^4.9.0
         version: 4.9.0
+      xss-clean:
+        specifier: ^0.1.4
+        version: 0.1.4
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -224,9 +256,24 @@ importers:
       "@lumi/testing":
         specifier: workspace:*
         version: link:../../packages/testing
+      "@types/compression":
+        specifier: ^1.8.1
+        version: 1.8.1
+      "@types/cookie-parser":
+        specifier: ^1.4.9
+        version: 1.4.9(@types/express@4.17.23)
+      "@types/cors":
+        specifier: ^2.8.19
+        version: 2.8.19
       "@types/express":
         specifier: ^4.17.21
         version: 4.17.23
+      "@types/express-mongo-sanitize":
+        specifier: ^2.1.2
+        version: 2.1.2
+      "@types/hpp":
+        specifier: ^0.2.6
+        version: 0.2.6
       "@types/node":
         specifier: ^20.12.7
         version: 20.19.19
@@ -2005,6 +2052,49 @@ packages:
         integrity: sha512-LxccF392NN37ISGxIurUljZSh1YWnphO34V5a0+T7FVQG2u9bhAXRTJpgmQ3483woVhkraQZFF7cbRrpbw/F4Q==,
       }
 
+  "@redis/bloom@5.8.3":
+    resolution:
+      {
+        integrity: sha512-1eldTzHvdW3Oi0TReb8m1yiFt8ZwyF6rv1NpZyG5R4TpCwuAdKQetBKoCw7D96tNFgsVVd6eL+NaGZZCqhRg4g==,
+      }
+    engines: { node: ">= 18" }
+    peerDependencies:
+      "@redis/client": ^5.8.3
+
+  "@redis/client@5.8.3":
+    resolution:
+      {
+        integrity: sha512-MZVUE+l7LmMIYlIjubPosruJ9ltSLGFmJqsXApTqPLyHLjsJUSAbAJb/A3N34fEqean4ddiDkdWzNu4ZKPvRUg==,
+      }
+    engines: { node: ">= 18" }
+
+  "@redis/json@5.8.3":
+    resolution:
+      {
+        integrity: sha512-DRR09fy/u8gynHGJ4gzXYeM7D8nlS6EMv5o+h20ndTJiAc7RGR01fdk2FNjnn1Nz5PjgGGownF+s72bYG4nZKQ==,
+      }
+    engines: { node: ">= 18" }
+    peerDependencies:
+      "@redis/client": ^5.8.3
+
+  "@redis/search@5.8.3":
+    resolution:
+      {
+        integrity: sha512-EMIvEeGRR2I0BJEz4PV88DyCuPmMT1rDtznlsHY3cKSDcc9vj0Q411jUnX0iU2vVowUgWn/cpySKjpXdZ8m+5g==,
+      }
+    engines: { node: ">= 18" }
+    peerDependencies:
+      "@redis/client": ^5.8.3
+
+  "@redis/time-series@5.8.3":
+    resolution:
+      {
+        integrity: sha512-5Jwy3ilsUYQjzpE7WZ1lEeG1RkqQ5kHtwV1p8yxXHSEmyUbC/T/AVgyjMcm52Olj/Ov/mhDKjx6ndYUi14bXsw==,
+      }
+    engines: { node: ">= 18" }
+    peerDependencies:
+      "@redis/client": ^5.8.3
+
   "@rollup/rollup-android-arm-eabi@4.52.4":
     resolution:
       {
@@ -2454,6 +2544,12 @@ packages:
         integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==,
       }
 
+  "@types/compression@1.8.1":
+    resolution:
+      {
+        integrity: sha512-kCFuWS0ebDbmxs0AXYn6e2r2nrGAb5KwQhknjSPSPgJcGd8+HVSILlUyFhGqML2gk39HcG7D1ydW9/qpYkN00Q==,
+      }
+
   "@types/connect@3.4.36":
     resolution:
       {
@@ -2466,10 +2562,24 @@ packages:
         integrity: sha512-7uz5EHdzz2TqoMfV7ee61Egf5y6NkcO4FB/1iCCQnbeiI1F3xzv3vK5dBCXUCLQgGYS+mUeigK1iKQzvED+QnQ==,
       }
 
+  "@types/cookie-parser@1.4.9":
+    resolution:
+      {
+        integrity: sha512-tGZiZ2Gtc4m3wIdLkZ8mkj1T6CEHb35+VApbL2T14Dew8HA7c+04dmKqsKRNC+8RJPm16JEK0tFSwdZqubfc4g==,
+      }
+    peerDependencies:
+      "@types/express": "*"
+
   "@types/cookiejar@2.1.5":
     resolution:
       {
         integrity: sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==,
+      }
+
+  "@types/cors@2.8.19":
+    resolution:
+      {
+        integrity: sha512-mFNylyeyqN93lfe/9CSxOGREz8cpzAhH+E93xJ4xWQf62V8sQ/24reV2nyzUWM6H6Xji+GGHpkbLe7pVoUEskg==,
       }
 
   "@types/estree@1.0.8":
@@ -2477,6 +2587,13 @@ packages:
       {
         integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==,
       }
+
+  "@types/express-mongo-sanitize@2.1.2":
+    resolution:
+      {
+        integrity: sha512-a0Vy5Ivkc9iipHBgcnpRsAl3H/pM4gkL6mf5BqGVg4NsVJXlI6hwzle+UHS9O7oqUau+b6S+hzZ3tXQaAhLcmg==,
+      }
+    deprecated: This is a stub types definition. express-mongo-sanitize provides its own type definitions, so you do not need this installed.
 
   "@types/express-serve-static-core@4.19.7":
     resolution:
@@ -2494,6 +2611,12 @@ packages:
     resolution:
       {
         integrity: sha512-olP3sd1qOEe5dXTSaFvQG+02VdRXcdytWLAZsAq1PecU8uqQAhkrnbli7DagjtXKW/Bl7YJbUsa8MPcuc8LHEQ==,
+      }
+
+  "@types/hpp@0.2.6":
+    resolution:
+      {
+        integrity: sha512-6gn1RuHA1/XFCVCqCkSV+AWy07YwtGg4re4SHhLMoiARTg9XlrbYMtVR+Uvws0VlERXzzcA+1UYvxEV6O+sgPg==,
       }
 
   "@types/http-errors@2.0.5":
@@ -3609,6 +3732,13 @@ packages:
       }
     engines: { node: ">=12" }
 
+  cluster-key-slot@1.1.2:
+    resolution:
+      {
+        integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==,
+      }
+    engines: { node: ">=0.10.0" }
+
   co@4.6.0:
     resolution:
       {
@@ -3701,6 +3831,20 @@ packages:
       {
         integrity: sha512-T0+barUSQRTUQASh8bx02dl+DhF54GtIDY13Y3m9oWTklKbb3Wv974meRpeZ3lp1JpLVECWWNHC4vaG2XHXouQ==,
       }
+
+  compressible@2.0.18:
+    resolution:
+      {
+        integrity: sha512-AF3r7P5dWxL8MxyITRMlORQNaOA2IkAFaTr4k7BUumjPtRpGDTZpl0Pb1XCO6JeDCBdp126Cgs9sMxqSjgYyRg==,
+      }
+    engines: { node: ">= 0.6" }
+
+  compression@1.8.1:
+    resolution:
+      {
+        integrity: sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==,
+      }
+    engines: { node: ">= 0.8.0" }
 
   concat-map@0.0.1:
     resolution:
@@ -3855,16 +3999,23 @@ packages:
         integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==,
       }
 
+  cookie-parser@1.4.7:
+    resolution:
+      {
+        integrity: sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==,
+      }
+    engines: { node: ">= 0.8.0" }
+
   cookie-signature@1.0.6:
     resolution:
       {
         integrity: sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==,
       }
 
-  cookie@0.7.1:
+  cookie@0.7.2:
     resolution:
       {
-        integrity: sha512-6DnInpx7SJ2AK3+CTUE/ZM0vWTUboZCegxhC2xiIydHR9jNuTAASBrfEpHhiGOZw/nX51bHt6YQl8jsGo4y/0w==,
+        integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==,
       }
     engines: { node: ">= 0.6" }
 
@@ -3879,6 +4030,13 @@ packages:
       {
         integrity: sha512-tqTt5T4PzsMIZ430XGviK4vzYSoeNJ6CXODi6c/voxOT6IZqBht5/EKaSNnYiEjjRYxjVz7DQIsOsY0XNi8PIA==,
       }
+
+  cors@2.8.5:
+    resolution:
+      {
+        integrity: sha512-KIHbLJqu73RGr/hnbrO9uBeixNGuvSQjul/jdFvS/KFSIH1hWVd1ng7zOHx+YrEfInLG7q4n6GHQ9cDtxv/P6g==,
+      }
+    engines: { node: ">= 0.10" }
 
   cosmiconfig-typescript-loader@6.1.0:
     resolution:
@@ -4730,6 +4888,22 @@ packages:
       }
     engines: { node: ^14.15.0 || ^16.10.0 || >=18.0.0 }
 
+  express-mongo-sanitize@2.2.0:
+    resolution:
+      {
+        integrity: sha512-PZBs5nwhD6ek9ZuP+W2xmpvcrHwXZxD5GdieX2dsjPbAbH4azOkrHbycBud2QRU+YQF1CT+pki/lZGedHgo/dQ==,
+      }
+    engines: { node: ">=10" }
+
+  express-rate-limit@8.1.0:
+    resolution:
+      {
+        integrity: sha512-4nLnATuKupnmwqiJc27b4dCFmB/T60ExgmtDD7waf4LdrbJ8CPZzZRHYErDYNhoz+ql8fUdYwM/opf90PoPAQA==,
+      }
+    engines: { node: ">= 16" }
+    peerDependencies:
+      express: ">= 4.11"
+
   express@4.21.2:
     resolution:
       {
@@ -5248,6 +5422,13 @@ packages:
       }
     engines: { node: ">= 0.4" }
 
+  helmet@8.1.0:
+    resolution:
+      {
+        integrity: sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==,
+      }
+    engines: { node: ">=18.0.0" }
+
   hosted-git-info@2.8.9:
     resolution:
       {
@@ -5267,6 +5448,13 @@ packages:
         integrity: sha512-puUZAUKT5m8Zzvs72XWy3HtvVbTWljRE66cP60bxJzAqf2DgICo7lYTY2IHUmLnNpjYvw5bvmoHvPc0QO2a62w==,
       }
     engines: { node: ^16.14.0 || >=18.0.0 }
+
+  hpp@0.2.3:
+    resolution:
+      {
+        integrity: sha512-4zDZypjQcxK/8pfFNR7jaON7zEUpXZxz4viyFmqjb3kWNWAHsLEUmWXcdn25c5l76ISvnD6hbOGO97cXUI3Ryw==,
+      }
+    engines: { node: ">=0.10.0" }
 
   html-encoding-sniffer@3.0.0:
     resolution:
@@ -5419,6 +5607,13 @@ packages:
         integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==,
       }
     engines: { node: ">= 0.4" }
+
+  ip-address@10.0.1:
+    resolution:
+      {
+        integrity: sha512-NWv9YLW4PoW2B7xtzaS3NCot75m6nK7Icdv0o3lfMceJVRfSoQwqD4wEH5rLwoKJwUiZ/rfpiVBhnaF0FK4HoA==,
+      }
+    engines: { node: ">= 12" }
 
   ipaddr.js@1.9.1:
     resolution:
@@ -6644,10 +6839,10 @@ packages:
         integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==,
       }
 
-  negotiator@0.6.3:
+  negotiator@0.6.4:
     resolution:
       {
-        integrity: sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==,
+        integrity: sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==,
       }
     engines: { node: ">= 0.6" }
 
@@ -6819,6 +7014,13 @@ packages:
     resolution:
       {
         integrity: sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==,
+      }
+    engines: { node: ">= 0.8" }
+
+  on-headers@1.1.0:
+    resolution:
+      {
+        integrity: sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==,
       }
     engines: { node: ">= 0.8" }
 
@@ -7424,6 +7626,15 @@ packages:
       }
     engines: { node: ">= 0.6" }
 
+  rate-limit-redis@4.2.2:
+    resolution:
+      {
+        integrity: sha512-0SGzpSCZQgkJuUK5AqGaUkgwTMaujWIek0PwlZBDsdNIcasrJae8AC47tP5UHayqDcocJxtogL6DnZFTLoruUw==,
+      }
+    engines: { node: ">= 16" }
+    peerDependencies:
+      express-rate-limit: ">= 6"
+
   rate-limiter-flexible@3.0.6:
     resolution:
       {
@@ -7539,6 +7750,13 @@ packages:
         integrity: sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg==,
       }
     engines: { node: ">=8" }
+
+  redis@5.8.3:
+    resolution:
+      {
+        integrity: sha512-MfSrfV6+tEfTw8c4W0yFp6XWX8Il4laGU7Bx4kvW4uiYM1AuZ3KGqEGt1LdQHeD1nEyLpIWetZ/SpY3kkbgrYw==,
+      }
+    engines: { node: ">= 18" }
 
   reflect.getprototypeof@1.0.10:
     resolution:
@@ -9116,6 +9334,19 @@ packages:
         integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==,
       }
 
+  xss-clean@0.1.4:
+    resolution:
+      {
+        integrity: sha512-4hArTFHYxrifK9VXOu/zFvwjTXVjKByPi6woUHb1IqxlX0Z4xtFBRjOhTKuYV/uE1VswbYsIh5vUEYp7MmoISQ==,
+      }
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+
+  xss-filters@1.2.7:
+    resolution:
+      {
+        integrity: sha512-KzcmYT/f+YzcYrYRqw6mXxd25BEZCxBQnf+uXTopQDIhrmiaLwO+f+yLsIvvNlPhYvgff8g3igqrBxYh9k8NbQ==,
+      }
+
   xtend@4.0.2:
     resolution:
       {
@@ -10291,6 +10522,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  "@redis/bloom@5.8.3(@redis/client@5.8.3)":
+    dependencies:
+      "@redis/client": 5.8.3
+
+  "@redis/client@5.8.3":
+    dependencies:
+      cluster-key-slot: 1.1.2
+
+  "@redis/json@5.8.3(@redis/client@5.8.3)":
+    dependencies:
+      "@redis/client": 5.8.3
+
+  "@redis/search@5.8.3(@redis/client@5.8.3)":
+    dependencies:
+      "@redis/client": 5.8.3
+
+  "@redis/time-series@5.8.3(@redis/client@5.8.3)":
+    dependencies:
+      "@redis/client": 5.8.3
+
   "@rollup/rollup-android-arm-eabi@4.52.4":
     optional: true
 
@@ -10613,6 +10864,11 @@ snapshots:
       "@types/connect": 3.4.36
       "@types/node": 20.19.19
 
+  "@types/compression@1.8.1":
+    dependencies:
+      "@types/express": 4.17.23
+      "@types/node": 20.19.19
+
   "@types/connect@3.4.36":
     dependencies:
       "@types/node": 20.19.19
@@ -10621,9 +10877,21 @@ snapshots:
     dependencies:
       "@types/node": 20.19.19
 
+  "@types/cookie-parser@1.4.9(@types/express@4.17.23)":
+    dependencies:
+      "@types/express": 4.17.23
+
   "@types/cookiejar@2.1.5": {}
 
+  "@types/cors@2.8.19":
+    dependencies:
+      "@types/node": 20.19.19
+
   "@types/estree@1.0.8": {}
+
+  "@types/express-mongo-sanitize@2.1.2":
+    dependencies:
+      express-mongo-sanitize: 2.2.0
 
   "@types/express-serve-static-core@4.19.7":
     dependencies:
@@ -10642,6 +10910,10 @@ snapshots:
   "@types/graceful-fs@4.1.9":
     dependencies:
       "@types/node": 20.19.19
+
+  "@types/hpp@0.2.6":
+    dependencies:
+      "@types/express": 4.17.23
 
   "@types/http-errors@2.0.5": {}
 
@@ -10963,7 +11235,7 @@ snapshots:
   accepts@1.3.8:
     dependencies:
       mime-types: 2.1.35
-      negotiator: 0.6.3
+      negotiator: 0.6.4
 
   acorn-globals@7.0.1:
     dependencies:
@@ -11351,6 +11623,8 @@ snapshots:
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
 
+  cluster-key-slot@1.1.2: {}
+
   co@4.6.0: {}
 
   collect-v8-coverage@1.0.2: {}
@@ -11392,6 +11666,22 @@ snapshots:
       dot-prop: 5.3.0
 
   component-emitter@1.3.1: {}
+
+  compressible@2.0.18:
+    dependencies:
+      mime-db: 1.52.0
+
+  compression@1.8.1:
+    dependencies:
+      bytes: 3.1.2
+      compressible: 2.0.18
+      debug: 2.6.9
+      negotiator: 0.6.4
+      on-headers: 1.1.0
+      safe-buffer: 5.2.1
+      vary: 1.1.2
+    transitivePeerDependencies:
+      - supports-color
 
   concat-map@0.0.1: {}
 
@@ -11485,15 +11775,25 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
+  cookie-parser@1.4.7:
+    dependencies:
+      cookie: 0.7.2
+      cookie-signature: 1.0.6
+
   cookie-signature@1.0.6: {}
 
-  cookie@0.7.1: {}
+  cookie@0.7.2: {}
 
   cookiejar@2.1.4: {}
 
   core-js-compat@3.45.1:
     dependencies:
       browserslist: 4.26.3
+
+  cors@2.8.5:
+    dependencies:
+      object-assign: 4.1.1
+      vary: 1.1.2
 
   cosmiconfig-typescript-loader@6.1.0(@types/node@20.19.19)(cosmiconfig@9.0.0(typescript@5.5.4))(typescript@5.5.4):
     dependencies:
@@ -12187,6 +12487,13 @@ snapshots:
       jest-message-util: 29.7.0
       jest-util: 29.7.0
 
+  express-mongo-sanitize@2.2.0: {}
+
+  express-rate-limit@8.1.0(express@4.21.2):
+    dependencies:
+      express: 4.21.2
+      ip-address: 10.0.1
+
   express@4.21.2:
     dependencies:
       accepts: 1.3.8
@@ -12194,7 +12501,7 @@ snapshots:
       body-parser: 1.20.3
       content-disposition: 0.5.4
       content-type: 1.0.5
-      cookie: 0.7.1
+      cookie: 0.7.2
       cookie-signature: 1.0.6
       debug: 2.6.9
       depd: 2.0.0
@@ -12531,6 +12838,8 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  helmet@8.1.0: {}
+
   hosted-git-info@2.8.9: {}
 
   hosted-git-info@6.1.3:
@@ -12540,6 +12849,11 @@ snapshots:
   hosted-git-info@7.0.2:
     dependencies:
       lru-cache: 10.4.3
+
+  hpp@0.2.3:
+    dependencies:
+      lodash: 4.17.21
+      type-is: 1.6.18
 
   html-encoding-sniffer@3.0.0:
     dependencies:
@@ -12625,6 +12939,8 @@ snapshots:
       es-errors: 1.3.0
       hasown: 2.0.2
       side-channel: 1.1.0
+
+  ip-address@10.0.1: {}
 
   ipaddr.js@1.9.1: {}
 
@@ -13512,7 +13828,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  negotiator@0.6.3: {}
+  negotiator@0.6.4: {}
 
   neo-async@2.6.2: {}
 
@@ -13631,6 +13947,8 @@ snapshots:
   on-finished@2.4.1:
     dependencies:
       ee-first: 1.1.1
+
+  on-headers@1.1.0: {}
 
   once@1.4.0:
     dependencies:
@@ -13919,6 +14237,10 @@ snapshots:
 
   range-parser@1.2.1: {}
 
+  rate-limit-redis@4.2.2(express-rate-limit@8.1.0(express@4.21.2)):
+    dependencies:
+      express-rate-limit: 8.1.0(express@4.21.2)
+
   rate-limiter-flexible@3.0.6: {}
 
   raw-body@2.5.2:
@@ -14010,6 +14332,14 @@ snapshots:
     dependencies:
       indent-string: 4.0.0
       strip-indent: 3.0.0
+
+  redis@5.8.3:
+    dependencies:
+      "@redis/bloom": 5.8.3(@redis/client@5.8.3)
+      "@redis/client": 5.8.3
+      "@redis/json": 5.8.3(@redis/client@5.8.3)
+      "@redis/search": 5.8.3(@redis/client@5.8.3)
+      "@redis/time-series": 5.8.3(@redis/client@5.8.3)
 
   reflect.getprototypeof@1.0.10:
     dependencies:
@@ -15047,6 +15377,12 @@ snapshots:
   xml-name-validator@4.0.0: {}
 
   xmlchars@2.2.0: {}
+
+  xss-clean@0.1.4:
+    dependencies:
+      xss-filters: 1.2.7
+
+  xss-filters@1.2.7: {}
 
   xtend@4.0.2: {}
 
