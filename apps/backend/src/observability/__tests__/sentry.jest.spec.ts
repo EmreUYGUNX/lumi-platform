@@ -161,7 +161,7 @@ describe("sentry integration", () => {
         res.locals = { requestId: "req-42" };
         res.statusCode = 200;
         // eslint-disable-next-line unicorn/no-useless-undefined -- Tests emulate Express API which returns undefined when header missing.
-        res.getHeader = ((...args: [string] | []) => undefined) as unknown as Response["getHeader"];
+        res.getHeader = ((..._args: [string] | []) => {}) as unknown as Response["getHeader"];
 
         middleware(req, res, () => {});
 
@@ -212,7 +212,7 @@ describe("sentry integration", () => {
         resError.locals = { requestId: "req-error" };
         resError.statusCode = 500;
         // eslint-disable-next-line unicorn/no-useless-undefined -- Tests emulate Express API which returns undefined when header missing.
-        resError.getHeader = ((...args: [string] | []) => {}) as unknown as Response["getHeader"];
+        resError.getHeader = ((..._args: [string] | []) => {}) as unknown as Response["getHeader"];
 
         middleware(reqError, resError, () => {});
         const failure = new Error("socket-failure");

@@ -54,5 +54,6 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
   sanitizationMiddleware.forEach((middleware) => app.use(middleware));
 
   const requestLogger = createRequestLoggingMiddleware(config);
+
   app.use(requestLogger);
 };
