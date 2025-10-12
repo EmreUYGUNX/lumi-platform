@@ -1,0 +1,167 @@
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+import { Router } from "express";
+
+import type { ApplicationConfig } from "@lumi/types";
+
+import {
+  evaluateHealth,
+  getMetricsSnapshot,
+  isMetricsCollectionEnabled,
+  metricsRegistry,
+} from "../observability/index.js";
+
+const BASIC_AUTH_REALM = "Lumi Metrics";
+const CACHE_CONTROL_HEADER = "no-store";
+
+const parseBasicAuthHeader = (
+  header: string | undefined,
+): { username: string; password: string } | undefined => {
+  let credentials: { username: string; password: string } | undefined;
+
+  if (typeof header === "string") {
+    const [scheme, encoded] = header.split(" ");
+
+    if (scheme && scheme.toLowerCase() === "basic" && encoded) {
+      try {
+        const decoded = Buffer.from(encoded, "base64").toString("utf8");
+        const separatorIndex = decoded.indexOf(":");
+
+        if (separatorIndex !== -1) {
+          credentials = {
+            username: decoded.slice(0, separatorIndex),
+            password: decoded.slice(separatorIndex + 1),
+          };
+        }
+      } catch {
+        credentials = undefined;
+      }
+    }
+  }
+
+  return credentials;
+};
+
+const getActiveConfig = (req: Request, fallback: ApplicationConfig): ApplicationConfig => {
+  const current = req.app?.locals?.config as ApplicationConfig | undefined;
+  return current ?? fallback;
+};
+
+const createMetricsAuthMiddleware =
+  (initialConfig: ApplicationConfig): RequestHandler =>
+  (req: Request, res: Response, next: NextFunction) => {
+    const { basicAuth } = getActiveConfig(req, initialConfig).observability.metrics;
+    if (!basicAuth) {
+      next();
+      return;
+    }
+
+    const credentials = parseBasicAuthHeader(req.headers.authorization);
+    if (
+      !credentials ||
+      credentials.username !== basicAuth.username ||
+      credentials.password !== basicAuth.password
+    ) {
+      res.setHeader("WWW-Authenticate", `Basic realm="${BASIC_AUTH_REALM}", charset="UTF-8"`);
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      });
+      return;
+    }
+
+    next();
+  };
+
+const metricsHandler: RequestHandler = async (req, res) => {
+  if (!isMetricsCollectionEnabled()) {
+    res.status(503).json({
+      success: false,
+      error: {
+        code: "METRICS_DISABLED",
+        message: "Metrics collection is disabled",
+      },
+    });
+    return;
+  }
+
+  try {
+    const snapshot = await getMetricsSnapshot();
+    res.setHeader("Cache-Control", CACHE_CONTROL_HEADER);
+
+    if (snapshot && snapshot.length > 0) {
+      res.type(metricsRegistry.contentType);
+      res.status(200).send(snapshot);
+      return;
+    }
+
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "METRICS_SNAPSHOT_ERROR",
+        message: "Failed to collect metrics snapshot",
+        details: {
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message }
+              : { message: String(error) },
+        },
+      },
+    });
+  }
+};
+
+const createHealthHandler =
+  (initialConfig: ApplicationConfig): RequestHandler =>
+  async (req, res) => {
+    try {
+      const snapshot = await evaluateHealth();
+      const activeConfig = getActiveConfig(req, initialConfig);
+      res.setHeader("Cache-Control", CACHE_CONTROL_HEADER);
+      res.status(200).json({
+        success: true,
+        data: snapshot,
+        meta: {
+          environment: activeConfig.app.environment,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "HEALTH_EVALUATION_FAILED",
+          message: "Failed to evaluate service health",
+          details: {
+            error:
+              error instanceof Error
+                ? { name: error.name, message: error.message }
+                : { message: String(error) },
+          },
+        },
+      });
+    }
+  };
+
+const normalisePath = (path: string): string => {
+  if (!path || path === "/") {
+    return "/metrics";
+  }
+
+  return path.startsWith("/") ? path : `/${path}`;
+};
+
+export const createInternalRouter = (config: ApplicationConfig): Router => {
+  const router = Router();
+  const metricsPath = normalisePath(config.observability.metrics.endpoint);
+  const metricsAuthMiddleware = createMetricsAuthMiddleware(config);
+
+  router.get(metricsPath, metricsAuthMiddleware, metricsHandler);
+  router.get("/health", createHealthHandler(config));
+
+  return router;
+};

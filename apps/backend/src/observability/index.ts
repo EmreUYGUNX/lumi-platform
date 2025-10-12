@@ -14,6 +14,9 @@ export {
   recordUptimeNow,
   trackDuration,
   trackDurationAsync,
+  beginHttpRequestObservation,
+  observeHttpRequest,
+  type HttpMetricLabels,
 } from "./metrics.js";
 
 export {

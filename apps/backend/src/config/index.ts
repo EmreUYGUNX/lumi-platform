@@ -104,6 +104,13 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
       prefix: env.metricsPrefix,
       collectDefaultMetrics: env.metricsCollectDefault,
       defaultMetricsInterval: env.metricsDefaultInterval,
+      basicAuth:
+        env.metricsBasicAuthUsername && env.metricsBasicAuthPassword
+          ? {
+              username: env.metricsBasicAuthUsername,
+              password: env.metricsBasicAuthPassword,
+            }
+          : undefined,
     },
     alerting: {
       enabled: env.alertingEnabled,

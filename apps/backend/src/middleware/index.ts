@@ -8,6 +8,7 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { createSentryRequestMiddleware } from "../lib/sentry.js";
 import { createCorsMiddleware } from "./cors.js";
+import { createMetricsMiddleware } from "./metrics.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
 import { createRequestIdMiddleware } from "./requestId.js";
 import { createRequestLoggingMiddleware } from "./requestLogger.js";
@@ -19,6 +20,7 @@ const COMPRESSION_THRESHOLD_BYTES = 1024;
 
 export const registerMiddleware = (app: Express, config: ApplicationConfig): void => {
   app.use(createRequestIdMiddleware());
+  app.use(createMetricsMiddleware());
   app.use(createSentryRequestMiddleware());
 
   const securityMiddlewares = createSecurityMiddleware(config.security.headers);

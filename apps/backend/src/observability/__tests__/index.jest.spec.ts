@@ -23,6 +23,22 @@ const BASE_ENV = {
   CI: "true",
 } as const;
 
+const noopRequestStopTimer = () => {};
+
+function beginHttpTimerStub() {
+  return noopRequestStopTimer;
+}
+
+const createHistogramTimer = () => {
+  const endTimer = jest.fn();
+
+  return {
+    startTimer: jest.fn(function startTimer() {
+      return endTimer;
+    }),
+  };
+};
+
 describe("observability bootstrap", () => {
   afterEach(() => {
     jest.resetModules();
@@ -57,6 +73,8 @@ describe("observability bootstrap", () => {
       trackDurationAsync: jest.fn(),
       getMetricsSnapshot: jest.fn(),
       recordUptimeNow: recordUptime,
+      beginHttpRequestObservation: jest.fn(beginHttpTimerStub),
+      observeHttpRequest: jest.fn(),
     }));
 
     jest.doMock("../health.js", () => ({
@@ -88,12 +106,9 @@ describe("observability bootstrap", () => {
       module.createCounter({ name: "counter", help: "help" });
       module.createGauge({ name: "gauge", help: "help" });
       module.createHistogram({ name: "hist", help: "help" });
-      module.trackDuration({ startTimer: jest.fn(() => jest.fn()) } as never, undefined, () => {});
-      await module.trackDurationAsync(
-        { startTimer: jest.fn(() => jest.fn()) } as never,
-        undefined,
-        async () => "done",
-      );
+      const histogramTimer = createHistogramTimer();
+      module.trackDuration(histogramTimer as never, undefined, () => {});
+      await module.trackDurationAsync(histogramTimer as never, undefined, async () => "done");
       module.registerHealthCheck("test", () => ({
         status: "healthy",
         summary: "ok",
