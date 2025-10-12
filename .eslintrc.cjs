@@ -33,6 +33,7 @@ module.exports = {
       },
       node: {
         extensions: [".js", ".jsx", ".ts", ".tsx"],
+        version: ">=20.11.0",
       },
     },
     react: {
@@ -155,11 +156,6 @@ module.exports = {
       env: { node: true },
       parserOptions: {
         project: [path.join(__dirname, "apps/backend/tsconfig.json")],
-      },
-      settings: {
-        node: {
-          version: ">=20.11.0",
-        },
       },
       plugins: ["n"],
       extends: ["plugin:n/recommended"],

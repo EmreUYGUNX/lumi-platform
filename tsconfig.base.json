@@ -12,6 +12,9 @@
       "@lumi/shared/*": ["packages/shared/src/*"],
       "@lumi/types": ["packages/types/src/index.ts"],
       "@lumi/types/*": ["packages/types/src/*"],
+      "@lumi/testing/jest": ["packages/testing/src/assertions/jest.ts"],
+      "@lumi/testing": ["packages/testing/src/index.ts"],
+      "@lumi/testing/*": ["packages/testing/src/*"],
       "@lumi/ui": ["packages/ui/src/index.ts"],
       "@lumi/ui/*": ["packages/ui/src/*"]
     },
