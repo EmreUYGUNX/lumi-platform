@@ -4,6 +4,7 @@ import type { RequestHandler } from "express";
 import { isOriginAllowed } from "@lumi/shared";
 import type { ApplicationConfig } from "@lumi/types";
 
+import { logger } from "../lib/logger.js";
 import { buildCorsOptions } from "../security/cors.js";
 
 export interface CorsMiddlewareBundle {
@@ -17,16 +18,25 @@ const NOOP_HANDLER: RequestHandler = (_request, _response, next) => {
 
 const createOriginValidator = (
   config: ApplicationConfig["security"]["cors"],
+  options: ReturnType<typeof buildCorsOptions>,
 ): CorsOptions["origin"] => {
-  const originConfig = buildCorsOptions(config);
-
-  if (!originConfig.enabled) {
+  if (!options.enabled) {
     return false;
   }
 
-  if (originConfig.origin === "*") {
-    return true;
+  if (options.origin.length === 0) {
+    if (options.unsafeWildcardDetected) {
+      logger.warn(
+        "CORS wildcard origin '*' ignored; configure explicit allowedOrigins to enable cross-origin access.",
+      );
+    }
+    return false;
   }
+
+  const sanitisedConfig = {
+    ...config,
+    allowedOrigins: options.origin,
+  };
 
   return (origin, callback) => {
     if (!origin) {
@@ -35,7 +45,7 @@ const createOriginValidator = (
       return;
     }
 
-    if (isOriginAllowed(origin, config)) {
+    if (isOriginAllowed(origin, sanitisedConfig)) {
       // eslint-disable-next-line unicorn/no-null -- Express callback expects a nullable error argument.
       callback(null, true);
       return;
@@ -56,8 +66,8 @@ export const createCorsMiddleware = (
     };
   }
 
-  const origin = createOriginValidator(config);
   const options = buildCorsOptions(config);
+  const origin = createOriginValidator(config, options);
 
   const corsOptions: CorsOptions = {
     origin,

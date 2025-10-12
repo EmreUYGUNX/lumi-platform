@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 
 import { createApiClient } from "@lumi/testing";
 
+import { logger } from "../../lib/logger.js";
 import { createTestConfig } from "../../testing/config.js";
 import { createCorsMiddleware } from "../cors.js";
 
@@ -25,7 +26,8 @@ describe("createCorsMiddleware", () => {
     expect(next).toHaveBeenCalledTimes(2);
   });
 
-  it("allows wildcard origins when configured", async () => {
+  it("rejects wildcard origins and omits CORS headers", async () => {
+    const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => logger);
     const app = express();
     const config = createTestConfig({
       security: {
@@ -46,6 +48,10 @@ describe("createCorsMiddleware", () => {
     const response = await client.get("/ping").set("Origin", "https://any.example");
 
     expect(response.status).toBe(200);
-    expect(response.headers["access-control-allow-origin"]).toBe("https://any.example");
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "CORS wildcard origin '*' ignored; configure explicit allowedOrigins to enable cross-origin access.",
+    );
+    warnSpy.mockRestore();
   });
 });
