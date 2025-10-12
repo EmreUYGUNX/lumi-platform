@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { createApiClient } from "@lumi/testing";
 import type { ApplicationConfig } from "@lumi/types";
 
+import { registerRoute } from "../../routes/registry.js";
 import type { DeepPartial } from "../../testing/config.js";
 import { createTestConfig } from "../../testing/config.js";
 
@@ -28,6 +29,7 @@ const setupTestApp = async (overrides?: DeepPartial<ApplicationConfig>) => {
   const config = createTestConfig(overrides ?? {});
   const { createApp } = await import("../../app.js");
   const app = createApp({ config });
+  const routeRegistry = app.get("routeRegistry");
 
   app.get("/test", (req, res) =>
     res.json({
@@ -38,6 +40,9 @@ const setupTestApp = async (overrides?: DeepPartial<ApplicationConfig>) => {
       },
     }),
   );
+  if (routeRegistry) {
+    registerRoute(routeRegistry, "GET", "/test");
+  }
 
   app.post("/echo", (req, res) =>
     res.json({
@@ -49,6 +54,9 @@ const setupTestApp = async (overrides?: DeepPartial<ApplicationConfig>) => {
       },
     }),
   );
+  if (routeRegistry) {
+    registerRoute(routeRegistry, "POST", "/echo");
+  }
 
   app.post("/api/v1/auth/login", (req, res) =>
     res.json({
@@ -60,7 +68,12 @@ const setupTestApp = async (overrides?: DeepPartial<ApplicationConfig>) => {
       },
     }),
   );
+  if (routeRegistry) {
+    registerRoute(routeRegistry, "POST", "/api/v1/auth/login");
+  }
 
+  const refreshHandlers = app.get("refreshErrorHandlers") as (() => void) | undefined;
+  refreshHandlers?.();
   return { app, config };
 };
 

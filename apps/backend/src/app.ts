@@ -1,11 +1,18 @@
-import express, { type Express } from "express";
+import express, { type ErrorRequestHandler, type Express, type RequestHandler } from "express";
+import "express-async-errors";
 
 import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig } from "./config/index.js";
+import { registerErrorHandlers } from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
 import { createHealthRouter } from "./routes/health.js";
 import { createInternalRouter } from "./routes/internal.js";
+import {
+  attachRouteRegistry,
+  createRouteRegistrar,
+  createRouteRegistry,
+} from "./routes/registry.js";
 
 export interface CreateAppOptions {
   /**
@@ -17,6 +24,9 @@ export interface CreateAppOptions {
 export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Express => {
   const config = providedConfig ?? getConfig();
   const app = express();
+  const routeRegistry = createRouteRegistry();
+
+  attachRouteRegistry(app, routeRegistry);
 
   app.locals.config = config;
   app.set("port", config.app.port ?? 4000);
@@ -32,8 +42,39 @@ export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Ex
   app.disable("x-powered-by");
 
   registerMiddleware(app, config);
-  app.use("/api", createHealthRouter(config));
-  app.use("/internal", createInternalRouter(config));
+  const registerApiRoute = createRouteRegistrar(routeRegistry, "/api");
+  const registerInternalRoute = createRouteRegistrar(routeRegistry, "/internal");
+
+  app.use("/api", createHealthRouter(config, { registerRoute: registerApiRoute }));
+  app.use("/internal", createInternalRouter(config, { registerRoute: registerInternalRoute }));
+
+  registerErrorHandlers(app, config);
+
+  const refreshErrorHandlers = () => {
+    const router = Reflect.get(app, "_router") as
+      | {
+          stack: {
+            handle?: RequestHandler | ErrorRequestHandler;
+            route?: unknown;
+          }[];
+        }
+      | undefined;
+    const storedLayers = app.get("errorHandlerLayers") as
+      | {
+          handle?: RequestHandler | ErrorRequestHandler;
+          route?: unknown;
+        }[]
+      | undefined;
+    if (!router?.stack || !storedLayers || storedLayers.length === 0) {
+      return;
+    }
+
+    router.stack = router.stack.filter((layer) => !storedLayers.includes(layer));
+    router.stack.push(...storedLayers);
+  };
+
+  refreshErrorHandlers();
+  app.set("refreshErrorHandlers", refreshErrorHandlers);
 
   return app;
 };
