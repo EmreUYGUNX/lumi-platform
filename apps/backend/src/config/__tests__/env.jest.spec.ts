@@ -15,6 +15,8 @@ const BASE_ENV = {
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
   JWT_SECRET: "12345678901234567890123456789012",
+  METRICS_BASIC_AUTH_USERNAME: "metrics",
+  METRICS_BASIC_AUTH_PASSWORD: "metrics-pass",
   SENTRY_DSN: "",
   FEATURE_FLAGS: '{"betaCheckout":true,"abTestVariant":"A"}',
   CONFIG_HOT_RELOAD: "false",
@@ -40,6 +42,8 @@ describe("environment loader", () => {
       expect(env.featureFlags.betaCheckout).toBe(true);
       expect(env.logDirectory).toBe("logs");
       expect(env.metricsEnabled).toBe(true);
+      expect(env.metricsBasicAuthUsername).toBe("metrics");
+      expect(env.metricsBasicAuthPassword).toBe("metrics-pass");
       expect(env.cors.allowedOrigins).toContain("http://localhost:3000");
       expect(env.securityHeaders.enabled).toBe(true);
       expect(env.rateLimit.points).toBe(100);
@@ -57,6 +61,10 @@ describe("environment loader", () => {
       expect(config.observability.logs.request.maxBodyLength).toBe(2048);
       expect(config.observability.logs.request.redactFields).toContain("password");
       expect(config.observability.metrics.defaultMetricsInterval).toBe(5000);
+      expect(config.observability.metrics.basicAuth).toEqual({
+        username: "metrics",
+        password: "metrics-pass",
+      });
       expect(config.observability.alerting.severityThreshold).toBe("error");
       expect(config.security.cors.allowedOrigins).toContain("http://localhost:3000");
       expect(config.security.headers.frameGuard).toBe("DENY");
@@ -101,6 +109,28 @@ describe("environment loader", () => {
         async () => {},
       ),
     ).rejects.toThrow("LOG_REQUEST_SAMPLE_RATE must be between 0 and 1");
+  });
+
+  it("requires both metrics basic auth credentials when configured", async () => {
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          METRICS_BASIC_AUTH_PASSWORD: "",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("METRICS_BASIC_AUTH_PASSWORD is required when username is provided");
+
+    await expect(
+      withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          METRICS_BASIC_AUTH_USERNAME: "",
+        },
+        async () => {},
+      ),
+    ).rejects.toThrow("METRICS_BASIC_AUTH_USERNAME is required when password is provided");
   });
 
   it("detects configuration changes on reload", async () => {

@@ -313,6 +313,8 @@ const EnvSchema = z
       .int()
       .min(1, "METRICS_DEFAULT_INTERVAL must be a positive integer")
       .default(5000),
+    METRICS_BASIC_AUTH_USERNAME: z.union([z.string(), z.undefined()]).transform(optionalString),
+    METRICS_BASIC_AUTH_PASSWORD: z.union([z.string(), z.undefined()]).transform(optionalString),
     ALERTING_ENABLED: z
       .any()
       .transform((value) => booleanTransformer(value, false))
@@ -358,6 +360,23 @@ const EnvSchema = z
       .any()
       .transform((value) => booleanTransformer(value, false))
       .pipe(z.boolean()),
+  })
+  .superRefine((value, ctx) => {
+    if (value.METRICS_BASIC_AUTH_USERNAME && !value.METRICS_BASIC_AUTH_PASSWORD) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "METRICS_BASIC_AUTH_PASSWORD is required when username is provided",
+        path: ["METRICS_BASIC_AUTH_PASSWORD"],
+      });
+    }
+
+    if (value.METRICS_BASIC_AUTH_PASSWORD && !value.METRICS_BASIC_AUTH_USERNAME) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "METRICS_BASIC_AUTH_USERNAME is required when password is provided",
+        path: ["METRICS_BASIC_AUTH_USERNAME"],
+      });
+    }
   })
   .transform((value) => ({
     ...value,
@@ -504,6 +523,8 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   metricsPrefix: parsed.METRICS_PREFIX,
   metricsCollectDefault: parsed.METRICS_COLLECT_DEFAULT,
   metricsDefaultInterval: parsed.METRICS_DEFAULT_INTERVAL,
+  metricsBasicAuthUsername: parsed.METRICS_BASIC_AUTH_USERNAME ?? undefined,
+  metricsBasicAuthPassword: parsed.METRICS_BASIC_AUTH_PASSWORD ?? undefined,
   alertingEnabled: parsed.ALERTING_ENABLED,
   alertingWebhookUrl: parsed.ALERTING_WEBHOOK_URL,
   alertingSeverity: parsed.ALERTING_SEVERITY,

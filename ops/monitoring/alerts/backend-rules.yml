@@ -1,0 +1,60 @@
+groups:
+  - name: lumi-backend-http
+    interval: 30s
+    rules:
+      - alert: LumiBackendHighErrorRate
+        expr: |
+          sum(rate(lumi_http_requests_total{status=~"5.."}[5m])) by () /
+          sum(rate(lumi_http_requests_total[5m])) by () > 0.02
+        for: 5m
+        labels:
+          severity: warn
+          service: lumi-backend
+        annotations:
+          summary: Backend HTTP error rate above 2%
+          description: |
+            5xx error rate has exceeded 2% over the last 5 minutes.
+            Investigate recent deployments or dependency failures.
+
+      - alert: LumiBackendCriticalErrorRate
+        expr: |
+          sum(rate(lumi_http_requests_total{status=~"5.."}[5m])) by () /
+          sum(rate(lumi_http_requests_total[5m])) by () > 0.05
+        for: 2m
+        labels:
+          severity: error
+          service: lumi-backend
+        annotations:
+          summary: Backend HTTP error rate above 5%
+          description: |
+            5xx error rate has exceeded 5% over the last 2 minutes.
+            Immediate action required; see runbook in docs/guides/observability.md.
+
+      - alert: LumiBackendLatencySLO
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(lumi_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.3
+        for: 10m
+        labels:
+          severity: warn
+          service: lumi-backend
+        annotations:
+          summary: Backend p95 latency above 300ms
+          description: |
+            p95 latency has breached the 300ms threshold for 10 minutes.
+            Check rate limiting, database health, and recent code changes.
+
+      - alert: LumiBackendHealthDegraded
+        expr: |
+          sum(rate(lumi_http_requests_total{route="/internal/health",status!="200"}[2m])) by () > 0
+        for: 2m
+        labels:
+          severity: warn
+          service: lumi-backend
+        annotations:
+          summary: Backend health degraded
+          description: |
+            /internal/health reported degraded or unhealthy status.
+            Inspect component details via the health endpoint.

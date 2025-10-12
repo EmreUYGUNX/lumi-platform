@@ -36,6 +36,43 @@ const BASE_ENV = {
   CI: "true",
 } as const;
 
+const installRotationMock = () => {
+  const instances: {
+    close: jest.Mock;
+    dirname?: string;
+  }[] = [];
+
+  jest.doMock("winston-daily-rotate-file", () => {
+    class DailyRotateFile extends TransportStream {
+      public readonly dirname: string | undefined;
+
+      private readonly closeMock = jest.fn();
+
+      constructor(options: Record<string, unknown>) {
+        super(options);
+        this.dirname = options.dirname as string | undefined;
+        instances.push({
+          close: this.closeMock,
+          dirname: this.dirname,
+        });
+      }
+
+      // eslint-disable-next-line class-methods-use-this
+      override log(_info: unknown, next: () => void): void {
+        next();
+      }
+
+      override close(): void {
+        this.closeMock();
+      }
+    }
+
+    return DailyRotateFile;
+  });
+
+  return instances;
+};
+
 class MemoryTransport extends TransportStream {
   public readonly logs: Record<string, unknown>[] = [];
 
@@ -204,47 +241,50 @@ describe("logger", () => {
 
   it("creates rotating file transports when disk logging is enabled", async () => {
     jest.resetModules();
+    const rotationInstances = installRotationMock();
 
     const tempDirectory = path.join(process.cwd(), "logs-test-suite");
     if (existsSync(tempDirectory)) {
       rmSync(tempDirectory, { recursive: true, force: true });
     }
 
-    await withTemporaryEnvironment(
-      {
-        ...BASE_ENV,
-        NODE_ENV: "production",
-        LOG_ENABLE_CONSOLE: "true",
-        LOG_DIRECTORY: "logs-test-suite",
-        CI: "false",
-      },
-      async () => {
-        const { logger } = await loadLoggerModule();
-        const { getConfig } = await loadConfigModule();
-        const config = getConfig();
+    try {
+      await withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          NODE_ENV: "production",
+          LOG_ENABLE_CONSOLE: "true",
+          LOG_DIRECTORY: "logs-test-suite",
+          CI: "false",
+        },
+        async () => {
+          const { logger } = await loadLoggerModule();
+          const { getConfig } = await loadConfigModule();
+          const config = getConfig();
 
-        expect(config.app.environment).toBe("production");
-        expect(config.runtime.ci).toBe(false);
+          expect(config.app.environment).toBe("production");
+          expect(config.runtime.ci).toBe(false);
+          expect(existsSync(tempDirectory)).toBe(true);
 
-        expect(existsSync(tempDirectory)).toBe(true);
+          const rotationTransports = logger.transports.filter(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(rotationTransports).toHaveLength(2);
+          expect(rotationInstances).toHaveLength(2);
 
-        const rotationTransports = logger.transports.filter(
-          (transport) => transport.constructor?.name === "DailyRotateFile",
-        );
-        expect(rotationTransports).toHaveLength(2);
-
-        logger.close();
-        await new Promise<void>((resolve) => {
-          setImmediate(resolve);
-        });
-      },
-    );
-
-    if (existsSync(tempDirectory)) {
-      rmSync(tempDirectory, { recursive: true, force: true });
+          logger.close();
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+        },
+      );
+    } finally {
+      jest.dontMock("winston-daily-rotate-file");
+      jest.resetModules();
+      if (existsSync(tempDirectory)) {
+        rmSync(tempDirectory, { recursive: true, force: true });
+      }
     }
-
-    jest.resetModules();
   });
 
   it("closes existing transports when re-registering with same name", async () => {
@@ -358,56 +398,58 @@ describe("logger", () => {
 
   it("closes rotation transports when disk logging is disabled", async () => {
     jest.resetModules();
+    const rotationInstances = installRotationMock();
     const tempDirectory = path.join(process.cwd(), "logs-rotate-close");
     if (existsSync(tempDirectory)) {
       rmSync(tempDirectory, { recursive: true, force: true });
     }
     mkdirSync(tempDirectory, { recursive: true });
 
-    await withTemporaryEnvironment(
-      {
-        ...BASE_ENV,
-        NODE_ENV: "production",
-        CI: "false",
-        LOG_ENABLE_CONSOLE: "false",
-        LOG_DIRECTORY: "logs-rotate-close",
-      },
-      async () => {
-        const { logger } = await loadLoggerModule();
-        const rotationTransports = logger.transports.filter(
-          (transport) => transport.constructor?.name === "DailyRotateFile",
-        );
-        expect(rotationTransports).toHaveLength(2);
+    try {
+      await withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          NODE_ENV: "production",
+          CI: "false",
+          LOG_ENABLE_CONSOLE: "false",
+          LOG_DIRECTORY: "logs-rotate-close",
+        },
+        async () => {
+          const { logger } = await loadLoggerModule();
+          const rotationTransports = logger.transports.filter(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(rotationTransports).toHaveLength(2);
+          expect(rotationInstances).toHaveLength(2);
+          rotationInstances.forEach(({ close }) => {
+            expect(close).not.toHaveBeenCalled();
+          });
 
-        const closeSpies = rotationTransports.map((transport) => jest.spyOn(transport, "close"));
+          process.env.CI = "true";
+          const { reloadConfiguration } = await loadConfigModule();
+          reloadConfiguration("disable-disk");
 
-        process.env.CI = "true";
-        const { reloadConfiguration } = await loadConfigModule();
-        reloadConfiguration("disable-disk");
+          rotationInstances.forEach(({ close }) => {
+            expect(close).toHaveBeenCalled();
+          });
+          const hasRotation = logger.transports.some(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(hasRotation).toBe(false);
 
-        closeSpies.forEach((spy) => expect(spy).toHaveBeenCalled());
-        const hasRotation = logger.transports.some(
-          (transport) => transport.constructor?.name === "DailyRotateFile",
-        );
-        expect(hasRotation).toBe(false);
-
-        logger.close();
-        await new Promise<void>((resolve) => {
-          setImmediate(resolve);
-        });
-      },
-    );
-
-    if (existsSync(tempDirectory)) {
-      try {
+          logger.close();
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+        },
+      );
+    } finally {
+      jest.dontMock("winston-daily-rotate-file");
+      jest.resetModules();
+      if (existsSync(tempDirectory)) {
         rmSync(tempDirectory, { recursive: true, force: true });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-          throw error;
-        }
       }
     }
-    jest.resetModules();
   });
 
   it("renders colourised console output in pretty mode", async () => {

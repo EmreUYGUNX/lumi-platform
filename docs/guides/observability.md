@@ -30,18 +30,53 @@ pnpm exec node tools/scripts/log-query.mjs --level error --request req-123
 - Default process metrics are collected (CPU, memory, GC) when `METRICS_ENABLED=true`.
 - Custom counters, gauges, and histograms are created with `createCounter`, `createGauge`, and `createHistogram`. Helper functions (`trackDuration`, `trackDurationAsync`) make latency instrumentation trivial.
 - A service uptime gauge (`<prefix>uptime_seconds`) updates automatically.
+- Use `beginHttpRequestObservation` and `observeHttpRequest` for consistent HTTP metrics in bespoke handlers (e.g. background jobs calling internal APIs).
+
+```ts
+import { beginHttpRequestObservation, observeHttpRequest } from "../observability/index";
+
+const stop = beginHttpRequestObservation("POST", "/api/internal/sync");
+try {
+  await syncJob();
+  stop("200");
+} catch (error) {
+  stop("500");
+  throw error;
+}
+
+// Manual timings (e.g. third-party calls)
+observeHttpRequest({ method: "GET", route: "/vendor/search", status: "200" }, durationSeconds);
+```
 
 > **Environment**
 >
-> | Key                        | Purpose                       | Default    |
-> | -------------------------- | ----------------------------- | ---------- |
-> | `METRICS_ENABLED`          | Toggle metrics pipeline       | `true`     |
-> | `METRICS_ENDPOINT`         | HTTP path for scraping        | `/metrics` |
-> | `METRICS_PREFIX`           | Metric name prefix            | `lumi_`    |
-> | `METRICS_COLLECT_DEFAULT`  | Collect Node.js defaults      | `true`     |
-> | `METRICS_DEFAULT_INTERVAL` | Default metrics interval (ms) | `5000`     |
+> | Key                           | Purpose                          | Default       |
+> | ----------------------------- | -------------------------------- | ------------- |
+> | `METRICS_ENABLED`             | Toggle metrics pipeline          | `true`        |
+> | `METRICS_ENDPOINT`            | HTTP path for scraping           | `/metrics`    |
+> | `METRICS_PREFIX`              | Metric name prefix               | `lumi_`       |
+> | `METRICS_COLLECT_DEFAULT`     | Collect Node.js defaults         | `true`        |
+> | `METRICS_DEFAULT_INTERVAL`    | Default metrics interval (ms)    | `5000`        |
+> | `METRICS_BASIC_AUTH_USERNAME` | Basic auth username for scraping | `metrics`     |
+> | `METRICS_BASIC_AUTH_PASSWORD` | Basic auth password for scraping | _set per env_ |
 
 Prometheus is pre-configured via `ops/monitoring/prometheus.yml`. Grafana dashboards are seeded in `ops/monitoring/dashboards/backend-overview.json`.
+
+### Internal Endpoints
+
+- `GET /internal/metrics` — Prometheus scrape target. Protected with HTTP Basic auth when `METRICS_BASIC_AUTH_USERNAME/PASSWORD` are set. The endpoint responds with `text/plain` Prometheus exposition format. Example:
+
+```bash
+curl \
+  -H "Authorization: Basic $(printf "%s:%s" "$METRICS_BASIC_AUTH_USERNAME" "$METRICS_BASIC_AUTH_PASSWORD" | base64)" \
+  http://localhost:4000/internal/metrics
+```
+
+> **Prometheus**: update `ops/monitoring/prometheus.yml` with matching `basic_auth` credentials (defaults: `metrics` / `change-me` for local development). Prefer environment-variable interpolation or a `password_file` for production deployments.
+
+- `GET /internal/health` — Machine-readable health snapshot following the Q2 response contract. Suitable for uptime monitors, Kubernetes probes, and runbook automation.
+
+Import the pre-built Grafana dashboard (`ops/monitoring/dashboards/backend-overview.json`) to track request throughput, latency percentiles, error rates, and resource utilisation using the standard Lumi metrics (`lumi_http_requests_total`, `lumi_http_request_duration_seconds_*`, etc.).
 
 ## Health Checks
 
@@ -66,6 +101,14 @@ Prometheus is pre-configured via `ops/monitoring/prometheus.yml`. Grafana dashbo
 - The alert manager (`observability/alerts.ts`) fan-outs notifications to registered channels.
 - Severity gating uses `ALERTING_SEVERITY`. Built-in webhook delivery is enabled automatically when `ALERTING_ENABLED=true` and a `ALERTING_WEBHOOK_URL` is supplied.
 - Register on-call integrations (e.g. PagerDuty, Slack) via `registerAlertChannel`.
+
+Recommended starter rules:
+
+1. **HTTP Error Rate** – Trigger `warn` at >2% 5xx over 5 minutes, `error` at >5%.
+2. **Latency SLO** – Alert when `lumi_http_request_duration_seconds` p95 exceeds 300ms for 10 minutes.
+3. **Health Degradation** – Notify when `/internal/health` reports `status !== "healthy"` for two consecutive checks.
+
+Document custom alert payloads under `ops/monitoring/alerts/` (create per-environment YAML as rules are finalised).
 
 > **Environment**
 >

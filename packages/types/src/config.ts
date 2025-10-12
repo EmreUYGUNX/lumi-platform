@@ -92,12 +92,18 @@ export interface LogTransportConfig {
   request: RequestLoggingConfig;
 }
 
+export interface MetricsBasicAuthConfig {
+  username: string;
+  password: string;
+}
+
 export interface MetricsConfig {
   enabled: boolean;
   endpoint: string;
   prefix?: string;
   collectDefaultMetrics: boolean;
   defaultMetricsInterval: number;
+  basicAuth?: MetricsBasicAuthConfig;
 }
 
 export interface AlertingConfig {
@@ -138,6 +144,8 @@ export interface ResolvedEnvironment {
   metricsPrefix?: string;
   metricsCollectDefault: boolean;
   metricsDefaultInterval: number;
+  metricsBasicAuthUsername?: string;
+  metricsBasicAuthPassword?: string;
   alertingEnabled: boolean;
   alertingWebhookUrl?: string;
   alertingSeverity: AlertSeverityLevel;
