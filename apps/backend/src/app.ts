@@ -6,7 +6,7 @@ import type { ApplicationConfig } from "@lumi/types";
 import { getConfig } from "./config/index.js";
 import { registerErrorHandlers } from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
-import { createHealthRouter } from "./routes/health.js";
+import { createApiRouter } from "./routes/index.js";
 import { createInternalRouter } from "./routes/internal.js";
 import {
   attachRouteRegistry,
@@ -45,7 +45,7 @@ export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Ex
   const registerApiRoute = createRouteRegistrar(routeRegistry, "/api");
   const registerInternalRoute = createRouteRegistrar(routeRegistry, "/internal");
 
-  app.use("/api", createHealthRouter(config, { registerRoute: registerApiRoute }));
+  app.use("/api", createApiRouter(config, { registerRoute: registerApiRoute }));
   app.use("/internal", createInternalRouter(config, { registerRoute: registerInternalRoute }));
 
   registerErrorHandlers(app, config);

@@ -86,16 +86,17 @@ Import the pre-built Grafana dashboard (`ops/monitoring/dashboards/backend-overv
 
 ### Kubernetes Probes
 
-- `/api/health/live` — lightweight liveness probe. Always returns `200` unless the process is unresponsive.
-- `/api/health/ready` — readiness gate. Returns `503` when any dependency reports `status !== "healthy"` (e.g. PostgreSQL or Redis unavailable, warm-up window active, or health check timeout).
-- `/api/health` — comprehensive diagnostics (uptime, CPU/memory stats, dependency breakdown, response latency) for observability dashboards or on-call tooling.
+- `/api/v1/health/live` — lightweight liveness probe. Always returns `200` unless the process is unresponsive.
+- `/api/v1/health/ready` — readiness gate. Returns `503` when any dependency reports `status !== "healthy"` (e.g. PostgreSQL or Redis unavailable, warm-up window active, or health check timeout).
+- `/api/v1/health` — comprehensive diagnostics (uptime, CPU/memory stats, dependency breakdown, response latency) for observability dashboards or on-call tooling.
+- Legacy `/api/health*` routes remain available during the deprecation window and proxy to the v1 handlers while emitting `Deprecation: true` headers. Update probes before the sunset date announced in response headers.
 
 Example deployment snippet:
 
 ```yaml
 livenessProbe:
   httpGet:
-    path: /api/health/live
+    path: /api/v1/health/live
     port: 4000
   initialDelaySeconds: 10
   periodSeconds: 15
@@ -103,7 +104,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /api/health/ready
+    path: /api/v1/health/ready
     port: 4000
   initialDelaySeconds: 20
   periodSeconds: 10
@@ -113,7 +114,7 @@ readinessProbe:
 
 > **Degraded States**
 >
-> Health checks return structured component summaries with `status` values (`healthy`, `degraded`, `unhealthy`). Degraded components keep `/api/health` at `200` for diagnostics while forcing `/api/health/ready` to `503`, preventing pods from receiving new traffic until dependencies stabilise.
+> Health checks return structured component summaries with `status` values (`healthy`, `degraded`, `unhealthy`). Degraded components keep `/api/v1/health` at `200` for diagnostics while forcing `/api/v1/health/ready` to `503`, preventing pods from receiving new traffic until dependencies stabilise.
 
 ## Performance Monitoring
 

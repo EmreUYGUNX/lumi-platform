@@ -86,7 +86,7 @@ describe("health routes", () => {
           const { createApp } = await import("../../app.js");
           const app = createApp();
 
-          const response = await request(app).get("/api/health").expect(200);
+          const response = await request(app).get("/api/v1/health").expect(200);
 
           expect(response.body.success).toBe(true);
           expect(response.body.data.status).toBe("healthy");
@@ -108,7 +108,7 @@ describe("health routes", () => {
       const { createApp } = await import("../../app.js");
       const app = createApp();
 
-      const response = await request(app).get("/api/health/ready").expect(503);
+      const response = await request(app).get("/api/v1/health/ready").expect(503);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe("SERVICE_NOT_READY");
@@ -122,7 +122,7 @@ describe("health routes", () => {
       const { createApp } = await import("../../app.js");
       const app = createApp();
 
-      const response = await request(app).get("/api/health/live").expect(200);
+      const response = await request(app).get("/api/v1/health/live").expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.status).toBe("healthy");
