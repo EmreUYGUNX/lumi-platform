@@ -8,6 +8,8 @@ import type { Router as ExpressRouter, RequestHandler } from "express";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig, onConfigChange } from "../config/index.js";
+import { asyncHandler } from "../lib/asyncHandler.js";
+import { errorResponse, successResponse } from "../lib/response.js";
 import {
   evaluateHealth,
   registerHealthCheck,
@@ -267,28 +269,10 @@ const captureProcessMetrics = () => {
   };
 };
 
-const buildSuccessResponse = (data: Record<string, unknown>, meta: Record<string, unknown>) => ({
-  success: true,
-  data,
-  meta,
-});
-
-const buildErrorResponse = (
-  error: Record<string, unknown>,
-  meta: Record<string, unknown>,
-  status = 503,
-) => ({
-  status,
-  body: {
-    success: false,
-    error,
-    meta,
-  },
-});
-
-const createComprehensiveHealthHandler =
-  (configResolver: () => ApplicationConfig): RequestHandler =>
-  async (_req, res) => {
+const createComprehensiveHealthHandler = (
+  configResolver: () => ApplicationConfig,
+): RequestHandler =>
+  asyncHandler(async (_req, res) => {
     const startedAt = performance.now();
     const snapshot = await evaluateHealth();
     const metrics = captureProcessMetrics();
@@ -296,7 +280,7 @@ const createComprehensiveHealthHandler =
     const config = configResolver();
 
     res.status(200).json(
-      buildSuccessResponse(
+      successResponse(
         {
           status: snapshot.status,
           uptimeSeconds: snapshot.uptimeSeconds,
@@ -312,38 +296,37 @@ const createComprehensiveHealthHandler =
         },
       ),
     );
-  };
+  });
 
-const createReadinessHandler =
-  (configResolver: () => ApplicationConfig): RequestHandler =>
-  async (_req, res) => {
+const createReadinessHandler = (configResolver: () => ApplicationConfig): RequestHandler =>
+  asyncHandler(async (_req, res) => {
     const snapshot = await evaluateHealth();
     const config = configResolver();
     const isHealthy = snapshot.status === "healthy";
 
     if (!isHealthy) {
-      const response = buildErrorResponse(
-        {
-          code: "SERVICE_NOT_READY",
-          message: "Service dependencies are not fully healthy.",
-          details: {
-            status: snapshot.status,
-            components: snapshot.components,
+      res.status(503).json(
+        errorResponse(
+          {
+            code: "SERVICE_NOT_READY",
+            message: "Service dependencies are not fully healthy.",
+            details: {
+              status: snapshot.status,
+              components: snapshot.components,
+            },
           },
-        },
-        {
-          environment: config.app.environment,
-          service: config.app.name,
-          check: "readiness",
-        },
+          {
+            environment: config.app.environment,
+            service: config.app.name,
+            check: "readiness",
+          },
+        ),
       );
-
-      res.status(response.status).json(response.body);
       return;
     }
 
     res.status(200).json(
-      buildSuccessResponse(
+      successResponse(
         {
           status: snapshot.status,
           timestamp: new Date().toISOString(),
@@ -355,14 +338,14 @@ const createReadinessHandler =
         },
       ),
     );
-  };
+  });
 
 const createLivenessHandler =
   (configResolver: () => ApplicationConfig): RequestHandler =>
   (_req, res) => {
     const config = configResolver();
     res.status(200).json(
-      buildSuccessResponse(
+      successResponse(
         {
           status: "healthy",
           uptimeSeconds: process.uptime(),

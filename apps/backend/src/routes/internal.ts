@@ -3,6 +3,8 @@ import { Router } from "express";
 
 import type { ApplicationConfig } from "@lumi/types";
 
+import { asyncHandler } from "../lib/asyncHandler.js";
+import { errorResponse, successResponse } from "../lib/response.js";
 import {
   evaluateHealth,
   getMetricsSnapshot,
@@ -62,28 +64,36 @@ const createMetricsAuthMiddleware =
       credentials.password !== basicAuth.password
     ) {
       res.setHeader("WWW-Authenticate", `Basic realm="${BASIC_AUTH_REALM}", charset="UTF-8"`);
-      res.status(401).json({
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Authentication required",
-        },
-      });
+      res.status(401).json(
+        errorResponse(
+          {
+            code: "UNAUTHORIZED",
+            message: "Authentication required",
+          },
+          {
+            realm: BASIC_AUTH_REALM,
+          },
+        ),
+      );
       return;
     }
 
     next();
   };
 
-const metricsHandler: RequestHandler = async (req, res) => {
+const formatUnknownError = (error: unknown) =>
+  error instanceof Error
+    ? { name: error.name, message: error.message }
+    : { message: String(error) };
+
+const metricsHandler: RequestHandler = asyncHandler(async (_req, res) => {
   if (!isMetricsCollectionEnabled()) {
-    res.status(503).json({
-      success: false,
-      error: {
+    res.status(503).json(
+      errorResponse({
         code: "METRICS_DISABLED",
         message: "Metrics collection is disabled",
-      },
-    });
+      }),
+    );
     return;
   }
 
@@ -99,53 +109,48 @@ const metricsHandler: RequestHandler = async (req, res) => {
 
     res.status(204).end();
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: {
+    res.status(500).json(
+      errorResponse({
         code: "METRICS_SNAPSHOT_ERROR",
         message: "Failed to collect metrics snapshot",
         details: {
-          error:
-            error instanceof Error
-              ? { name: error.name, message: error.message }
-              : { message: String(error) },
+          error: formatUnknownError(error),
         },
-      },
-    });
+      }),
+    );
   }
-};
+});
 
-const createHealthHandler =
-  (initialConfig: ApplicationConfig): RequestHandler =>
-  async (req, res) => {
+const createHealthHandler = (initialConfig: ApplicationConfig): RequestHandler =>
+  asyncHandler(async (req, res) => {
     try {
       const snapshot = await evaluateHealth();
       const activeConfig = getActiveConfig(req, initialConfig);
       res.setHeader("Cache-Control", CACHE_CONTROL_HEADER);
-      res.status(200).json({
-        success: true,
-        data: snapshot,
-        meta: {
+      res.status(200).json(
+        successResponse(snapshot, {
           environment: activeConfig.app.environment,
           generatedAt: new Date().toISOString(),
-        },
-      });
+        }),
+      );
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: {
-          code: "HEALTH_EVALUATION_FAILED",
-          message: "Failed to evaluate service health",
-          details: {
-            error:
-              error instanceof Error
-                ? { name: error.name, message: error.message }
-                : { message: String(error) },
+      res.status(500).json(
+        errorResponse(
+          {
+            code: "HEALTH_EVALUATION_FAILED",
+            message: "Failed to evaluate service health",
+            details: {
+              error: formatUnknownError(error),
+            },
           },
-        },
-      });
+          {
+            environment: initialConfig.app.environment,
+            generatedAt: new Date().toISOString(),
+          },
+        ),
+      );
     }
-  };
+  });
 
 const normalisePath = (path: string): string => {
   if (!path || path === "/") {
