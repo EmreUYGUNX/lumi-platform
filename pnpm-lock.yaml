@@ -28,6 +28,7 @@ overrides:
   "@stoplight/spectral-formats": 1.5.0
   "@stoplight/spectral-functions": 1.7.2
   jsonpath-plus: 10.3.0
+  dotenv-expand: ^11.0.7
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -224,7 +225,7 @@ importers:
         specifier: ^16.4.5
         version: 16.6.1
       dotenv-expand:
-        specifier: ^11.0.6
+        specifier: ^11.0.7
         version: 11.0.7
       express:
         specifier: ^4.19.2
@@ -4900,13 +4901,6 @@ packages:
         integrity: sha512-XkBYCG0tPIes+YZr4SpfFv76SQrV/LeCE8CI7JSEMi3VR9MvTihCGTOtbIexD6i2mXF+6px7trb1imVCXSNMDw==,
       }
     hasBin: true
-
-  dotenv-expand@10.0.0:
-    resolution:
-      {
-        integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==,
-      }
-    engines: { node: ">=12" }
 
   dotenv-expand@11.0.7:
     resolution:
@@ -13516,10 +13510,8 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       dotenv: 16.6.1
-      dotenv-expand: 10.0.0
+      dotenv-expand: 11.0.7
       minimist: 1.2.8
-
-  dotenv-expand@10.0.0: {}
 
   dotenv-expand@11.0.7:
     dependencies:
