@@ -8,7 +8,7 @@ export type DeepPartial<T> = {
 const isMergeableObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const deepMerge = <T>(base: T, overrides: DeepPartial<T> = {}): T => {
+export const deepMerge = <T>(base: T, overrides: DeepPartial<T> = {}): T => {
   if (!isMergeableObject(base)) {
     return (overrides === undefined ? base : (overrides as T)) as T;
   }
@@ -39,6 +39,20 @@ const deepMerge = <T>(base: T, overrides: DeepPartial<T> = {}): T => {
   });
 
   return result as T;
+};
+
+export const mergeTestOverrides = <T>(...overrides: DeepPartial<T>[]): DeepPartial<T> => {
+  let accumulator: DeepPartial<T> = {};
+
+  overrides.forEach((override) => {
+    if (!override) {
+      return;
+    }
+
+    accumulator = deepMerge(accumulator as T, override);
+  });
+
+  return accumulator;
 };
 
 export const createTestConfig = (
