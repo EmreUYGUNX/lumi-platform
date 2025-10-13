@@ -38,11 +38,11 @@ const loadEnvironment = () => {
 const stubFiles = [
   {
     name: "index.js",
-    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on(_event, handler) {\n    if (typeof handler === 'function') {\n      handler({});\n    }\n  }\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: { Prisma } };\n`,
+    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on(_event, handler) {\n    if (typeof handler === 'function') {\n      handler({});\n    }\n  }\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: PrismaClient };\n`,
   },
   {
     name: "default.js",
-    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on(_event, handler) {\n    if (typeof handler === 'function') {\n      handler({});\n    }\n  }\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: { Prisma } };\n`,
+    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on(_event, handler) {\n    if (typeof handler === 'function') {\n      handler({});\n    }\n  }\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: PrismaClient };\n`,
   },
   {
     name: "index.d.ts",

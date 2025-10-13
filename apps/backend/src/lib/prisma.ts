@@ -1,16 +1,33 @@
 import { setTimeout as delay } from "node:timers/promises";
 
-import { PrismaClient } from "@prisma/client";
+import PrismaClientConstructor from "@prisma/client";
 
 import { getConfig } from "../config/index.js";
 import { logger } from "./logger.js";
+
+interface PrismaClientBase {
+  $connect(): Promise<void>;
+  $disconnect(): Promise<void>;
+  $on(event: string, handler: (payload: unknown) => void): void;
+  $use(middleware: (...args: unknown[]) => void): void;
+  $transaction<T>(fn: (client: PrismaClientBase, ...args: unknown[]) => Promise<T> | T): Promise<T>;
+}
+
+type PrismaClientClass = new (...args: unknown[]) => PrismaClientBase & {
+  $connect(): Promise<void>;
+  $disconnect(): Promise<void>;
+};
+
+const PrismaClient = PrismaClientConstructor as unknown as PrismaClientClass;
+
+type PrismaClientInstance = PrismaClientBase;
 
 const MAX_CONNECT_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1000;
 const DEFAULT_PRISMA_TARGET = "unknown";
 const DEFAULT_PRISMA_MESSAGE = "No message provided";
 
-type PrismaExtensionFactory = (client: PrismaClient) => PrismaClient;
+type PrismaExtensionFactory = (client: PrismaClientInstance) => PrismaClientInstance;
 
 interface PrismaClientLogEvent {
   timestamp?: Date;
@@ -24,7 +41,7 @@ interface PrismaClientQueryEvent extends PrismaClientLogEvent {
   duration?: number;
 }
 
-let prismaInstance: PrismaClient | undefined;
+let prismaInstance: PrismaClientInstance | undefined;
 let connectPromise: Promise<void> | undefined;
 const extensionFactories: PrismaExtensionFactory[] = [];
 
@@ -37,7 +54,8 @@ const truncate = (value: string, maxLength: number) => {
 };
 
 /* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
-const registerEventLogging = (client: PrismaClient, slowQueryThresholdMs: number) => {
+/* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
+const registerEventLogging = (client: PrismaClientInstance, slowQueryThresholdMs: number) => {
   const {
     app: { environment },
   } = getConfig();
@@ -97,7 +115,7 @@ const registerEventLogging = (client: PrismaClient, slowQueryThresholdMs: number
   });
 };
 
-const applyExtensions = (client: PrismaClient) => {
+const applyExtensions = (client: PrismaClientInstance) => {
   let current = client;
 
   extensionFactories.forEach((factory) => {
@@ -107,7 +125,7 @@ const applyExtensions = (client: PrismaClient) => {
   return current;
 };
 
-const createPrismaClient = (): PrismaClient => {
+const createPrismaClient = (): PrismaClientInstance => {
   const {
     database: {
       url,
@@ -148,7 +166,7 @@ const createPrismaClient = (): PrismaClient => {
   return applyExtensions(client);
 };
 
-const connectWithRetry = async (client: PrismaClient): Promise<void> => {
+const connectWithRetry = async (client: PrismaClientInstance): Promise<void> => {
   let attempt = 0;
 
   const attemptConnection = async (): Promise<void> => {
@@ -188,7 +206,7 @@ const ensureConnection = (): Promise<void> => {
   return connectPromise;
 };
 
-export const getPrismaClient = (): PrismaClient => {
+export const getPrismaClient = (): PrismaClientInstance => {
   if (!prismaInstance) {
     prismaInstance = createPrismaClient();
     connectPromise = undefined;
@@ -201,7 +219,7 @@ export const getPrismaClient = (): PrismaClient => {
   return prismaInstance;
 };
 
-export const waitForPrismaClient = async (): Promise<PrismaClient> => {
+export const waitForPrismaClient = async (): Promise<PrismaClientInstance> => {
   const client = getPrismaClient();
   await ensureConnection();
   return client;
