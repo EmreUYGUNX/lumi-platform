@@ -106,6 +106,14 @@ export interface MetricsConfig {
   basicAuth?: MetricsBasicAuthConfig;
 }
 
+export interface DatabasePoolConfig {
+  minConnections: number;
+  maxConnections: number;
+  idleTimeoutMs: number;
+  maxLifetimeMs: number;
+  connectionTimeoutMs: number;
+}
+
 export interface AlertingConfig {
   enabled: boolean;
   webhookUrl?: string;
@@ -123,6 +131,11 @@ export interface ResolvedEnvironment {
   apiBaseUrl: string;
   frontendUrl: string;
   databaseUrl: string;
+  databasePool: {
+    minConnections: number;
+    maxConnections: number;
+  };
+  queryTimeoutMs: number;
   redisUrl: string;
   storageBucket: string;
   logLevel: LogLevel;
@@ -167,6 +180,8 @@ export interface ApplicationConfig {
   };
   database: {
     url: string;
+    pool: DatabasePoolConfig;
+    queryTimeoutMs: number;
   };
   cache: {
     redisUrl: string;

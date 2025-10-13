@@ -9,6 +9,7 @@ import type { ApplicationConfig } from "@lumi/types";
 import { type CreateAppOptions, createApp } from "./app.js";
 import { getConfig } from "./config/index.js";
 import { logger } from "./lib/logger.js";
+import { disconnectPrismaClient } from "./lib/prisma.js";
 
 export interface StartServerOptions extends CreateAppOptions {
   port?: number;
@@ -355,6 +356,7 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Ser
       }
     }
     await waitForServerClose(closePromise);
+    await disconnectPrismaClient();
 
     listenerRegistry.cleanup();
     finaliseShutdown(reason, exitAfterShutdown, exitCode, error);

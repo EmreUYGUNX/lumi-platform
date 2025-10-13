@@ -7,6 +7,10 @@ import { createFeatureFlagRegistry } from "./feature-flags.js";
 
 const configEmitter = new EventEmitter();
 
+const DEFAULT_POOL_IDLE_TIMEOUT_MS = 30 * 1e3;
+const DEFAULT_POOL_MAX_LIFETIME_MS = 300 * 1e3;
+const DEFAULT_POOL_CONNECTION_TIMEOUT_MS = 5 * 1e3;
+
 const flatten = (input: unknown, prefix = ""): Record<string, unknown> => {
   if (typeof input !== "object" || input === null) {
     if (!prefix) {
@@ -68,6 +72,14 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
   },
   database: {
     url: env.databaseUrl,
+    pool: {
+      minConnections: env.databasePool.minConnections,
+      maxConnections: env.databasePool.maxConnections,
+      idleTimeoutMs: DEFAULT_POOL_IDLE_TIMEOUT_MS,
+      maxLifetimeMs: DEFAULT_POOL_MAX_LIFETIME_MS,
+      connectionTimeoutMs: Math.min(env.queryTimeoutMs, DEFAULT_POOL_CONNECTION_TIMEOUT_MS),
+    },
+    queryTimeoutMs: env.queryTimeoutMs,
   },
   cache: {
     redisUrl: env.redisUrl,

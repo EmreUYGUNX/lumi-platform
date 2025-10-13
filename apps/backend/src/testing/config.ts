@@ -69,6 +69,14 @@ export const createTestConfig = (
     },
     database: {
       url: "postgresql://localhost:5432/lumi",
+      pool: {
+        minConnections: 2,
+        maxConnections: 20,
+        idleTimeoutMs: 30 * 1e3,
+        maxLifetimeMs: 300 * 1e3,
+        connectionTimeoutMs: 5 * 1e3,
+      },
+      queryTimeoutMs: 5 * 1e3,
     },
     cache: {
       redisUrl: "redis://localhost:6379/0",
