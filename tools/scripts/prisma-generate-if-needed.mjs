@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,6 +35,36 @@ const loadEnvironment = () => {
   expand(result);
 };
 
+const stubFiles = [
+  {
+    name: "index.js",
+    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on() {}\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: { Prisma } };\n`,
+  },
+  {
+    name: "default.js",
+    content: `'use strict';\nclass PrismaClient {\n  constructor() {\n    console.warn('Prisma client stub active: no models defined in schema.');\n  }\n  async $connect() {}\n  async $disconnect() {}\n  $on() {}\n  $use() {}\n  async $transaction(cb, ...args) {\n    if (typeof cb === 'function') {\n      return cb(this, ...args);\n    }\n    return Promise.resolve(undefined);\n  }\n}\nconst Prisma = {\n  prismaVersion: { client: 'stub', engine: 'stub' },\n  PrismaPromise: Promise\n};\nmodule.exports = { PrismaClient, Prisma, default: { Prisma } };\n`,
+  },
+  {
+    name: "index.d.ts",
+    content: `export declare class PrismaClient {\n  constructor(options?: Record<string, unknown>);\n  $connect(): Promise<void>;\n  $disconnect(): Promise<void>;\n  $on(event: string, handler: (...args: unknown[]) => void): void;\n  $use(middleware: (...args: unknown[]) => void): void;\n  $transaction<T>(fn: (client: PrismaClient, ...args: unknown[]) => Promise<T> | T, options?: Record<string, unknown>): Promise<T>;\n}\nexport declare namespace Prisma {\n  type PrismaPromise<T> = Promise<T>;\n  const prismaVersion: { client: string; engine: string };\n}\nexport default PrismaClient;\n`,
+  },
+  {
+    name: "default.d.ts",
+    content: `export declare class PrismaClient {\n  constructor(options?: Record<string, unknown>);\n  $connect(): Promise<void>;\n  $disconnect(): Promise<void>;\n  $on(event: string, handler: (...args: unknown[]) => void): void;\n  $use(middleware: (...args: unknown[]) => void): void;\n  $transaction<T>(fn: (client: PrismaClient, ...args: unknown[]) => Promise<T> | T, options?: Record<string, unknown>): Promise<T>;\n}\nexport declare namespace Prisma {\n  type PrismaPromise<T> = Promise<T>;\n  const prismaVersion: { client: string; engine: string };\n}\nexport default PrismaClient;\n`,
+  },
+];
+
+const writeStubClient = async () => {
+  const clientDir = path.join(repoRoot, "node_modules", ".prisma", "client");
+  await mkdir(clientDir, { recursive: true });
+
+  await Promise.all(
+    stubFiles.map(({ name, content }) =>
+      writeFile(path.join(clientDir, name), content, { encoding: "utf8" }),
+    ),
+  );
+};
+
 const runPrismaGenerate = async () =>
   new Promise((resolve, reject) => {
     const child = spawn("pnpm", ["exec", "prisma", "generate"], {
@@ -61,6 +91,7 @@ const main = async () => {
 
   if (!shouldGenerate) {
     console.log("Skipping Prisma generate: no models, views, or enums defined in schema.");
+    await writeStubClient();
     return;
   }
 
