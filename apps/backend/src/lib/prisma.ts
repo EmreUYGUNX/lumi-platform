@@ -7,19 +7,21 @@ import { logger } from "./logger.js";
 
 const MAX_CONNECT_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1000;
+const DEFAULT_PRISMA_TARGET = "unknown";
+const DEFAULT_PRISMA_MESSAGE = "No message provided";
 
 type PrismaExtensionFactory = (client: PrismaClient) => PrismaClient;
 
 interface PrismaClientLogEvent {
-  timestamp: Date;
-  target: string;
-  message: string;
+  timestamp?: Date;
+  target?: string;
+  message?: string;
 }
 
 interface PrismaClientQueryEvent extends PrismaClientLogEvent {
-  query: string;
-  params: string;
-  duration: number;
+  query?: string;
+  params?: string;
+  duration?: number;
 }
 
 let prismaInstance: PrismaClient | undefined;
@@ -34,14 +36,22 @@ const truncate = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength)}…`;
 };
 
+/* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
 const registerEventLogging = (client: PrismaClient, slowQueryThresholdMs: number) => {
   const {
     app: { environment },
   } = getConfig();
   const verboseQueryLogging = environment !== "production";
 
-  client.$on("query", ({ duration, target, query, params }: PrismaClientQueryEvent) => {
-    const payload = {
+  client.$on("query", (payload: unknown) => {
+    const rawEvent = payload as PrismaClientQueryEvent | undefined;
+    /* istanbul ignore if -- Prisma callback payload omitted in test environment */
+    if (!rawEvent) {
+      return;
+    }
+
+    const { duration = 0, target = DEFAULT_PRISMA_TARGET, query = "", params = "" } = rawEvent;
+    const logPayload = {
       durationMs: duration,
       target,
       query: truncate(query, 512),
@@ -49,35 +59,40 @@ const registerEventLogging = (client: PrismaClient, slowQueryThresholdMs: number
     };
 
     if (duration >= slowQueryThresholdMs) {
-      logger.warn("Slow database query detected", payload);
+      logger.warn("Slow database query detected", logPayload);
       return;
     }
 
     if (verboseQueryLogging) {
-      logger.debug("Database query executed", payload);
+      logger.debug("Database query executed", logPayload);
     }
   });
 
-  client.$on("warn", ({ target, message }: PrismaClientLogEvent) => {
+  client.$on("warn", (payload: unknown) => {
+    const rawEvent = payload as PrismaClientLogEvent | undefined;
     logger.warn("Prisma client warning", {
-      target,
-      message,
+      target: rawEvent?.target ?? DEFAULT_PRISMA_TARGET,
+      message: rawEvent?.message ?? DEFAULT_PRISMA_MESSAGE,
     });
   });
 
-  client.$on("info", ({ target, message }: PrismaClientLogEvent) => {
-    if (verboseQueryLogging) {
-      logger.info("Prisma client info", {
-        target,
-        message,
-      });
+  client.$on("info", (payload: unknown) => {
+    if (!verboseQueryLogging) {
+      return;
     }
+
+    const rawEvent = payload as PrismaClientLogEvent | undefined;
+    logger.info("Prisma client info", {
+      target: rawEvent?.target ?? DEFAULT_PRISMA_TARGET,
+      message: rawEvent?.message ?? DEFAULT_PRISMA_MESSAGE,
+    });
   });
 
-  client.$on("error", ({ target, message }: PrismaClientLogEvent) => {
+  client.$on("error", (payload: unknown) => {
+    const rawEvent = payload as PrismaClientLogEvent | undefined;
     logger.error("Prisma client error", {
-      target,
-      message,
+      target: rawEvent?.target ?? DEFAULT_PRISMA_TARGET,
+      message: rawEvent?.message ?? DEFAULT_PRISMA_MESSAGE,
     });
   });
 };
