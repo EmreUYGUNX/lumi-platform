@@ -138,6 +138,7 @@ model UserSession {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([expiresAt, revokedAt])
 }
 
 model Role {
@@ -186,6 +187,8 @@ model UserRole {
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
 }
 
 model UserPermission {
@@ -221,7 +224,7 @@ model Product {
   id              String          @id @default(cuid())
   title           String
   slug            String
-  sku             String?
+  sku             String?         @unique
   description     String?
   summary         String?
   status          ProductStatus   @default(DRAFT)
@@ -245,6 +248,7 @@ model Product {
   @@unique([slug])
   @@index([status, createdAt])
   @@index([deletedAt])
+  @@index([searchKeywords], type: Gin)
 }
 
 model ProductVariant {
@@ -305,6 +309,7 @@ model ProductCategory {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@id([productId, categoryId])
+  @@index([productId])
   @@index([categoryId])
 }
 
@@ -501,6 +506,7 @@ model Order {
 
   @@index([userId])
   @@index([status, createdAt])
+  @@index([userId, status, createdAt])
 }
 
 model OrderItem {
@@ -709,5 +715,6 @@ model AuditLog {
 
   @@index([userId])
   @@index([entity, entityId])
+  @@index([entity, entityId, createdAt])
   @@index([createdAt])
 }
