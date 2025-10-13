@@ -29,6 +29,7 @@ overrides:
   "@stoplight/spectral-functions": 1.7.2
   jsonpath-plus: 10.3.0
   dotenv-expand: ^11.0.7
+  validator: link:vendor/validator
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -191,6 +192,9 @@ importers:
       typescript:
         specifier: ~5.5.4
         version: 5.5.4
+      validator:
+        specifier: link:vendor/validator
+        version: link:vendor/validator
       vitest:
         specifier: ^1.5.0
         version: 1.6.1(@types/node@20.19.19)(jsdom@20.0.3)
@@ -10108,13 +10112,6 @@ packages:
         integrity: sha512-M6w37eVCMMouJ9V/sdPGnC5H4uDr73/+xdq0FBLO3TFFX1+7wiUY6Es328NN+y43tmY+doUdN9g9J21vqB7iLw==,
       }
 
-  validator@13.15.15:
-    resolution:
-      {
-        integrity: sha512-BgWVbCI72aIQy937xbawcs+hrVaN/CZ2UwutgaJ36hGqRrLNM+f5LUT/YPRbo8IV/ASeFzXszezV+y2+rq3l8A==,
-      }
-    engines: { node: ">= 0.10" }
-
   vary@1.1.2:
     resolution:
       {
@@ -16981,8 +16978,6 @@ snapshots:
     dependencies:
       builtins: 1.0.3
 
-  validator@13.15.15: {}
-
   vary@1.1.2: {}
 
   vite-node@1.6.1(@types/node@20.19.19):
@@ -17255,7 +17250,7 @@ snapshots:
     dependencies:
       lodash.get: 4.4.2
       lodash.isequal: 4.5.0
-      validator: 13.15.15
+      validator: link:vendor/validator
     optionalDependencies:
       commander: 9.5.0
 

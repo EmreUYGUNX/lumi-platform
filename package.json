@@ -117,6 +117,7 @@
     "turbo": "^2.1.3",
     "tsx": "^4.7.2",
     "typescript": "~5.5.4",
+    "validator": "link:vendor/validator",
     "vitest": "^1.5.0"
   },
   "size-limit": [
@@ -151,7 +152,8 @@
       "@stoplight/spectral-formats": "1.5.0",
       "@stoplight/spectral-functions": "1.7.2",
       "jsonpath-plus": "10.3.0",
-      "dotenv-expand": "^11.0.7"
+      "dotenv-expand": "^11.0.7",
+      "validator": "link:vendor/validator"
     },
     "packageExtensions": {
       "react-dom@*": {
