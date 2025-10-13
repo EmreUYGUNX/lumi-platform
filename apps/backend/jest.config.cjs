@@ -11,6 +11,11 @@ const config = createProjectJestConfig({
   setupFiles: []
 });
 
+config.setupFilesAfterEnv = [
+  ...(config.setupFilesAfterEnv || []),
+  path.join(__dirname, "src/__tests__/setup.ts")
+];
+
 config.collectCoverageFrom = [
   ...(config.collectCoverageFrom || []),
   "!<rootDir>/apps/backend/src/index.ts"
