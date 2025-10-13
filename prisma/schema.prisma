@@ -1,0 +1,18 @@
+/// Prisma schema for the Lumi commerce platform data layer.
+/// Phase 2 - Database & Prisma ORM (Foundation)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-musl"]
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+  // Connection pooling is configured in PrismaClient options (apps/backend/src/lib/prisma.ts)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Models are defined in subsequent checklist items for this phase.

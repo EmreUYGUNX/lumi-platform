@@ -48,6 +48,9 @@ const DEFAULT_REQUEST_REDACT_FIELDS = [
 ] as const;
 const hasLength = (value: string) => value.length > 0;
 
+const MAX_QUERY_TIMEOUT_MS = 120 * 1e3;
+const DEFAULT_QUERY_TIMEOUT_MS = 5 * 1e3;
+
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {
     return value;
@@ -154,6 +157,22 @@ const EnvSchema = z
     API_BASE_URL: z.string().url("API_BASE_URL must be a valid URL"),
     FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    DATABASE_POOL_MIN: z.coerce
+      .number()
+      .int()
+      .min(0, "DATABASE_POOL_MIN must be zero or positive")
+      .default(2),
+    DATABASE_POOL_MAX: z.coerce
+      .number()
+      .int()
+      .min(1, "DATABASE_POOL_MAX must be at least 1")
+      .default(20),
+    QUERY_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(100, "QUERY_TIMEOUT_MS must be at least 100ms")
+      .max(MAX_QUERY_TIMEOUT_MS, "QUERY_TIMEOUT_MS should not exceed 120000ms")
+      .default(DEFAULT_QUERY_TIMEOUT_MS),
     REDIS_URL: z.string().min(1, "REDIS_URL is required"),
     STORAGE_BUCKET: z.string().min(1, "STORAGE_BUCKET is required"),
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
@@ -377,6 +396,14 @@ const EnvSchema = z
         path: ["METRICS_BASIC_AUTH_USERNAME"],
       });
     }
+
+    if (value.DATABASE_POOL_MIN > value.DATABASE_POOL_MAX) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "DATABASE_POOL_MAX must be greater than or equal to DATABASE_POOL_MIN",
+        path: ["DATABASE_POOL_MAX"],
+      });
+    }
   })
   .transform((value) => ({
     ...value,
@@ -445,6 +472,11 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   apiBaseUrl: parsed.API_BASE_URL,
   frontendUrl: parsed.FRONTEND_URL,
   databaseUrl: parsed.DATABASE_URL,
+  databasePool: {
+    minConnections: parsed.DATABASE_POOL_MIN,
+    maxConnections: parsed.DATABASE_POOL_MAX,
+  },
+  queryTimeoutMs: parsed.QUERY_TIMEOUT_MS,
   redisUrl: parsed.REDIS_URL,
   storageBucket: parsed.STORAGE_BUCKET,
   logLevel: parsed.LOG_LEVEL,
