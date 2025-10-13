@@ -36,42 +36,38 @@ const BASE_ENV = {
   CI: "true",
 } as const;
 
-const installRotationMock = () => {
-  const instances: {
-    close: jest.Mock;
-    dirname?: string;
-  }[] = [];
+const rotationInstances: { close: jest.Mock; dirname?: string }[] = [];
 
-  jest.doMock("winston-daily-rotate-file", () => {
-    class DailyRotateFile extends TransportStream {
-      public readonly dirname: string | undefined;
+jest.mock("winston-daily-rotate-file", () => {
+  class DailyRotateFile extends TransportStream {
+    public readonly dirname: string | undefined;
 
-      private readonly closeMock = jest.fn();
+    private readonly closeMock = jest.fn();
 
-      constructor(options: Record<string, unknown>) {
-        super(options);
-        this.dirname = options.dirname as string | undefined;
-        instances.push({
-          close: this.closeMock,
-          dirname: this.dirname,
-        });
-      }
-
-      // eslint-disable-next-line class-methods-use-this
-      override log(_info: unknown, next: () => void): void {
-        next();
-      }
-
-      override close(): void {
-        this.closeMock();
-      }
+    constructor(options: Record<string, unknown>) {
+      super(options);
+      this.dirname = options.dirname as string | undefined;
+      rotationInstances.push({
+        close: this.closeMock,
+        dirname: this.dirname,
+      });
     }
 
-    return DailyRotateFile;
-  });
+    // eslint-disable-next-line class-methods-use-this
+    override log(_info: unknown, next: () => void): void {
+      next();
+    }
 
-  return instances;
-};
+    override close(): void {
+      this.closeMock();
+    }
+  }
+
+  return {
+    __esModule: true,
+    default: DailyRotateFile,
+  };
+});
 
 class MemoryTransport extends TransportStream {
   public readonly logs: Record<string, unknown>[] = [];
@@ -91,6 +87,7 @@ const loadConfigModule = async () => import("../../config/index.js");
 
 beforeEach(() => {
   jest.resetModules();
+  rotationInstances.length = 0;
 });
 
 afterEach(() => {
@@ -241,7 +238,6 @@ describe("logger", () => {
 
   it("creates rotating file transports when disk logging is enabled", async () => {
     jest.resetModules();
-    const rotationInstances = installRotationMock();
 
     const tempDirectory = path.join(process.cwd(), "logs-test-suite");
     if (existsSync(tempDirectory)) {
@@ -279,11 +275,7 @@ describe("logger", () => {
         },
       );
     } finally {
-      jest.dontMock("winston-daily-rotate-file");
       jest.resetModules();
-      if (existsSync(tempDirectory)) {
-        rmSync(tempDirectory, { recursive: true, force: true });
-      }
     }
   });
 
@@ -398,7 +390,6 @@ describe("logger", () => {
 
   it("closes rotation transports when disk logging is disabled", async () => {
     jest.resetModules();
-    const rotationInstances = installRotationMock();
     const tempDirectory = path.join(process.cwd(), "logs-rotate-close");
     if (existsSync(tempDirectory)) {
       rmSync(tempDirectory, { recursive: true, force: true });
@@ -444,11 +435,7 @@ describe("logger", () => {
         },
       );
     } finally {
-      jest.dontMock("winston-daily-rotate-file");
       jest.resetModules();
-      if (existsSync(tempDirectory)) {
-        rmSync(tempDirectory, { recursive: true, force: true });
-      }
     }
   });
 
@@ -457,7 +444,7 @@ describe("logger", () => {
     jest.doMock("winston-daily-rotate-file", () => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
       const MockedTransportStream = require("winston-transport");
-      return class MockRotationTransport extends MockedTransportStream {
+      class MockRotationTransport extends MockedTransportStream {
         public readonly dirname: string | undefined;
 
         constructor(options: Record<string, unknown>) {
@@ -469,6 +456,11 @@ describe("logger", () => {
         log(_info: unknown, next: () => void): void {
           next();
         }
+      }
+
+      return {
+        __esModule: true,
+        default: MockRotationTransport,
       };
     });
 
@@ -511,7 +503,6 @@ describe("logger", () => {
         },
       );
     } finally {
-      jest.dontMock("winston-daily-rotate-file");
       jest.resetModules();
     }
   });

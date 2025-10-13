@@ -134,6 +134,7 @@
       "@opentelemetry/instrumentation": "0.57.2",
       "@opentelemetry/semantic-conventions": "1.37.0",
       "@types/pg": "8.15.5",
+      "@colors/colors": "1.6.0",
       "body-parser": "1.20.3",
       "mime": "1.6.0",
       "cookie": "0.7.2",
