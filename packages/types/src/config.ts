@@ -135,6 +135,7 @@ export interface ResolvedEnvironment {
     minConnections: number;
     maxConnections: number;
   };
+  slowQueryThresholdMs: number;
   queryTimeoutMs: number;
   redisUrl: string;
   storageBucket: string;
@@ -181,6 +182,7 @@ export interface ApplicationConfig {
   database: {
     url: string;
     pool: DatabasePoolConfig;
+    slowQueryThresholdMs: number;
     queryTimeoutMs: number;
   };
   cache: {

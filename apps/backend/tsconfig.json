@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "baseUrl": ".",
     "types": ["node", "jest", "@prisma/client"],
+    "allowJs": true,
     "paths": {
       "@/*": ["./src/*"],
       "@lumi/shared": ["../../packages/shared/src/index.ts"],

@@ -50,6 +50,8 @@ const hasLength = (value: string) => value.length > 0;
 
 const MAX_QUERY_TIMEOUT_MS = 120 * 1e3;
 const DEFAULT_QUERY_TIMEOUT_MS = 5 * 1e3;
+const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 200;
+const MIN_SLOW_QUERY_THRESHOLD_MS = 50;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {
@@ -160,13 +162,22 @@ const EnvSchema = z
     DATABASE_POOL_MIN: z.coerce
       .number()
       .int()
-      .min(0, "DATABASE_POOL_MIN must be zero or positive")
-      .default(2),
+      .min(5, "DATABASE_POOL_MIN must be at least 5")
+      .default(5),
     DATABASE_POOL_MAX: z.coerce
       .number()
       .int()
-      .min(1, "DATABASE_POOL_MAX must be at least 1")
+      .min(5, "DATABASE_POOL_MAX must be at least 5")
       .default(20),
+    DATABASE_SLOW_QUERY_THRESHOLD_MS: z.coerce
+      .number()
+      .int()
+      .min(MIN_SLOW_QUERY_THRESHOLD_MS, "DATABASE_SLOW_QUERY_THRESHOLD_MS must be at least 50ms")
+      .max(
+        MAX_QUERY_TIMEOUT_MS,
+        "DATABASE_SLOW_QUERY_THRESHOLD_MS should not exceed QUERY_TIMEOUT_MS",
+      )
+      .default(DEFAULT_SLOW_QUERY_THRESHOLD_MS),
     QUERY_TIMEOUT_MS: z.coerce
       .number()
       .int()
@@ -476,6 +487,7 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
     minConnections: parsed.DATABASE_POOL_MIN,
     maxConnections: parsed.DATABASE_POOL_MAX,
   },
+  slowQueryThresholdMs: Math.min(parsed.DATABASE_SLOW_QUERY_THRESHOLD_MS, parsed.QUERY_TIMEOUT_MS),
   queryTimeoutMs: parsed.QUERY_TIMEOUT_MS,
   redisUrl: parsed.REDIS_URL,
   storageBucket: parsed.STORAGE_BUCKET,
