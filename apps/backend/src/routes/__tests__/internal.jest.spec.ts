@@ -1,9 +1,23 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import * as fs from "node:fs";
+import path from "node:path";
+
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 import request from "supertest";
 
 import { resetEnvironmentCache } from "../../config/env.js";
 import { withTemporaryEnvironment } from "../../config/testing.js";
+
+const TEST_LOG_DIR = path.join(process.cwd(), "apps/backend/tmp-logs");
 
 const BASE_ENV = {
   NODE_ENV: "test",
@@ -15,6 +29,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379/0",
   STORAGE_BUCKET: "internal-routes",
   LOG_LEVEL: "info",
+  LOG_DIRECTORY: TEST_LOG_DIR,
   JWT_SECRET: "12345678901234567890123456789012",
   METRICS_ENABLED: "true",
   METRICS_ENDPOINT: "/metrics",
@@ -34,9 +49,19 @@ beforeEach(() => {
   jest.resetModules();
 });
 
+beforeAll(() => {
+  fs.mkdirSync(TEST_LOG_DIR, { recursive: true });
+});
+
 afterEach(() => {
   resetEnvironmentCache();
   jest.resetModules();
+});
+
+afterAll(() => {
+  if (fs.existsSync(TEST_LOG_DIR)) {
+    fs.rmSync(TEST_LOG_DIR, { recursive: true, force: true });
+  }
 });
 
 const toAuthHeader = (username: string, password: string) => {

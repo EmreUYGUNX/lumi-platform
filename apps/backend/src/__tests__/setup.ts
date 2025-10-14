@@ -1,11 +1,20 @@
+import * as fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { afterEach, beforeEach } from "@jest/globals";
 
 import { resetEnvironmentCache } from "../config/env.js";
 import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.js";
 
+const LOG_DIR_ROOT = fs.realpathSync(os.tmpdir());
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useRealTimers();
+
+  const logDir = fs.mkdtempSync(path.join(LOG_DIR_ROOT, "lumi-test-logs-"));
+  process.env.LOG_DIRECTORY = logDir;
 });
 
 afterEach(async () => {
