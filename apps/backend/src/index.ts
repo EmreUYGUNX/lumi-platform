@@ -2,6 +2,7 @@ import process from "node:process";
 
 import { getConfig, onConfigChange } from "./config/index.js";
 import { logger } from "./lib/logger.js";
+import { registerPrismaMiddlewares } from "./lib/prisma/middleware.js";
 import { initializeObservability } from "./observability/index.js";
 import { type ServerController, startServer } from "./server.js";
 
@@ -13,6 +14,7 @@ export const createBackendApp = () => {
     async start() {
       const initialConfig = getConfig();
 
+      registerPrismaMiddlewares();
       initializeObservability();
 
       logger.info("Backend service starting", {
