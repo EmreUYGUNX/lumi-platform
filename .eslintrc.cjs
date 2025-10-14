@@ -17,6 +17,7 @@ module.exports = {
       "./packages/*/tsconfig.json",
       "./packages/*/tsconfig.eslint.json",
       "./tools/tsconfig.json",
+      "./prisma/tsconfig.json",
     ],
     tsconfigRootDir: __dirname,
   },
@@ -29,6 +30,7 @@ module.exports = {
           "./packages/*/tsconfig.json",
           "./packages/*/tsconfig.eslint.json",
           "./tools/tsconfig.json",
+          "./prisma/tsconfig.json",
         ],
       },
       node: {
@@ -192,6 +194,14 @@ module.exports = {
       rules: {
         "security/detect-object-injection": "off",
         "sonarjs/no-duplicate-string": "off",
+      },
+    },
+    {
+      files: ["prisma/seed.ts"],
+      rules: {
+        "no-await-in-loop": "off",
+        "no-restricted-syntax": "off",
+        "sonarjs/cognitive-complexity": "off",
       },
     },
   ],
