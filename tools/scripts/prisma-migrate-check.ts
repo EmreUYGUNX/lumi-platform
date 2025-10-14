@@ -105,7 +105,12 @@ async function runCommandsSequentially(index = 0): Promise<void> {
     return;
   }
 
-  const { label, command, args, optional } = commands[index];
+  const commandConfig = commands.at(index);
+  if (!commandConfig) {
+    return;
+  }
+
+  const { label, command, args, optional } = commandConfig;
   info(`Running: ${label}`);
   const result = await runCommand(command, args, { env: commonEnv });
   if (result.code !== 0) {
@@ -122,10 +127,10 @@ async function runCommandsSequentially(index = 0): Promise<void> {
   await runCommandsSequentially(index + 1);
 }
 
-try {
-  await main();
-} catch (error) {
+// Top-level await is unavailable in the CJS runtime that executes this script; fall back to promise chaining.
+// eslint-disable-next-line unicorn/prefer-top-level-await
+main().catch((error) => {
   // eslint-disable-next-line no-console
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
-}
+});
