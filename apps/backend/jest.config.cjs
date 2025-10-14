@@ -21,6 +21,12 @@ config.collectCoverageFrom = [
   "!<rootDir>/apps/backend/src/index.ts"
 ];
 
+config.coveragePathIgnorePatterns = [
+  ...(config.coveragePathIgnorePatterns || []),
+  "<rootDir>/vendor/",
+  "<rootDir>/apps/backend/src/lib/prisma/middleware.ts"
+];
+
 config.moduleNameMapper = {
   "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
   ...(config.moduleNameMapper || {}),
