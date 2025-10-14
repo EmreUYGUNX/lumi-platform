@@ -40,6 +40,11 @@ const commands: CheckCommand[] = [
     args: runBackendScriptArgs("prisma:validate"),
   },
   {
+    label: "Apply pending migrations",
+    command: "pnpm",
+    args: runBackendScriptArgs("prisma:migrate:deploy"),
+  },
+  {
     label: "Migration status",
     command: "pnpm",
     args: runBackendScriptArgs("prisma:migrate:status"),
