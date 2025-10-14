@@ -79,6 +79,7 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
       maxLifetimeMs: DEFAULT_POOL_MAX_LIFETIME_MS,
       connectionTimeoutMs: Math.min(env.queryTimeoutMs, DEFAULT_POOL_CONNECTION_TIMEOUT_MS),
     },
+    slowQueryThresholdMs: env.slowQueryThresholdMs,
     queryTimeoutMs: env.queryTimeoutMs,
   },
   cache: {

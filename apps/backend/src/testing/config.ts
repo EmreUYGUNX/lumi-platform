@@ -70,12 +70,13 @@ export const createTestConfig = (
     database: {
       url: "postgresql://localhost:5432/lumi",
       pool: {
-        minConnections: 2,
+        minConnections: 5,
         maxConnections: 20,
         idleTimeoutMs: 30 * 1e3,
         maxLifetimeMs: 300 * 1e3,
         connectionTimeoutMs: 5 * 1e3,
       },
+      slowQueryThresholdMs: 200,
       queryTimeoutMs: 5 * 1e3,
     },
     cache: {

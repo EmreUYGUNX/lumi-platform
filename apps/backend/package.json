@@ -29,7 +29,7 @@
     "test:integration": "NODE_ENV=test pnpm exec jest --config jest.config.cjs --runInBand --testPathPattern=__tests__/integration",
     "test:vitest": "vitest run --passWithNoTests",
     "test:performance": "tsx src/__tests__/performance/health.performance.ts",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "pnpm run prisma:generate:if-needed && tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {

@@ -24,8 +24,7 @@ COPY apps/backend/package.json apps/backend/
 COPY packages/shared/package.json packages/shared/
 COPY packages/types/package.json packages/types/
 COPY packages/ui/package.json packages/ui/
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm fetch --filter @lumi/backend...
+RUN pnpm fetch --filter @lumi/backend...
 
 FROM base AS development
 
@@ -33,8 +32,7 @@ ENV NODE_ENV=development
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/backend... --frozen-lockfile
+RUN pnpm install --filter @lumi/backend... --frozen-lockfile
 EXPOSE 4000
 ENV PNPM_YES=true \
   PNPM_NON_INTERACTIVE=true
@@ -46,8 +44,7 @@ ENV NODE_ENV=production
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile
+RUN NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile
 RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 

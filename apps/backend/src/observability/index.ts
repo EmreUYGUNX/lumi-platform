@@ -20,6 +20,13 @@ export {
 } from "./metrics.js";
 
 export {
+  recordDatabaseQueryMetrics,
+  measureDatabaseOperation,
+  databaseMetricsInternals,
+  type DatabaseQueryObservation,
+} from "./database-metrics.js";
+
+export {
   evaluateHealth,
   registerHealthCheck,
   unregisterHealthCheck,

@@ -21,4 +21,10 @@ config.collectCoverageFrom = [
   "!<rootDir>/apps/backend/src/index.ts"
 ];
 
+config.moduleNameMapper = {
+  "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
+  ...(config.moduleNameMapper || {}),
+  "^@/(.*)$": "<rootDir>/apps/backend/src/$1"
+};
+
 module.exports = config;
