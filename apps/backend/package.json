@@ -17,6 +17,7 @@
     "prisma:migrate:dev": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate deploy",
     "prisma:migrate:status": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate status",
+    "prisma:migrate:reset": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate reset --force --skip-seed",
     "prisma:studio": "dotenv -e ../../env/.env.template -- pnpm exec prisma studio",
     "prisma:generate:if-needed": "node ../../tools/scripts/prisma-generate-if-needed.mjs",
     "clean": "rimraf dist",
