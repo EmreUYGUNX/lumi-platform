@@ -9,6 +9,7 @@
     { "path": "./packages/testing" },
     { "path": "./apps/backend" },
     { "path": "./apps/frontend" },
-    { "path": "./tools" }
+    { "path": "./tools" },
+    { "path": "./prisma" }
   ]
 }

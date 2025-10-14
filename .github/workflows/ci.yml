@@ -177,6 +177,10 @@ jobs:
           psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE lumi_shadow;"
       - name: Run migration validation
         run: pnpm prisma:migrate:check
+      - name: Seed database (development profile)
+        run: SEED_PROFILE=development pnpm prisma:seed
+      - name: Validate seed status
+        run: SEED_PROFILE=development pnpm prisma:seed:status
 
   build:
     name: Build Artifacts
