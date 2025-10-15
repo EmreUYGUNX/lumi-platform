@@ -10,7 +10,7 @@ Complete this checklist during your first day on the Lumi engineering team. Each
 
 ## Day 1 – Workstation Setup
 
-- [ ] Install Node.js 20.11+, pnpm 9+, and Docker 24+.
+- [ ] Install Node.js 20.18+, pnpm 9+, and Docker 24+.
 - [ ] Clone the repository and run through [`docs/getting-started.md`](../getting-started.md).
 - [ ] Run `pnpm exec tsx tools/scripts/verify-workspace.ts --full` and attach the report to the onboarding ticket.
 - [ ] Review security policies in [`docs/security.md`](../security.md).

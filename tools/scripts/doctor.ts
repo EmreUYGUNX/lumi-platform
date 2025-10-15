@@ -15,7 +15,7 @@ interface CheckResult {
   details: string;
 }
 
-const MIN_NODE = "20.11.0";
+const MIN_NODE = "20.18.1";
 const MIN_PNPM = "9.0.0";
 const TURBO_TOKEN_WARNING = "TURBO_TOKEN not set. Remote cache disabled.";
 const WARNING_SUFFIX = "warning(s) detected. Review before continuing.";

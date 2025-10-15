@@ -4,7 +4,7 @@ This guide walks a new Lumi engineer from a clean machine to a fully validated l
 
 ## 1. Prerequisites
 
-- Node.js 20.11.0 or higher (use `asdf`, `nvm`, or Volta to lock versions).
+- Node.js 20.18.1 or higher (use `asdf`, `nvm`, or Volta to lock versions).
 - pnpm 9.0.0 or higher (`corepack enable pnpm` is recommended).
 - Docker Desktop (macOS/Windows) or Docker Engine 24+ (Linux).
 - Git with LFS extension enabled.
