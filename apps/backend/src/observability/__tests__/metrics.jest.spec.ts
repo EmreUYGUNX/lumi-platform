@@ -163,6 +163,107 @@ describe("metrics", () => {
     });
   });
 
+  it("logs failures when HTTP metric instruments throw", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const { logger } = await import("../../lib/logger.js");
+
+      interface HistogramMetric {
+        startTimer: () => (labels: { status: string }) => void;
+      }
+      interface CounterMetric {
+        labels: (method: string, route: string, status: string) => never;
+      }
+
+      const durationMetric = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_request_duration_seconds",
+      ) as unknown as HistogramMetric;
+      const requestCounter = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_requests_total",
+      ) as unknown as CounterMetric;
+
+      const timerSpy = jest.spyOn(durationMetric, "startTimer").mockReturnValue(() => {
+        throw new Error("histogram failure");
+      });
+      const counterSpy = jest.spyOn(requestCounter, "labels").mockImplementation(() => {
+        throw new Error("counter failure");
+      });
+      const logSpy = jest.spyOn(logger, "debug").mockReturnValue(logger);
+
+      const timer = metrics.beginHttpRequestObservation("GET", "/failing");
+      timer("200");
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("histogram"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("counter"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+
+      logSpy.mockRestore();
+      timerSpy.mockRestore();
+      counterSpy.mockRestore();
+    });
+  });
+
+  it("normalises and records observed HTTP metrics", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const { logger } = await import("../../lib/logger.js");
+
+      interface HistogramLabels {
+        labels: (method: string, route: string, status: string) => { observe: () => void };
+      }
+      interface CounterLabels {
+        labels: (method: string, route: string, status: string) => { inc: () => void };
+      }
+
+      const durationMetric = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_request_duration_seconds",
+      ) as unknown as HistogramLabels;
+      const requestCounter = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_requests_total",
+      ) as unknown as CounterLabels;
+
+      const counterLabels = jest.spyOn(requestCounter, "labels").mockImplementation(() => {
+        return {
+          inc: () => {
+            throw new Error("counter observe");
+          },
+        };
+      });
+      const histogramLabels = jest.spyOn(durationMetric, "labels").mockImplementation(() => {
+        return {
+          observe: () => {
+            throw new Error("histogram observe");
+          },
+        };
+      });
+      const logSpy = jest.spyOn(logger, "debug").mockReturnValue(logger);
+
+      metrics.observeHttpRequest({ method: "post", route: "orders", status: "201" }, 0.123);
+
+      expect(counterLabels).toHaveBeenCalled();
+      expect(histogramLabels).toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("counter"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("histogram"),
+        expect.objectContaining({
+          error: expect.objectContaining({ duration: expect.any(Number) }),
+        }),
+      );
+
+      logSpy.mockRestore();
+      counterLabels.mockRestore();
+      histogramLabels.mockRestore();
+    });
+  });
+
   it("invokes collectDefaultMetrics when enabled in configuration", async () => {
     await withTemporaryEnvironment(
       {

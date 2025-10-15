@@ -85,6 +85,24 @@ describe("internal router", () => {
     });
   });
 
+  it("allows metrics export when authentication is disabled", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_BASIC_AUTH_USERNAME: "",
+        METRICS_BASIC_AUTH_PASSWORD: "",
+      },
+      async () => {
+        const { createApp } = await import("../../app.js");
+        const app = createApp();
+
+        const response = await request(app).get("/internal/metrics").expect(200);
+
+        expect(response.headers["content-type"]).toContain("text/plain");
+      },
+    );
+  });
+
   it("rejects metrics requests without valid credentials", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const { createApp } = await import("../../app.js");
@@ -117,6 +135,45 @@ describe("internal router", () => {
         expect(response.body.error.code).toBe("METRICS_DISABLED");
       },
     );
+  });
+
+  it("returns 204 when no metrics are recorded", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const observability = await import("../../observability/index.js");
+      const snapshotSpy = jest.spyOn(observability, "getMetricsSnapshot").mockResolvedValue("");
+
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app)
+        .get("/internal/metrics")
+        .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+        .expect(204);
+
+      expect(response.text).toBe("");
+      snapshotSpy.mockRestore();
+    });
+  });
+
+  it("surfaces metrics snapshot errors", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const observability = await import("../../observability/index.js");
+      const snapshotSpy = jest
+        .spyOn(observability, "getMetricsSnapshot")
+        .mockRejectedValue("metrics-down");
+
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app)
+        .get("/internal/metrics")
+        .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+        .expect(500);
+
+      expect(response.body.error.code).toBe("METRICS_SNAPSHOT_ERROR");
+      expect(response.body.error.details.error.message).toBe("metrics-down");
+      snapshotSpy.mockRestore();
+    });
   });
 
   it("returns a health snapshot", async () => {

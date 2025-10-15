@@ -163,6 +163,16 @@ describe("catalog routes", () => {
     expect(response.body.success).toBe(false);
     expect(response.body.error.code).toBe("NOT_FOUND");
   });
+
+  it("rejects requests without a slug parameter", async () => {
+    const { app } = buildApp();
+
+    const response = await request(app).get("/catalog/products/%20").expect(400);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error.details.issues[0]?.path).toBe("slug");
+  });
 });
 
 /* eslint-enable unicorn/no-null */

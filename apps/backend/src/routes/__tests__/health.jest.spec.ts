@@ -7,6 +7,8 @@ import request from "supertest";
 
 import { resetEnvironmentCache } from "../../config/env.js";
 import { withTemporaryEnvironment } from "../../config/testing.js";
+import type { ProductServiceContract } from "../../modules/product/product.service.js";
+import { registerHealthCheck, unregisterHealthCheck } from "../../observability/index.js";
 
 const BASE_ENV = {
   NODE_ENV: "test",
@@ -70,6 +72,27 @@ afterEach(() => {
   jest.resetModules();
 });
 
+const PRISMA_HEALTH_CHECK_ID = "database:prisma";
+
+const createProductServiceStub = (): ProductServiceContract => ({
+  async search() {
+    return {
+      items: [],
+      meta: {
+        page: 1,
+        pageSize: 0,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    };
+  },
+  async getBySlug() {
+    throw new Error("Not implemented in health route tests.");
+  },
+});
+
 describe("health routes", () => {
   it("returns comprehensive health snapshot with metrics when dependencies are reachable", async () => {
     const database = await startProbeServer();
@@ -84,18 +107,35 @@ describe("health routes", () => {
         },
         async () => {
           const { createApp } = await import("../../app.js");
-          const app = createApp();
+          const app = createApp({
+            apiOptions: {
+              catalogServices: {
+                productService: createProductServiceStub(),
+              },
+            },
+          });
 
-          const response = await request(app).get("/api/v1/health").expect(200);
+          unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+          registerHealthCheck(PRISMA_HEALTH_CHECK_ID, async () => ({
+            status: "healthy",
+            summary: "Stubbed database connectivity.",
+            details: { latencyMs: 0 },
+          }));
 
-          expect(response.body.success).toBe(true);
-          expect(response.body.data.status).toBe("healthy");
-          expect(response.body.data.components.database.status).toBe("healthy");
-          expect(response.body.data.components.redis.status).toBe("healthy");
-          expect(response.body.data.metrics.memory).toBeDefined();
-          expect(response.body.data.metrics.cpu).toBeDefined();
-          expect(response.body.data.responseTimeMs).toBeGreaterThanOrEqual(0);
-          expect(response.body.meta.environment).toBe("test");
+          try {
+            const response = await request(app).get("/api/v1/health").expect(200);
+
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.status).toBe("healthy");
+            expect(response.body.data.components.database.status).toBe("healthy");
+            expect(response.body.data.components.redis.status).toBe("healthy");
+            expect(response.body.data.metrics.memory).toBeDefined();
+            expect(response.body.data.metrics.cpu).toBeDefined();
+            expect(response.body.data.responseTimeMs).toBeGreaterThanOrEqual(0);
+            expect(response.body.meta.environment).toBe("test");
+          } finally {
+            unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+          }
         },
       );
     } finally {
@@ -106,28 +146,57 @@ describe("health routes", () => {
   it("marks readiness as failed when dependencies are unavailable", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const { createApp } = await import("../../app.js");
-      const app = createApp();
+      const app = createApp({
+        apiOptions: {
+          catalogServices: {
+            productService: createProductServiceStub(),
+          },
+        },
+      });
 
-      const response = await request(app).get("/api/v1/health/ready").expect(503);
+      unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+      registerHealthCheck(PRISMA_HEALTH_CHECK_ID, async () => ({
+        status: "unhealthy",
+        summary: "Stubbed database connectivity failure.",
+        severity: "error",
+      }));
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe("SERVICE_NOT_READY");
-      expect(response.body.error.details.components.database.status).toBe("unhealthy");
-      expect(response.body.error.details.components.redis.status).toBe("unhealthy");
+      try {
+        const response = await request(app).get("/api/v1/health/ready").expect(503);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe("SERVICE_NOT_READY");
+        expect(response.body.error.details.components.database.status).toBe("unhealthy");
+        expect(response.body.error.details.components.redis.status).toBe("unhealthy");
+      } finally {
+        unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+      }
     });
   });
 
   it("exposes a basic liveness endpoint", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const { createApp } = await import("../../app.js");
-      const app = createApp();
+      const app = createApp({
+        apiOptions: {
+          catalogServices: {
+            productService: createProductServiceStub(),
+          },
+        },
+      });
 
-      const response = await request(app).get("/api/v1/health/live").expect(200);
+      unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.status).toBe("healthy");
-      expect(response.body.data).toHaveProperty("uptimeSeconds");
-      expect(response.body.meta.check).toBe("liveness");
+      try {
+        const response = await request(app).get("/api/v1/health/live").expect(200);
+
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.status).toBe("healthy");
+        expect(response.body.data).toHaveProperty("uptimeSeconds");
+        expect(response.body.meta.check).toBe("liveness");
+      } finally {
+        unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+      }
     });
   });
 });

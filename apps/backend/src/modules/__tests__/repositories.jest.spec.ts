@@ -1,8 +1,12 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
+
+/* eslint-disable unicorn/no-null */
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+
+import { NotFoundError } from "@/lib/errors.js";
 
 import { AddressRepository } from "../address/address.repository";
 import { CartRepository } from "../cart/cart.repository";
@@ -80,10 +84,7 @@ describe("Repository layer", () => {
     const prisma = createPrismaStub(delegates);
     const repository = new ProductRepository(prisma);
 
-    await repository.search(
-      { term: "Phone", status: "ACTIVE" as Prisma.ProductStatus },
-      { page: 1, pageSize: 10 },
-    );
+    await repository.search({ term: "Phone", statuses: ["ACTIVE"] }, { page: 1, pageSize: 10 });
 
     const findManyArgs = delegates.product.findMany.mock
       .calls[0]?.[0] as Prisma.ProductFindManyArgs;
@@ -175,6 +176,67 @@ describe("Repository layer", () => {
     const hierarchy = await repository.getHierarchy();
     expect(hierarchy).toHaveLength(1);
     expect(hierarchy[0].children).toHaveLength(1);
+  });
+
+  it("CategoryRepository.getBreadcrumbs returns empty list when category is missing", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      category: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn(),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new CategoryRepository(prisma);
+
+    await expect(repository.getBreadcrumbs("missing")).resolves.toEqual([]);
+    expect(delegates.category.findMany).not.toHaveBeenCalled();
+  });
+
+  it("CategoryRepository.getBreadcrumbs builds lookup segments from paths", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      category: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "lighting",
+          parentId: "home",
+          slug: "lighting",
+          path: "/home",
+        }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new CategoryRepository(prisma);
+
+    await repository.getBreadcrumbs("lighting");
+
+    const findManyArgs = delegates.category.findMany.mock
+      .calls[0]?.[0] as Prisma.CategoryFindManyArgs;
+    const where = findManyArgs?.where as Prisma.CategoryWhereInput;
+    const orClauses = Array.isArray(where?.OR) ? where?.OR : [];
+    expect(orClauses).toContainEqual({ id: { in: ["home", "lighting"] } });
+    expect(orClauses).toContainEqual({ slug: { in: ["home", "lighting"] } });
+  });
+
+  it("CategoryRepository.getTopLevel applies limit and ordering", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      category: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new CategoryRepository(prisma);
+
+    await repository.getTopLevel(5);
+
+    expect(delegates.category.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { level: 0 },
+        take: 5,
+      }),
+    );
   });
 
   it("OrderRepository.updateStatus increments version and sets timestamps", async () => {
@@ -380,6 +442,49 @@ describe("Repository layer", () => {
     expect(update).toHaveBeenCalled();
   });
 
+  it("UserRepository.findByEmail normalises input and merges include options", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      user: {
+        findFirst: jest.fn(),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new UserRepository(prisma);
+
+    await repository.findByEmail("  Admin@Example.COM  ", {
+      includeRoles: true,
+      includePermissions: true,
+      include: {
+        profile: true,
+      },
+      select: { id: true },
+      requireActive: true,
+    });
+
+    const findFirstArgs = delegates.user.findFirst.mock.calls[0]?.[0] as Prisma.UserFindFirstArgs;
+    expect(findFirstArgs?.where).toEqual({ email: "admin@example.com", status: "ACTIVE" });
+    expect(findFirstArgs?.include).toEqual({
+      roles: { include: { role: true } },
+      permissions: { include: { permission: true } },
+      profile: true,
+    });
+    expect(findFirstArgs?.select).toEqual({ id: true });
+  });
+
+  it("UserRepository.requireById throws NotFoundError when user does not exist", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      user: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new UserRepository(prisma);
+
+    await expect(repository.requireById("missing-user")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
   it("ProductRepository covers association helpers", async () => {
     const productRecord = { id: "product-1", slug: "demo", status: "ACTIVE" };
 
@@ -582,6 +687,81 @@ describe("Repository layer", () => {
     await repository.mergeCarts("cart-1", "cart-1");
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("CartRepository.ensureActiveCart rejects missing or inactive carts", async () => {
+    const inactiveCart = {
+      id: "cart-1",
+      status: "PENDING",
+      items: [],
+      expiresAt: undefined,
+    };
+    const findFirst = jest.fn().mockResolvedValueOnce(null).mockResolvedValue(inactiveCart);
+
+    const delegates: Record<string, MockDelegate> = {
+      cart: {
+        findFirst,
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new CartRepository(prisma);
+
+    await expect(repository.ensureActiveCart("cart-1")).rejects.toBeInstanceOf(NotFoundError);
+
+    await expect(repository.ensureActiveCart("cart-1")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("CartRepository.ensureActiveCart rejects expired carts", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      cart: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "cart-2",
+          status: "ACTIVE",
+          items: [],
+          expiresAt: new Date(Date.now() - 60_000),
+        }),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new CartRepository(prisma);
+
+    await expect(repository.ensureActiveCart("cart-2")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("CartRepository.addOrUpdateItem throws when updated cart cannot be reloaded", async () => {
+    const activeCart = {
+      id: "cart-3",
+      status: "ACTIVE",
+      items: [],
+      expiresAt: undefined,
+    };
+
+    const findFirst = jest.fn().mockResolvedValueOnce(activeCart).mockResolvedValueOnce(null);
+
+    const delegates: Record<string, MockDelegate> = {
+      cart: {
+        findFirst,
+      },
+    };
+
+    const transactionDelegates: Record<string, MockDelegate> = {
+      cart: {
+        findFirst,
+        update: jest.fn(),
+      },
+      cartItem: {
+        upsert: jest.fn(),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates, transactionDelegates);
+    const repository = new CartRepository(prisma);
+
+    await expect(
+      repository.addOrUpdateItem("cart-3", "variant-1", 1, new Prisma.Decimal(10)),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("OrderRepository supports listing helpers", async () => {

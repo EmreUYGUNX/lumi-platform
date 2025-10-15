@@ -346,6 +346,15 @@ const applyExtensions = (client: PrismaClientInstance) => {
 const registerDatabaseHealthCheck = (client: PrismaClientInstance) => {
   unregisterHealthCheck(DATABASE_HEALTH_CHECK_ID);
 
+  const {
+    app: { environment },
+  } = getConfig();
+
+  if (environment === "test") {
+    databaseHealthCheckRegistered = false;
+    return;
+  }
+
   registerHealthCheck(DATABASE_HEALTH_CHECK_ID, async () => {
     const startedAt = performance.now();
 
@@ -472,9 +481,15 @@ export const getPrismaClient = (): PrismaClientInstance => {
     connectPromise = undefined;
   }
 
-  // Trigger connection in background; callers can await waitForPrismaClient when needed.
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  ensureConnection();
+  const {
+    app: { environment },
+  } = getConfig();
+
+  if (environment !== "test") {
+    // Trigger connection in background; callers can await waitForPrismaClient when needed.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    ensureConnection();
+  }
 
   return prismaInstance;
 };
