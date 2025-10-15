@@ -11,7 +11,8 @@
       "Bash(while read dir)",
       "Bash(do [ -f \"apps/backend/src/modules/$dir/$dir.repository.ts\" ])",
       "Bash(echo:*)",
-      "Bash(echo \"❌ $dir\")"
+      "Bash(echo \"❌ $dir\")",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

@@ -161,7 +161,7 @@ const spawnEmbeddedServer = (
   });
 
 const waitForEmbeddedServer = async (server: ChildProcess): Promise<void> => {
-  const timeoutMs = 15e3;
+  const timeoutMs = 15_000;
   let timer: NodeJS.Timeout | undefined;
 
   await new Promise<void>((resolve, reject) => {
@@ -469,7 +469,7 @@ export class TestDatabaseManager {
           if (!handle.killed) {
             handle.kill("SIGKILL");
           }
-        }, 5e3);
+        }, 5000);
       });
       this.embeddedProcess = undefined;
     }
