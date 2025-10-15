@@ -20,13 +20,14 @@
     }
   },
   "scripts": {
-    "build": "pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
+    "prisma:generate:if-needed": "node ../../tools/scripts/prisma-generate-if-needed.mjs",
+    "build": "pnpm run prisma:generate:if-needed && pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",
     "test:jest": "jest --config jest.config.cjs --runInBand",
     "test:vitest": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "pnpm run prisma:generate:if-needed && tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
