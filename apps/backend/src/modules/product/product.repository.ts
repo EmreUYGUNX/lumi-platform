@@ -17,8 +17,9 @@ type ProductRepositoryContext = RepositoryContext<
 
 export interface ProductSearchFilters {
   term?: string;
-  status?: ProductStatus;
+  statuses?: ProductStatus[];
   categoryIds?: string[];
+  primaryCategoryId?: string;
   collectionIds?: string[];
   minPrice?: Prisma.Decimal | number;
   maxPrice?: Prisma.Decimal | number;
@@ -99,10 +100,12 @@ const toDecimal = (value?: Prisma.Decimal | number): Prisma.Decimal | undefined 
 };
 
 const buildProductSearchWhere = (filters: ProductSearchFilters): Prisma.ProductWhereInput => {
-  const where: Prisma.ProductWhereInput = {
-    // eslint-disable-next-line unicorn/no-null -- Soft delete filters rely on null sentinel
-    deletedAt: filters.includeDeleted ? undefined : null,
-  };
+  const where: Prisma.ProductWhereInput = {};
+
+  if (!filters.includeDeleted) {
+    // eslint-disable-next-line unicorn/no-null -- Soft delete filters rely on null sentinel values
+    where.deletedAt = null;
+  }
 
   if (filters.term) {
     const normalized = filters.term.trim();
@@ -113,11 +116,18 @@ const buildProductSearchWhere = (filters: ProductSearchFilters): Prisma.ProductW
     ];
   }
 
-  if (filters.status) {
-    where.status = filters.status;
+  if (filters.statuses?.length) {
+    where.status = filters.statuses.length === 1 ? filters.statuses[0] : { in: filters.statuses };
   }
 
-  if (filters.categoryIds?.length) {
+  if (filters.primaryCategoryId) {
+    where.categories = {
+      some: {
+        categoryId: filters.primaryCategoryId,
+        isPrimary: true,
+      },
+    };
+  } else if (filters.categoryIds?.length) {
     where.categories = {
       some: { categoryId: { in: filters.categoryIds } },
     };

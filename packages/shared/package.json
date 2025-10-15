@@ -16,6 +16,7 @@
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
+    "@prisma/client": "^5.20.0",
     "@lumi/types": "workspace:*",
     "zod": "^3.23.8"
   },

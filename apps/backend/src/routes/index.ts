@@ -5,6 +5,7 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
 import { createAdminRouter } from "./admin.js";
+import { createCatalogRouter } from "./catalog.js";
 import { createHealthRouter } from "./health.js";
 import { buildRequestPath } from "./registry.js";
 
@@ -106,6 +107,13 @@ export const createV1Router = (
   router.use(
     "/admin",
     createAdminRouter(config, {
+      registerRoute: registerV1Route,
+    }),
+  );
+
+  router.use(
+    "/catalog",
+    createCatalogRouter(config, {
       registerRoute: registerV1Route,
     }),
   );

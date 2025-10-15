@@ -18,3 +18,5 @@ export {
   type ValidationResult,
   type ValidationSuccess,
 } from "./validation/index.js";
+
+export * from "./dto/index.js";

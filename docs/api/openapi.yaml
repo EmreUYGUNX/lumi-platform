@@ -283,6 +283,713 @@ components:
                       type: string
                       enum:
                         - liveness
+    Money:
+      type: object
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: string
+          pattern: ^-?\d+(?:\.\d{1,2})?$
+          description: Decimal amount represented as a string with up to two fractional digits.
+          examples:
+            - "199.99"
+            - "0.00"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: ^[A-Z]{3}$
+          description: ISO-4217 currency code.
+          examples:
+            - TRY
+            - USD
+    AuditTimestamps:
+      type: object
+      required:
+        - createdAt
+        - updatedAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp in ISO-8601 format.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp in ISO-8601 format.
+    SoftDeleteMetadata:
+      type: object
+      properties:
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp indicating when the record was soft deleted.
+    UserRoleSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - name
+          properties:
+            id:
+              type: string
+              format: cuid
+            name:
+              type: string
+              maxLength: 120
+            description:
+              type: string
+              nullable: true
+    UserPermissionSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - key
+          properties:
+            id:
+              type: string
+              format: cuid
+            key:
+              type: string
+              maxLength: 120
+            description:
+              type: string
+              nullable: true
+    UserSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - email
+            - status
+            - emailVerified
+            - roles
+            - permissions
+          properties:
+            id:
+              type: string
+              format: cuid
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+              nullable: true
+            lastName:
+              type: string
+              nullable: true
+            fullName:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - SUSPENDED
+                - DELETED
+            emailVerified:
+              type: boolean
+            roles:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserRoleSummary"
+            permissions:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserPermissionSummary"
+    MediaAsset:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - assetId
+            - url
+            - type
+            - provider
+            - mimeType
+            - sizeBytes
+          properties:
+            id:
+              type: string
+              format: cuid
+            assetId:
+              type: string
+              maxLength: 120
+            url:
+              type: string
+              format: uri
+            type:
+              type: string
+              enum:
+                - IMAGE
+                - VIDEO
+                - DOCUMENT
+            provider:
+              type: string
+              enum:
+                - CLOUDINARY
+                - S3
+            mimeType:
+              type: string
+            sizeBytes:
+              type: integer
+              minimum: 0
+            width:
+              type: integer
+              nullable: true
+            height:
+              type: integer
+              nullable: true
+            alt:
+              type: string
+              nullable: true
+            caption:
+              type: string
+              nullable: true
+    CategorySummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - name
+            - slug
+            - path
+            - level
+          properties:
+            id:
+              type: string
+              format: cuid
+            name:
+              type: string
+            slug:
+              type: string
+              pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+            description:
+              type: string
+              nullable: true
+            parentId:
+              type: string
+              format: cuid
+              nullable: true
+            level:
+              type: integer
+              minimum: 0
+            path:
+              type: string
+            imageUrl:
+              type: string
+              format: uri
+              nullable: true
+            iconUrl:
+              type: string
+              format: uri
+              nullable: true
+            displayOrder:
+              type: integer
+              nullable: true
+    ProductVariant:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - title
+            - price
+            - stock
+            - isPrimary
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            sku:
+              type: string
+              nullable: true
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            stock:
+              type: integer
+              minimum: 0
+            attributes:
+              type: object
+              nullable: true
+              additionalProperties: true
+            weightGrams:
+              type: integer
+              nullable: true
+            isPrimary:
+              type: boolean
+    ProductMedia:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - productId
+            - mediaId
+            - isPrimary
+            - media
+          properties:
+            productId:
+              type: string
+              format: cuid
+            mediaId:
+              type: string
+              format: cuid
+            sortOrder:
+              type: integer
+              nullable: true
+            isPrimary:
+              type: boolean
+            media:
+              $ref: "#/components/schemas/MediaAsset"
+    ProductSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - $ref: "#/components/schemas/SoftDeleteMetadata"
+        - type: object
+          required:
+            - id
+            - title
+            - slug
+            - status
+            - price
+            - currency
+            - inventoryPolicy
+            - variants
+            - categories
+            - media
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            slug:
+              type: string
+              pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+            sku:
+              type: string
+              nullable: true
+            summary:
+              type: string
+              nullable: true
+            description:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - DRAFT
+                - ACTIVE
+                - ARCHIVED
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            inventoryPolicy:
+              type: string
+              enum:
+                - TRACK
+                - CONTINUE
+                - DENY
+            searchKeywords:
+              type: array
+              items:
+                type: string
+            attributes:
+              type: object
+              additionalProperties: true
+              nullable: true
+            variants:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductVariant"
+            categories:
+              type: array
+              items:
+                $ref: "#/components/schemas/CategorySummary"
+            media:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductMedia"
+    CartItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - cartId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            cartId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            productVariant:
+              $ref: "#/components/schemas/ProductVariant"
+              nullable: true
+    CartTotals:
+      type: object
+      required:
+        - subtotal
+        - tax
+        - discount
+        - total
+      properties:
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        tax:
+          $ref: "#/components/schemas/Money"
+        discount:
+          $ref: "#/components/schemas/Money"
+        total:
+          $ref: "#/components/schemas/Money"
+    CartSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - status
+            - items
+            - totals
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            sessionId:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - CHECKED_OUT
+                - ABANDONED
+            expiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CartItem"
+            totals:
+              $ref: "#/components/schemas/CartTotals"
+    OrderItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - orderId
+            - productId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            productId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            titleSnapshot:
+              type: string
+            variantSnapshot:
+              type: object
+              additionalProperties: true
+              nullable: true
+    OrderSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - reference
+            - status
+            - totalAmount
+            - subtotalAmount
+            - taxAmount
+            - discountAmount
+            - currency
+            - items
+          properties:
+            id:
+              type: string
+              format: cuid
+            reference:
+              type: string
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            cartId:
+              type: string
+              format: cuid
+              nullable: true
+            status:
+              type: string
+              enum:
+                - PENDING
+                - PAID
+                - FULFILLED
+                - SHIPPED
+                - DELIVERED
+                - CANCELLED
+            totalAmount:
+              $ref: "#/components/schemas/Money"
+            subtotalAmount:
+              $ref: "#/components/schemas/Money"
+            taxAmount:
+              $ref: "#/components/schemas/Money"
+            discountAmount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            placedAt:
+              type: string
+              format: date-time
+              nullable: true
+            fulfilledAt:
+              type: string
+              format: date-time
+              nullable: true
+            shippedAt:
+              type: string
+              format: date-time
+              nullable: true
+            deliveredAt:
+              type: string
+              format: date-time
+              nullable: true
+            cancelledAt:
+              type: string
+              format: date-time
+              nullable: true
+            notes:
+              type: string
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+              nullable: true
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+            shippingAddressId:
+              type: string
+              format: cuid
+              nullable: true
+            billingAddressId:
+              type: string
+              format: cuid
+              nullable: true
+    PaymentSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - orderId
+            - provider
+            - status
+            - transactionId
+            - amount
+            - currency
+          properties:
+            id:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            provider:
+              type: string
+              enum:
+                - IYZICO
+                - STRIPE
+                - PAYPAL
+                - MANUAL
+            status:
+              type: string
+              enum:
+                - INITIATED
+                - AUTHORIZED
+                - SETTLED
+                - FAILED
+                - REFUNDED
+            transactionId:
+              type: string
+            conversationId:
+              type: string
+              nullable: true
+            amount:
+              $ref: "#/components/schemas/Money"
+            paidPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            installment:
+              type: integer
+              nullable: true
+            paymentChannel:
+              type: string
+              nullable: true
+            paymentGroup:
+              type: string
+              nullable: true
+            cardToken:
+              type: string
+              nullable: true
+            cardAssociation:
+              type: string
+              nullable: true
+            cardFamily:
+              type: string
+              nullable: true
+            cardType:
+              type: string
+              nullable: true
+            cardBankName:
+              type: string
+              nullable: true
+            cardHolderName:
+              type: string
+              nullable: true
+            binNumber:
+              type: string
+              nullable: true
+            lastFourDigits:
+              type: string
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            deviceId:
+              type: string
+              nullable: true
+            fraudScore:
+              type: number
+              nullable: true
+            riskFlags:
+              type: object
+              additionalProperties: true
+              nullable: true
+            authorizedAt:
+              type: string
+              format: date-time
+              nullable: true
+            settledAt:
+              type: string
+              format: date-time
+              nullable: true
+            failedAt:
+              type: string
+              format: date-time
+              nullable: true
+            failureReason:
+              type: string
+              nullable: true
+            failureCode:
+              type: string
+              nullable: true
+            rawPayload:
+              type: object
+              additionalProperties: true
+              nullable: true
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - pageSize
+        - totalItems
+        - totalPages
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        page:
+          type: integer
+          minimum: 0
+        pageSize:
+          type: integer
+          minimum: 1
+        totalItems:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
 paths:
   /api/v1/admin/users:
     get:
