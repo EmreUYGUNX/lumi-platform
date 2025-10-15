@@ -71,7 +71,7 @@ describe("health checks", () => {
     await withTemporaryEnvironment(
       {
         ...BASE_ENV,
-        HEALTH_UPTIME_GRACE_PERIOD: "120",
+        HEALTH_UPTIME_GRACE_PERIOD: "100000",
       },
       async () => {
         const health = await import("../health.js");

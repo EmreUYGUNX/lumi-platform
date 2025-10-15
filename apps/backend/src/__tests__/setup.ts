@@ -2,13 +2,20 @@ import * as fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, beforeEach } from "@jest/globals";
+import { afterAll, afterEach, beforeAll, beforeEach } from "@jest/globals";
 
 import { resetEnvironmentCache } from "../config/env.js";
 import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.js";
+import { disposeSharedTestDatabase, getTestDatabaseManager } from "./helpers/db.js";
 
 // eslint-disable-next-line security/detect-non-literal-fs-filename -- resolves a controlled temp directory root for tests
 const LOG_DIR_ROOT = fs.realpathSync(os.tmpdir());
+
+const testDatabaseManager = getTestDatabaseManager();
+
+beforeAll(async () => {
+  await testDatabaseManager.getPrismaClient();
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -27,4 +34,9 @@ afterEach(async () => {
   });
 
   process.env.SENTRY_DSN = "";
+  await testDatabaseManager.resetDatabase();
+});
+
+afterAll(async () => {
+  await disposeSharedTestDatabase();
 });
