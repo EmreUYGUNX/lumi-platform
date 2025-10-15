@@ -65,12 +65,26 @@ const writeStubClient = async () => {
   );
 };
 
+const resolvePrismaEnv = () => {
+  const childEnv = { ...process.env };
+  const allowErd = childEnv.PRISMA_ALLOW_ERD?.toLowerCase() === "true";
+
+  if (!allowErd && childEnv.DISABLE_ERD === undefined) {
+    childEnv.DISABLE_ERD = "true";
+    console.log(
+      "Prisma ERD generation disabled by default (set PRISMA_ALLOW_ERD=true to re-enable).",
+    );
+  }
+
+  return childEnv;
+};
+
 const runPrismaGenerate = async () =>
   new Promise((resolve, reject) => {
     const child = spawn("pnpm", ["exec", "prisma", "generate"], {
       cwd: backendDir,
       stdio: "inherit",
-      env: process.env,
+      env: resolvePrismaEnv(),
     });
 
     child.on("exit", (code) => {

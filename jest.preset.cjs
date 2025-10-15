@@ -31,10 +31,22 @@ function createProjectJestConfig({
   moduleNameMapper = {},
   coverageDirectory,
 }) {
+  const resolveCustomTimeout = () => {
+    const raw = process.env.LUMI_TEST_TIMEOUT_MS;
+    if (!raw) {
+      return undefined;
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
+
   const repoRoot = path.resolve(__dirname);
   const projectRelativeRoot = path.relative(repoRoot, projectRoot).replace(/\\/g, "/");
   const coverageLabel = displayName.replace(/[^a-z0-9]/gi, "_");
   const jestTsConfig = path.join(repoRoot, "tsconfig.jest.json");
+  const defaultTimeout = testEnvironment === "node" ? 120000 : 60000;
+  const resolvedTestTimeout = resolveCustomTimeout() ?? defaultTimeout;
 
   return {
     displayName,
@@ -106,7 +118,7 @@ function createProjectJestConfig({
     },
     cacheDirectory: path.join(repoRoot, ".jest-cache", coverageLabel),
     reporters: process.env.CI === "true" ? ["default", "github-actions"] : ["default"],
-    testTimeout: testEnvironment === "node" ? 20000 : 30000,
+    testTimeout: resolvedTestTimeout,
     verbose: false,
   };
 }

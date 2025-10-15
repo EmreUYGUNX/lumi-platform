@@ -29,20 +29,40 @@ This document defines how the Lumi backend team manages Prisma migrations in bot
 
 ## Production Workflow
 
-1. Ensure staging has the same migrations applied and passes validation.
-2. Deploy migrations in CI/CD using:
+1. Verify staging mirrors production (migrations, seed, configuration) and all automated tests pass.
+2. Trigger the backup pipeline (see [Backup Strategy](#backup-strategy)) and record the archive ID in the rollout ticket.
+3. Place the service in **read-only** mode if required by the migration (long-running schema changes, column drops, etc.).
+4. Deploy migrations through CI/CD:
    ```bash
    pnpm prisma:migrate:deploy
    ```
-3. Run `pnpm prisma:migrate:status` after deployment to confirm the expected state.
-4. Capture database backups before running production migrations.
-5. Document any manual steps required for rollback in the change ticket.
+5. Immediately run a status check from the deployed environment:
+   ```bash
+   pnpm prisma:migrate:status
+   ```
+6. Run targeted smoke tests (API read/write happy paths) before opening the service to full traffic.
+7. Document follow-up tasks, compensating data fixes, or feature flags associated with the rollout.
+
+## Backup Strategy
+
+- **Schedule**: Nightly logical dumps (`pg_dump --format=custom`) retained for 30 days and hourly WAL archiving for point-in-time recovery. Backups are orchestrated by `tools/scripts/backup.ts`.
+- **On-demand backups**: Prior to each production migration run `pnpm backup:create` (wrapper around `tools/scripts/backup.ts`) and store the artefact in the secure S3 bucket (`s3://lumi-backups/<environment>/<timestamp>`). Tag the change ticket with the backup URI.
+- **Verification**: CI runs `pnpm backup:restore -- --verify` weekly against staging to confirm backups are restorable. Engineers can manually test restores using Docker by pulling the latest artefact and invoking the restore script.
+- **Access control**: Backup buckets are encrypted with KMS and restricted to the SRE IAM role; do not embed credentials in scripts. Fetch temporary credentials from Vault when running manual backups.
 
 ## Rollback Strategy
 
-- Prisma does not auto-generate down migrations. To revert, create a compensating migration following the same naming convention (e.g. `20250203-120501_rollback_coupon_table`).
-- Verify the rollback on staging with `pnpm prisma:migrate:deploy`.
-- Update the incident log with the steps taken.
+1. **Containment**: Disable write traffic (load balancer drain or feature flag) and notify stakeholders.
+2. **Evaluate options**:
+   - Schema-only issues → create a compensating migration (e.g. `20250203-120501_rollback_coupon_table`) and deploy via the normal pipeline.
+   - Data corruption → restore the latest backup to a shadow database, validate correctness, then promote or replay targeted WAL segments.
+3. **Implement**:
+   ```bash
+   pnpm prisma:migrate:dev --name rollback_<issue>
+   pnpm prisma:migrate:deploy
+   ```
+   Document manual changes executed against production (SQL scripts, hotfixes).
+4. **Validation**: Re-run smoke tests, monitor error rates, and close the incident with a root-cause summary.
 
 ## Validation Script
 

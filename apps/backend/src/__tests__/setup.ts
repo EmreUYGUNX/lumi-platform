@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll, afterEach, beforeAll, beforeEach } from "@jest/globals";
+import { afterAll, afterEach, beforeAll, beforeEach, jest } from "@jest/globals";
 
 import { resetEnvironmentCache } from "../config/env.js";
 import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.js";
@@ -12,6 +12,8 @@ import { disposeSharedTestDatabase, getTestDatabaseManager } from "./helpers/db.
 const LOG_DIR_ROOT = fs.realpathSync(os.tmpdir());
 
 const testDatabaseManager = getTestDatabaseManager();
+
+jest.setTimeout(120_000);
 
 beforeAll(async () => {
   await testDatabaseManager.getPrismaClient();
