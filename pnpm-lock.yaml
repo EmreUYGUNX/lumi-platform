@@ -405,6 +405,9 @@ importers:
       "@lumi/types":
         specifier: workspace:*
         version: link:../types
+      "@prisma/client":
+        specifier: ^5.20.0
+        version: 5.22.0(prisma@5.22.0)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
