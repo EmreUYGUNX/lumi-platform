@@ -6,6 +6,7 @@ import type { ApplicationConfig } from "@lumi/types";
 import { createChildLogger } from "../lib/logger.js";
 import { createAdminRouter } from "./admin.js";
 import { createCatalogRouter } from "./catalog.js";
+import type { CatalogRouterOptions } from "./catalog.js";
 import { createHealthRouter } from "./health.js";
 import { buildRequestPath } from "./registry.js";
 
@@ -17,6 +18,7 @@ interface ApiRouterOptions {
    * accurate 405 responses and documentation remains in sync.
    */
   registerRoute?: RouteRegistrar;
+  catalogServices?: CatalogRouterOptions["services"];
 }
 
 interface VersionMetadata {
@@ -115,6 +117,7 @@ export const createV1Router = (
     "/catalog",
     createCatalogRouter(config, {
       registerRoute: registerV1Route,
+      services: options.catalogServices,
     }),
   );
 

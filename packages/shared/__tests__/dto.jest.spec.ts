@@ -740,3 +740,222 @@ describe("DTO type guards", () => {
     ).not.toThrow();
   });
 });
+
+describe("Mapper edge cases", () => {
+  it("normalises malformed monetary inputs and default currency", () => {
+    const order = createOrderFixture(createProductFixture());
+    const weirdPayment = {
+      ...createPaymentFixture(order.id),
+      amount: "not-a-number" as unknown as Prisma.Decimal,
+      currency: "   ",
+    };
+
+    const summary = mapPaymentToSummary(weirdPayment);
+
+    expect(summary.amount.amount).toBe("0");
+    expect(summary.amount.currency).toBe("TRY");
+  });
+
+  it("defaults missing payment amount when value is nullish", () => {
+    const order = createOrderFixture(createProductFixture());
+    const paymentWithNullAmount = {
+      ...createPaymentFixture(order.id),
+      amount: null as unknown as Prisma.Decimal,
+      paidPrice: null,
+      userId: null,
+      conversationId: undefined,
+      installment: null,
+      paymentChannel: "   ",
+      paymentGroup: null,
+      cardToken: null,
+      cardAssociation: " ",
+      cardFamily: null,
+      cardType: null,
+      cardBankName: null,
+      cardHolderName: " ",
+      binNumber: " ",
+      lastFourDigits: " ",
+      ipAddress: null,
+      deviceId: null,
+      fraudScore: null,
+      riskFlags: null,
+      authorizedAt: null,
+      settledAt: null,
+      failedAt: null,
+      failureReason: " ",
+      failureCode: " ",
+      rawPayload: null,
+    } as unknown as Prisma.PaymentGetPayload<undefined>;
+
+    const summary = mapPaymentToSummary(paymentWithNullAmount);
+
+    expect(summary.amount.amount).toBe("0");
+    expect(summary.amount.currency).toBe("TRY");
+    expect(summary.userId).toBeNull();
+    expect(summary.paidPrice).toBeUndefined();
+    expect(summary.installment).toBeNull();
+    expect(summary.paymentChannel).toBeNull();
+    expect(summary.paymentGroup).toBeNull();
+    expect(summary.cardAssociation).toBeNull();
+    expect(summary.cardHolderName).toBeNull();
+    expect(summary.binNumber).toBeNull();
+    expect(summary.lastFourDigits).toBeNull();
+    expect(summary.ipAddress).toBeNull();
+    expect(summary.deviceId).toBeNull();
+    expect(summary.fraudScore).toBeNull();
+    expect(summary.riskFlags).toBeNull();
+    expect(summary.authorizedAt).toBeNull();
+    expect(summary.settledAt).toBeNull();
+    expect(summary.failedAt).toBeNull();
+    expect(summary.failureReason).toBeNull();
+    expect(summary.failureCode).toBeNull();
+    expect(summary.rawPayload).toBeNull();
+  });
+
+  it("handles optional date fields gracefully when invalid", () => {
+    const malformedUser = {
+      ...createUserFixture(),
+      emailVerifiedAt: "invalid-date" as unknown as Date,
+      lockoutUntil: "invalid-date" as unknown as Date,
+      firstName: "   ",
+      lastName: "\t",
+      roles: undefined,
+      permissions: undefined,
+    } as unknown as UserWithRoleEntities;
+
+    const detail = mapUserEntityToDetail(malformedUser);
+
+    expect(detail.emailVerifiedAt).toBeNull();
+    expect(detail.lockoutUntil).toBeNull();
+    expect(detail.fullName).toBeNull();
+    expect(detail.roles).toHaveLength(0);
+    expect(detail.permissions).toHaveLength(0);
+  });
+
+  it("maps update requests by trimming and nullifying fields", () => {
+    const updatePayload: UserUpdateRequestDTO = {
+      firstName: "  ",
+      lastName: " Doe ",
+      phone: null,
+      emailVerified: false,
+      status: UserStatus.SUSPENDED,
+    };
+
+    const result = mapUserUpdateRequestToData(updatePayload);
+
+    expect(result.firstName).toBe("");
+    expect(result.lastName).toBe("Doe");
+    expect(result.phone).toBeNull();
+    expect(result.emailVerifiedAt).toBeNull();
+    expect(result.emailVerified).toBe(false);
+    expect(result.status).toBe(UserStatus.SUSPENDED);
+  });
+
+  it("normalises optional product relations with sparse data", () => {
+    const baseProduct = createProductFixture();
+    const mutatedProduct: ProductWithRelations = {
+      ...baseProduct,
+      sku: null as unknown as string,
+      summary: null,
+      description: null,
+      currency: null as unknown as string,
+      variants: [
+        {
+          ...baseProduct.variants[0]!,
+          compareAtPrice: "invalid" as unknown as Prisma.Decimal,
+          attributes: null,
+        },
+      ],
+      productMedia: [
+        {
+          ...baseProduct.productMedia[0]!,
+          sortOrder: null,
+          media: {
+            ...baseProduct.productMedia[0]!.media,
+            alt: "   ",
+            caption: " ",
+            width: undefined as unknown as number,
+            height: undefined as unknown as number,
+          },
+        },
+      ],
+      categories: [
+        {
+          ...baseProduct.categories[0]!,
+          category: {
+            ...baseProduct.categories[0]!.category,
+            description: " ",
+            displayOrder: undefined as unknown as number,
+          },
+        },
+      ],
+    };
+
+    const summary = mapProductToSummary(mutatedProduct);
+
+    expect(summary.sku).toBeNull();
+    expect(summary.summary).toBeNull();
+    expect(summary.description).toBeNull();
+    expect(summary.price.currency).toBe("TRY");
+    expect(summary.variants[0]?.compareAtPrice?.amount).toBe("0");
+    expect(summary.variants[0]?.attributes).toBeNull();
+    expect(summary.media[0]?.media.alt).toBeNull();
+    expect(summary.media[0]?.media.caption).toBeNull();
+    expect(summary.media[0]?.media.width).toBeNull();
+    expect(summary.media[0]?.media.height).toBeNull();
+    expect(summary.categories[0]?.description).toBeNull();
+    expect(summary.categories[0]?.displayOrder).toBeNull();
+  });
+
+  it("returns null for missing order addresses when mapping details", () => {
+    const order = createOrderFixture(createProductFixture());
+    const detail = mapOrderToDetail({
+      ...order,
+      shippingAddressId: null,
+      billingAddressId: null,
+      shippingAddress: null,
+      billingAddress: null,
+    });
+
+    expect(detail.shippingAddress).toBeNull();
+    expect(detail.billingAddress).toBeNull();
+  });
+
+  it("maps cart summaries when variant details are missing", () => {
+    const product = createProductFixture();
+    const baseCart = createCartFixture(product);
+    const sparseCart = {
+      ...baseCart,
+      items: [
+        {
+          ...baseCart.items[0]!,
+          productVariant: undefined,
+        },
+      ],
+    } as unknown as CartWithItems;
+
+    const summary = mapCartToSummary(sparseCart);
+
+    expect(summary.items[0]?.productVariant).toBeUndefined();
+    expect(summary.totals.total.currency).toBe("TRY");
+  });
+
+  it("maps coupons with optional constraints and defaults", () => {
+    const coupon = {
+      ...createCouponFixture(),
+      description: " ",
+      minOrderAmount: null,
+      usageLimit: null,
+      maxDiscountAmount: createDecimal("25"),
+      expiresAt: new Date("2024-08-01T00:00:00.000Z"),
+    };
+
+    const summary = mapCouponToSummary(coupon, "TRY");
+
+    expect(summary.description).toBeNull();
+    expect(summary.minOrderAmount).toBeUndefined();
+    expect(summary.usageLimit).toBeNull();
+    expect(summary.maxDiscountAmount?.amount).toBe("25.00");
+    expect(summary.expiresAt).toBe("2024-08-01T00:00:00.000Z");
+  });
+});

@@ -5,6 +5,20 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./dto": {
+      "import": "./dist/dto/index.js",
+      "types": "./dist/dto/index.d.ts"
+    },
+    "./dto/*": {
+      "import": "./dist/dto/*.js",
+      "types": "./dist/dto/*.d.ts"
+    }
+  },
   "scripts": {
     "build": "pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
     "clean": "rimraf dist",

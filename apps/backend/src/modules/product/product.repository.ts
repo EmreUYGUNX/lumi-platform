@@ -1,5 +1,8 @@
+/* eslint-disable import/order */
 import { Prisma, ProductStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+
+import type { ProductWithRelations } from "@lumi/shared/dto";
 
 import {
   BaseRepository,
@@ -185,14 +188,14 @@ export class ProductRepository extends BaseRepository<
   async findBySlug(
     slug: string,
     options: { include?: Prisma.ProductInclude; select?: Prisma.ProductSelect } = {},
-  ) {
+  ): Promise<ProductWithRelations | null> {
     const include = options.include ?? PRODUCT_DEFAULT_INCLUDE;
 
-    return this.findFirst({
+    return (await this.findFirst({
       where: { slug },
       include,
       select: options.select,
-    });
+    })) as ProductWithRelations | null;
   }
 
   async search(
@@ -206,17 +209,17 @@ export class ProductRepository extends BaseRepository<
       >,
       "where"
     > = {},
-  ): Promise<PaginatedResult<Prisma.ProductGetPayload<{ include: Prisma.ProductInclude }>>> {
+  ): Promise<PaginatedResult<ProductWithRelations>> {
     const where = buildProductSearchWhere(filters);
 
     const include = pagination.include ?? PRODUCT_DEFAULT_INCLUDE;
 
-    return this.paginate({
+    return this.paginate<Prisma.ProductFindManyArgs, ProductWithRelations>({
       ...pagination,
       where,
       include,
       orderBy: pagination.orderBy ?? [{ status: "asc" }, { createdAt: "desc" }],
-    }) as Promise<PaginatedResult<Prisma.ProductGetPayload<{ include: Prisma.ProductInclude }>>>;
+    });
   }
 
   async listActiveProducts(limit = 20): Promise<ProductListingSummary[]> {

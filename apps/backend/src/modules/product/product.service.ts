@@ -12,7 +12,7 @@ import {
   productFilterSchema,
 } from "@lumi/shared/dto";
 
-import { NotFoundError, ValidationError } from "@/lib/errors.js";
+import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/lib/errors.js";
 import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
 
 /* eslint-disable unicorn/no-null */
@@ -25,7 +25,7 @@ interface ProductRepositoryLike {
       include?: Prisma.ProductInclude;
       select?: Prisma.ProductSelect;
     },
-  ): Promise<Prisma.ProductGetPayload<{ include: Prisma.ProductInclude }> | null>;
+  ): Promise<ProductWithRelations | null>;
   search(
     filters: ProductSearchFilters,
     pagination?: Omit<
@@ -37,7 +37,7 @@ interface ProductRepositoryLike {
       >,
       "where"
     >,
-  ): Promise<PaginatedResult<Prisma.ProductGetPayload<{ include: Prisma.ProductInclude }>>>;
+  ): Promise<PaginatedResult<ProductWithRelations>>;
 }
 
 const DEFAULT_PRODUCT_INCLUDE: Prisma.ProductInclude = {
@@ -136,6 +136,16 @@ const buildPriceRangeInput = (
 const coerceQuery = (input: unknown): Record<string, unknown> =>
   input && typeof input === "object" ? (input as Record<string, unknown>) : {};
 
+const formatValidationPath = (path: (string | number)[]): string =>
+  path.length > 0 ? path.map(String).join(".") : "root";
+
+const buildValidationIssues = <T>(issues: ZodError<T>["issues"]): ValidationErrorDetail[] =>
+  issues.map((issue) => ({
+    path: formatValidationPath(issue.path),
+    message: issue.message,
+    code: issue.code,
+  }));
+
 const parseWithValidation = <T>(
   schema: {
     safeParse(input: unknown): { success: true; data: T } | { success: false; error: ZodError<T> };
@@ -146,9 +156,7 @@ const parseWithValidation = <T>(
   const result = schema.safeParse(input);
   if (!result.success) {
     throw new ValidationError(message, {
-      details: {
-        issues: result.error.issues,
-      },
+      issues: buildValidationIssues(result.error.issues),
     });
   }
 
@@ -238,15 +246,26 @@ const buildFilterInput = (raw: Record<string, unknown>): Record<string, unknown>
   ...resolveTakeFilter(raw),
 });
 
-const buildPaginationInput = (raw: Record<string, unknown>): Record<string, unknown> => {
-  const pagination: Record<string, unknown> = {};
-
-  if (raw.page !== undefined) {
-    pagination.page = raw.page;
+const normalisePaginationNumber = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
   }
 
-  if (raw.pageSize !== undefined) {
-    pagination.pageSize = raw.pageSize;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const buildPaginationInput = (raw: Record<string, unknown>): Partial<PaginationRequest> => {
+  const pagination: Partial<PaginationRequest> = {};
+
+  const page = normalisePaginationNumber(raw.page);
+  if (page !== undefined) {
+    pagination.page = page;
+  }
+
+  const pageSize = normalisePaginationNumber(raw.pageSize);
+  if (pageSize !== undefined) {
+    pagination.pageSize = pageSize;
   }
 
   return pagination;
@@ -269,7 +288,7 @@ const parsePaginationInput = (input: unknown): PaginationRequest => {
 
   const raw = coerceQuery(input ?? {});
   const paginationInput = buildPaginationInput(raw);
-  return parseWithValidation(
+  return parseWithValidation<PaginationRequest>(
     paginationRequestSchema,
     paginationInput,
     "Invalid pagination parameters.",
@@ -370,7 +389,12 @@ const mapSortToOrderBy = (
 
 export type ProductSearchResult = PaginatedResult<ProductSummaryDTO>;
 
-export class ProductService {
+export interface ProductServiceContract {
+  search(input: unknown): Promise<ProductSearchResult>;
+  getBySlug(slug: string): Promise<ProductSummaryDTO>;
+}
+
+export class ProductService implements ProductServiceContract {
   private readonly repository: ProductRepositoryLike;
 
   constructor(repository: ProductRepositoryLike) {
@@ -391,7 +415,7 @@ export class ProductService {
     });
 
     return {
-      items: result.items.map((product) => mapProductToSummary(product as ProductWithRelations)),
+      items: result.items.map((product) => mapProductToSummary(product)),
       meta: result.meta,
     };
   }

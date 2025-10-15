@@ -26,9 +26,13 @@ export interface CreateAppOptions {
    * Allows dependency injection of configuration for testing scenarios.
    */
   config?: ApplicationConfig;
+  apiOptions?: Parameters<typeof createApiRouter>[1];
 }
 
-export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Express => {
+export const createApp = ({
+  config: providedConfig,
+  apiOptions,
+}: CreateAppOptions = {}): Express => {
   const config = providedConfig ?? getConfig();
   const app = express();
   const routeRegistry = createRouteRegistry();
@@ -66,7 +70,7 @@ export const createApp = ({ config: providedConfig }: CreateAppOptions = {}): Ex
   const registerApiRoute = createRouteRegistrar(routeRegistry, "/api");
   const registerInternalRoute = createRouteRegistrar(routeRegistry, "/internal");
 
-  app.use("/api", createApiRouter(config, { registerRoute: registerApiRoute }));
+  app.use("/api", createApiRouter(config, { registerRoute: registerApiRoute, ...apiOptions }));
   app.use("/internal", createInternalRouter(config, { registerRoute: registerInternalRoute }));
 
   registerErrorHandlers(app, config);

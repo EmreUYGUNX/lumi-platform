@@ -67,7 +67,7 @@ const buildServers = (config: ApplicationConfig): OpenApi31.ServerObject[] => {
   return servers;
 };
 
-const standardComponents: OpenApi31.ComponentsObject = {
+const standardComponents = {
   securitySchemes: {
     bearerAuth: {
       type: "http",
@@ -1333,7 +1333,7 @@ const buildSwaggerDefinition = (config: ApplicationConfig): OpenApi31.Document =
       description: "Product catalogue browsing endpoints.",
     },
   ],
-  components: standardComponents,
+  components: standardComponents as unknown as OpenApi31.ComponentsObject,
 });
 
 const buildSwaggerJSDocOptions = (config: ApplicationConfig): SwaggerJSDocOptions => ({

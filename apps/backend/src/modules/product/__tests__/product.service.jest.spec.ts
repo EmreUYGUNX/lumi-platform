@@ -1,5 +1,8 @@
+/* eslint-disable import/order */
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma } from "@prisma/client";
+
+import type { ProductWithRelations } from "@lumi/shared/dto";
 
 import { NotFoundError } from "@/lib/errors.js";
 import type { PaginatedResult } from "@/lib/repository/base.repository.js";
@@ -9,11 +12,24 @@ import { ProductService } from "../product.service.js";
 
 /* eslint-disable unicorn/no-null */
 
-const createProductEntity = () => {
+type RepositoryFindBySlug = (
+  slug: string,
+  options?: {
+    include?: Prisma.ProductInclude;
+    select?: Prisma.ProductSelect;
+  },
+) => Promise<ProductWithRelations | null>;
+
+type RepositorySearch = (
+  filters: ProductSearchFilters,
+  pagination?: unknown,
+) => Promise<PaginatedResult<ProductWithRelations>>;
+
+const createProductEntity = (): ProductWithRelations => {
   const timestamp = new Date("2024-01-01T00:00:00.000Z");
 
   return {
-    id: "prod_123",
+    id: "ckproduct000000000000000000",
     title: "Aurora Desk Lamp",
     slug: "aurora-desk-lamp",
     sku: null,
@@ -31,8 +47,8 @@ const createProductEntity = () => {
     updatedAt: timestamp,
     variants: [
       {
-        id: "variant_123",
-        productId: "prod_123",
+        id: "ckvariant000000000000000000",
+        productId: "ckproduct000000000000000000",
         title: "Default",
         sku: "LAMP-001",
         price: new Prisma.Decimal("249.90"),
@@ -47,14 +63,14 @@ const createProductEntity = () => {
     ],
     categories: [
       {
-        productId: "prod_123",
-        categoryId: "cat_123",
+        productId: "ckproduct000000000000000000",
+        categoryId: "ckcategory00000000000000000",
         isPrimary: true,
         assignedAt: timestamp,
         createdAt: timestamp,
         updatedAt: timestamp,
         category: {
-          id: "cat_123",
+          id: "ckcategory00000000000000000",
           name: "Lighting",
           slug: "lighting",
           description: null,
@@ -71,15 +87,15 @@ const createProductEntity = () => {
     ],
     productMedia: [
       {
-        productId: "prod_123",
-        mediaId: "media_123",
+        productId: "ckproduct000000000000000000",
+        mediaId: "ckmedia0000000000000000000",
         sortOrder: 1,
         isPrimary: true,
         assignedAt: timestamp,
         createdAt: timestamp,
         updatedAt: timestamp,
         media: {
-          id: "media_123",
+          id: "ckmedia0000000000000000000",
           assetId: "aurora.png",
           url: "https://cdn.example.com/aurora.png",
           type: "IMAGE" as const,
@@ -95,31 +111,26 @@ const createProductEntity = () => {
         },
       },
     ],
-    collections: [],
-    reviews: [],
-    orderItems: [],
-  };
+  } as ProductWithRelations;
 };
 
 describe("ProductService", () => {
   it("normalises search queries and maps repository results to DTOs", async () => {
     const product = createProductEntity();
-    const searchMock = jest
-      .fn<Promise<PaginatedResult<typeof product>>, [ProductSearchFilters, unknown?]>()
-      .mockResolvedValue({
-        items: [product],
-        meta: {
-          page: 1,
-          pageSize: 25,
-          totalItems: 1,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false,
-        },
-      });
+    const searchMock = jest.fn<RepositorySearch>().mockResolvedValue({
+      items: [product],
+      meta: {
+        page: 1,
+        pageSize: 25,
+        totalItems: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    });
 
     const service = new ProductService({
-      findBySlug: jest.fn(),
+      findBySlug: jest.fn<RepositoryFindBySlug>(),
       search: searchMock,
     });
 
@@ -133,9 +144,10 @@ describe("ProductService", () => {
   });
 
   it("throws NotFoundError when product cannot be located", async () => {
+    const findBySlugMock = jest.fn<RepositoryFindBySlug>().mockResolvedValue(null);
     const service = new ProductService({
-      findBySlug: jest.fn().mockResolvedValue(null),
-      search: jest.fn(),
+      findBySlug: findBySlugMock,
+      search: jest.fn<RepositorySearch>(),
     });
 
     await expect(service.getBySlug("missing-product")).rejects.toThrow(NotFoundError);
@@ -143,9 +155,10 @@ describe("ProductService", () => {
 
   it("returns mapped DTO when product is found", async () => {
     const product = createProductEntity();
+    const findBySlugMock = jest.fn<RepositoryFindBySlug>().mockResolvedValue(product);
     const service = new ProductService({
-      findBySlug: jest.fn().mockResolvedValue(product),
-      search: jest.fn(),
+      findBySlug: findBySlugMock,
+      search: jest.fn<RepositorySearch>(),
     });
 
     const dto = await service.getBySlug(product.slug);

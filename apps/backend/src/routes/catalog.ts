@@ -4,17 +4,15 @@ import { type RequestHandler, Router } from "express";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { asyncHandler } from "@/lib/asyncHandler.js";
+import { ValidationError } from "@/lib/errors.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 import { paginatedResponse, successResponse } from "@/lib/response.js";
 import { ProductRepository } from "@/modules/product/product.repository.js";
-import {
-  ProductService,
-  type ProductService as ProductServiceContract,
-} from "@/modules/product/product.service.js";
+import { ProductService, type ProductServiceContract } from "@/modules/product/product.service.js";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
-interface CatalogRouterOptions {
+export interface CatalogRouterOptions {
   registerRoute?: RouteRegistrar;
   services?: {
     productService?: ProductServiceContract;
@@ -49,7 +47,20 @@ const createSearchHandler = (service: ProductServiceContract): RequestHandler =>
 
 const createDetailHandler = (service: ProductServiceContract): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const product = await service.getBySlug(req.params.slug);
+    const slug = req.params.slug?.trim();
+    if (!slug) {
+      throw new ValidationError("Product slug is required.", {
+        issues: [
+          {
+            path: "slug",
+            message: "The route parameter `slug` must be provided.",
+            code: "MISSING_PARAM",
+          },
+        ],
+      });
+    }
+
+    const product = await service.getBySlug(slug);
     res.json(successResponse(product));
   });
 

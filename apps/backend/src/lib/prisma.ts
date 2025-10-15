@@ -2,7 +2,8 @@
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
-import PrismaClientConstructor from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 import { getConfig } from "../config/index.js";
 import {
@@ -13,24 +14,7 @@ import {
 } from "../observability/index.js";
 import { logger } from "./logger.js";
 
-interface PrismaClientBase {
-  $connect(): Promise<void>;
-  $disconnect(): Promise<void>;
-  $on(event: string, handler: (payload: unknown) => void): void;
-  $use(middleware: (...args: unknown[]) => void): void;
-  $transaction<T>(fn: (client: PrismaClientBase, ...args: unknown[]) => Promise<T> | T): Promise<T>;
-  $queryRaw<T = unknown>(query: TemplateStringsArray | unknown, ...params: unknown[]): Promise<T>;
-  $queryRawUnsafe<T = unknown>(query: string, ...params: unknown[]): Promise<T>;
-}
-
-type PrismaClientClass = new (...args: unknown[]) => PrismaClientBase & {
-  $connect(): Promise<void>;
-  $disconnect(): Promise<void>;
-};
-
-const PrismaClient = PrismaClientConstructor as unknown as PrismaClientClass;
-
-type PrismaClientInstance = PrismaClientBase;
+type PrismaClientInstance = PrismaClient;
 
 const MAX_CONNECT_ATTEMPTS = 5;
 const BASE_RETRY_DELAY_MS = 1000;
@@ -197,7 +181,12 @@ const scheduleQueryPlanAnalysis = (
 /* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
 /* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
 const registerEventLogging = (client: PrismaClientInstance) => {
-  client.$on("query", (payload: unknown) => {
+  const register = client.$on.bind(client) as (
+    event: string,
+    handler: (payload: unknown) => void,
+  ) => void;
+
+  register("query", (payload: unknown) => {
     const rawEvent = payload as PrismaClientQueryEvent | undefined;
     /* istanbul ignore if -- Prisma callback payload omitted in test environment */
     if (!rawEvent) {
@@ -283,7 +272,7 @@ const registerEventLogging = (client: PrismaClientInstance) => {
     }
   });
 
-  client.$on("warn", (payload: unknown) => {
+  register("warn", (payload: unknown) => {
     const rawEvent = payload as PrismaClientLogEvent | undefined;
     logger.warn("Prisma client warning", {
       target: rawEvent?.target ?? DEFAULT_PRISMA_TARGET,
@@ -291,7 +280,7 @@ const registerEventLogging = (client: PrismaClientInstance) => {
     });
   });
 
-  client.$on("info", (payload: unknown) => {
+  register("info", (payload: unknown) => {
     const rawEvent = payload as PrismaClientLogEvent | undefined;
     const {
       app: { environment },
@@ -305,7 +294,7 @@ const registerEventLogging = (client: PrismaClientInstance) => {
     }
   });
 
-  client.$on("error", (payload: unknown) => {
+  register("error", (payload: unknown) => {
     const rawEvent = payload as PrismaClientLogEvent | undefined;
     const target = rawEvent?.target ?? DEFAULT_PRISMA_TARGET;
     const message = rawEvent?.message ?? DEFAULT_PRISMA_MESSAGE;
@@ -391,11 +380,7 @@ const registerDatabaseHealthCheck = (client: PrismaClientInstance) => {
 
 const createPrismaClient = (): PrismaClientInstance => {
   const {
-    database: {
-      url,
-      pool: { minConnections, maxConnections, idleTimeoutMs, connectionTimeoutMs, maxLifetimeMs },
-      queryTimeoutMs,
-    },
+    database: { url, queryTimeoutMs },
     app: { environment },
   } = getConfig();
 
@@ -404,13 +389,6 @@ const createPrismaClient = (): PrismaClientInstance => {
       db: {
         url,
       },
-    },
-    pooling: {
-      minConnections,
-      maxConnections,
-      idleTimeout: idleTimeoutMs,
-      connectionTimeout: connectionTimeoutMs,
-      maxLifetime: maxLifetimeMs,
     },
     errorFormat: environment === "production" ? "minimal" : "pretty",
     log: [
@@ -423,7 +401,7 @@ const createPrismaClient = (): PrismaClientInstance => {
       maxWait: queryTimeoutMs,
       timeout: queryTimeoutMs,
     },
-  });
+  } as unknown as Prisma.PrismaClientOptions);
 
   registerEventLogging(client);
   registerDatabaseHealthCheck(client);

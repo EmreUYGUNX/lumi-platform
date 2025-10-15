@@ -1,11 +1,18 @@
+/* eslint-disable import/order */
 import { describe, expect, it, jest } from "@jest/globals";
 import express from "express";
 import request from "supertest";
+
+import type { ProductSummaryDTO } from "@lumi/shared/dto";
 
 import { NotFoundError } from "@/lib/errors.js";
 import { registerErrorHandlers } from "@/middleware/errorHandler.js";
 import { createTestConfig } from "@/testing/config.js";
 
+import type {
+  ProductSearchResult,
+  ProductServiceContract,
+} from "../../modules/product/product.service.js";
 import { createCatalogRouter } from "../catalog.js";
 import { attachRouteRegistry, createRouteRegistrar, createRouteRegistry } from "../registry.js";
 
@@ -13,8 +20,8 @@ import { attachRouteRegistry, createRouteRegistrar, createRouteRegistry } from "
 
 const buildApp = (
   overrides: {
-    searchResult?: unknown;
-    detailResult?: unknown;
+    searchResult?: ProductSearchResult;
+    detailResult?: ProductSummaryDTO;
     detailError?: Error;
   } = {},
 ) => {
@@ -26,7 +33,7 @@ const buildApp = (
   attachRouteRegistry(app, registry);
   const registerRoute = createRouteRegistrar(registry, "/catalog");
 
-  const defaultProduct = {
+  const defaultProduct: ProductSummaryDTO = {
     id: "prod_1",
     title: "Aurora Desk Lamp",
     slug: "aurora-desk-lamp",
@@ -34,9 +41,10 @@ const buildApp = (
     description: null,
     status: "ACTIVE",
     price: { amount: "249.90", currency: "TRY" },
-    compareAtPrice: null,
+    compareAtPrice: undefined,
     currency: "TRY",
     inventoryPolicy: "TRACK",
+    sku: null,
     searchKeywords: ["lamp"],
     attributes: null,
     variants: [
@@ -45,7 +53,7 @@ const buildApp = (
         title: "Default",
         sku: "LAMP-001",
         price: { amount: "249.90", currency: "TRY" },
-        compareAtPrice: null,
+        compareAtPrice: undefined,
         stock: 12,
         attributes: null,
         weightGrams: 3500,
@@ -61,38 +69,41 @@ const buildApp = (
     deletedAt: null,
   };
 
-  const productService = {
-    search: jest.fn().mockResolvedValue(
-      overrides.searchResult ?? {
-        items: [defaultProduct],
-        meta: {
-          page: 1,
-          pageSize: 25,
-          totalItems: 1,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false,
-        },
-      },
-    ),
-    getBySlug: jest.fn().mockImplementation(async () => {
-      if (overrides.detailError) {
-        throw overrides.detailError;
-      }
-
-      if (overrides.detailResult) {
-        return overrides.detailResult;
-      }
-
-      return defaultProduct;
-    }),
+  const defaultSearchResult: ProductSearchResult = {
+    items: [defaultProduct],
+    meta: {
+      page: 1,
+      pageSize: 25,
+      totalItems: 1,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
   };
+
+  const productService = {
+    search: jest.fn<ProductServiceContract["search"]>(),
+    getBySlug: jest.fn<ProductServiceContract["getBySlug"]>(),
+  } as jest.Mocked<Pick<ProductServiceContract, "search" | "getBySlug">>;
+
+  productService.search.mockResolvedValue(overrides.searchResult ?? defaultSearchResult);
+  productService.getBySlug.mockImplementation(async () => {
+    if (overrides.detailError) {
+      throw overrides.detailError;
+    }
+
+    if (overrides.detailResult) {
+      return overrides.detailResult;
+    }
+
+    return defaultProduct;
+  });
 
   app.use(
     "/catalog",
     createCatalogRouter(config, {
       registerRoute,
-      services: { productService: productService as never },
+      services: { productService: productService as unknown as ProductServiceContract },
     }),
   );
 
@@ -114,7 +125,7 @@ describe("catalog routes", () => {
   });
 
   it("returns product details by slug", async () => {
-    const product = {
+    const product: ProductSummaryDTO = {
       id: "prod_2",
       title: "Orbit Chair",
       slug: "orbit-chair",
@@ -122,7 +133,7 @@ describe("catalog routes", () => {
       description: null,
       status: "ACTIVE",
       price: { amount: "499.00", currency: "TRY" },
-      compareAtPrice: null,
+      compareAtPrice: undefined,
       currency: "TRY",
       inventoryPolicy: "TRACK",
       searchKeywords: [],
@@ -133,6 +144,7 @@ describe("catalog routes", () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       deletedAt: null,
+      sku: null,
     };
 
     const { app, productService } = buildApp({ detailResult: product });
