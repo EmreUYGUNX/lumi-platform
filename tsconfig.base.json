@@ -10,6 +10,8 @@
       "@/*": ["src/*"],
       "@lumi/shared": ["packages/shared/src/index.ts"],
       "@lumi/shared/*": ["packages/shared/src/*"],
+      "@lumi/shared/dto": ["packages/shared/src/dto/index.ts"],
+      "@lumi/shared/dto/*": ["packages/shared/src/dto/*"],
       "@lumi/types": ["packages/types/src/index.ts"],
       "@lumi/types/*": ["packages/types/src/*"],
       "@lumi/testing/jest": ["packages/testing/src/assertions/jest.ts"],

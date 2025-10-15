@@ -1,5 +1,6 @@
 export * from "./user/user.repository.js";
 export * from "./product/product.repository.js";
+export * from "./product/product.service.js";
 export * from "./category/category.repository.js";
 export * from "./order/order.repository.js";
 export * from "./cart/cart.repository.js";

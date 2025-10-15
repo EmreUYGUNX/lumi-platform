@@ -1,9 +1,17 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
+
+/* eslint-disable unicorn/no-null */
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma } from "@prisma/client";
 
-import { ConflictError, InternalServerError } from "../../errors.js";
+import {
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+  ValidationError,
+} from "../../errors.js";
+import { logger } from "../../logger.js";
 import {
   BaseRepository,
   type DelegateWithMethods,
@@ -216,6 +224,208 @@ describe("BaseRepository", () => {
       }),
     );
     expect(result.hasMore).toBe(false);
+    expect(result.nextCursor).toBeUndefined();
+  });
+
+  it("maps relational constraint errors to ValidationError with context", async () => {
+    const delegate = createDelegate();
+    delegate.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Constraint failed", {
+        code: "P2003",
+        clientVersion: "test",
+        meta: { field_name: "userId" },
+      }),
+    );
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    await expect(
+      repo.update({ where: { id: "entity-1" }, data: { title: "Updated" } }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("maps missing record errors to NotFoundError", async () => {
+    const delegate = createDelegate();
+    delegate.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Record missing", {
+        code: "P2025",
+        clientVersion: "test",
+      }),
+    );
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    await expect(repo.delete({ where: { id: "missing" } })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("surface Prisma validation errors as ValidationError instances", async () => {
+    const delegate = createDelegate();
+    delegate.create.mockRejectedValue(
+      new Prisma.PrismaClientValidationError("Invalid payload", { clientVersion: "test" }),
+    );
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    await expect(repo.create({})).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("wraps unexpected errors in InternalServerError", async () => {
+    const delegate = createDelegate();
+    delegate.findFirst.mockRejectedValue(new Error("boom"));
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    await expect(repo.findFirst({ where: { id: "boom" } })).rejects.toBeInstanceOf(
+      InternalServerError,
+    );
+  });
+
+  it("skips logging when logOperations flag is disabled", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([]);
+    const debugSpy = jest.spyOn(logger, "debug").mockImplementation(() => {});
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        primaryKey: "id",
+        logOperations: false,
+      }),
+    );
+
+    await repo.findMany();
+
+    expect(debugSpy).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
+  });
+
+  it("applies configured default sort when orderBy is omitted", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([]);
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        primaryKey: "id",
+        defaultSort: [{ createdAt: "desc" }],
+      }),
+    );
+
+    await repo.findMany({});
+
+    expect(delegate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ createdAt: "desc" }],
+      }),
+    );
+  });
+
+  it("merges soft delete constraints when deleting records", async () => {
+    const delegate = createDelegate();
+    delegate.delete.mockResolvedValue({});
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        primaryKey: "id",
+        softDeleteField: "deletedAt",
+      }),
+    );
+
+    await repo.delete({ where: { status: "ACTIVE" } });
+
+    const deleteArgs = delegate.delete.mock.calls[0]?.[0] as { where?: { AND?: unknown[] } };
+    expect(Array.isArray(deleteArgs?.where?.AND)).toBe(true);
+    const filters = deleteArgs?.where?.AND as Record<string, unknown>[];
+    expect(filters?.[0]).toEqual({ deletedAt: null });
+    expect(filters?.[1]).toEqual({ status: "ACTIVE" });
+  });
+
+  it("adds soft delete filter automatically when counting records", async () => {
+    const delegate = createDelegate();
+    delegate.count.mockResolvedValue(0);
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        primaryKey: "id",
+        softDeleteField: "deletedAt",
+      }),
+    );
+
+    await repo.count();
+
+    expect(delegate.count).toHaveBeenCalledWith({
+      where: { deletedAt: null },
+    });
+  });
+
+  it("supports soft delete and restore life-cycle", async () => {
+    const delegate = createDelegate();
+    delegate.update.mockResolvedValue({});
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        primaryKey: "id",
+        softDeleteField: "removedAt",
+      }),
+    );
+
+    await repo.softDelete("entity-1");
+    await repo.restore("entity-1");
+
+    const [softDeleteCall, restoreCall] = delegate.update.mock.calls;
+    expect(softDeleteCall?.[0]?.data?.removedAt).toBeInstanceOf(Date);
+    expect(restoreCall?.[0]?.data?.removedAt).toBeNull();
+  });
+
+  it("passes skip values through cursor pagination when no cursor provided", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([{ id: "p1" }]);
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    await repo.paginateWithCursor({ skip: 5, take: 1 });
+
+    expect(delegate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 5,
+        take: 2,
+      }),
+    );
+  });
+
+  it("does not resolve cursor when last item is missing identifier", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([{ name: "orphan" }]);
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    const result = await repo.paginateWithCursor({ take: 1 });
+
+    expect(result.hasMore).toBe(false);
+    expect(result.nextCursor).toBeUndefined();
+  });
+
+  it("ignores cursor resolution when identifier is null", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([{ id: null }, { id: null }, { id: null }]);
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, { primaryKey: "id" }),
+    );
+
+    const result = await repo.paginateWithCursor({ take: 2 });
+
+    expect(result.hasMore).toBe(true);
     expect(result.nextCursor).toBeUndefined();
   });
 });

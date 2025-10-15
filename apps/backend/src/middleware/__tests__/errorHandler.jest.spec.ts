@@ -6,6 +6,7 @@ import request from "supertest";
 import { createApp } from "../../app.js";
 import { AppError, ERROR_CODES, ValidationError } from "../../lib/errors.js";
 import { logger } from "../../lib/logger.js";
+import { registerHealthCheck, unregisterHealthCheck } from "../../observability/index.js";
 import { registerRoute } from "../../routes/registry.js";
 import { createTestConfig } from "../../testing/config.js";
 import { registerErrorHandlers } from "../errorHandler.js";
@@ -31,6 +32,26 @@ const createDetailLessError = () =>
     exposeDetails: true,
   });
 
+const PRISMA_HEALTH_CHECK_ID = "database:prisma";
+
+const stubDatabaseHealthCheck = () => {
+  unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+  registerHealthCheck(PRISMA_HEALTH_CHECK_ID, async () => ({
+    status: "healthy",
+    summary: "Stubbed database connectivity.",
+    details: { latencyMs: 0 },
+  }));
+};
+
+const createAppWithStubs = (
+  overrides?: Parameters<typeof createTestConfig>[0],
+): { app: Express; config: ReturnType<typeof createTestConfig> } => {
+  const config = createTestConfig(overrides);
+  const app = createApp({ config });
+  stubDatabaseHealthCheck();
+  return { app, config };
+};
+
 describe("global error handling middleware", () => {
   let warnSpy: jest.SpiedFunction<typeof logger.warn>;
   let errorSpy: jest.SpiedFunction<typeof logger.error>;
@@ -45,13 +66,17 @@ describe("global error handling middleware", () => {
     errorSpy.mockClear();
   });
 
+  afterEach(() => {
+    unregisterHealthCheck(PRISMA_HEALTH_CHECK_ID);
+  });
+
   afterAll(() => {
     warnSpy.mockRestore();
     errorSpy.mockRestore();
   });
 
   it("returns Q2 compliant payload for unknown routes", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
 
     const response = await request(app).get("/unknown-route").expect(404);
 
@@ -64,7 +89,7 @@ describe("global error handling middleware", () => {
   });
 
   it("returns 405 with allowed methods for disallowed verb", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
 
     const response = await request(app).post("/api/v1/health").expect(405);
 
@@ -80,7 +105,7 @@ describe("global error handling middleware", () => {
   });
 
   it("falls through to subsequent handlers when no alternative methods exist", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -93,7 +118,7 @@ describe("global error handling middleware", () => {
   });
 
   it("masks internal error details while logging the incident", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -116,7 +141,7 @@ describe("global error handling middleware", () => {
   });
 
   it("captures errors thrown from async handlers via express-async-errors integration", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -134,7 +159,7 @@ describe("global error handling middleware", () => {
   });
 
   it("includes validation details for operational errors", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -157,7 +182,7 @@ describe("global error handling middleware", () => {
   });
 
   it("propagates allowed methods metadata for unknown routes with registry entries", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -170,9 +195,7 @@ describe("global error handling middleware", () => {
   });
 
   it("exposes stack traces in development environment", async () => {
-    const app = createApp({
-      config: createTestConfig({ app: { environment: "development" } }),
-    });
+    const { app } = createAppWithStubs({ app: { environment: "development" } });
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -194,7 +217,7 @@ describe("global error handling middleware", () => {
   });
 
   it("normalises non-error thrown values", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -217,7 +240,7 @@ describe("global error handling middleware", () => {
   });
 
   it("removes unserialisable error details from responses", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -235,8 +258,7 @@ describe("global error handling middleware", () => {
   });
 
   it("forwards processing when the response has already been sent", () => {
-    const config = createTestConfig();
-    const app = createApp({ config });
+    const { app, config } = createAppWithStubs();
     const handlers = registerErrorHandlers(app, config);
     const globalHandler = handlers.at(-1) as ErrorRequestHandler;
 
@@ -250,7 +272,7 @@ describe("global error handling middleware", () => {
   });
 
   it("omits details when none are provided despite expose flag", async () => {
-    const app = createApp({ config: createTestConfig() });
+    const { app } = createAppWithStubs();
     const registry = app.get("routeRegistry");
 
     if (registry) {
@@ -291,8 +313,7 @@ describe("global error handling middleware", () => {
   });
 
   it("invokes error flow when headers are already sent for method handler", () => {
-    const config = createTestConfig();
-    const app = createApp({ config });
+    const { app, config } = createAppWithStubs();
     const [methodHandler] = registerErrorHandlers(app, config) as [RequestHandler];
     const next = jest.fn();
     methodHandler(
