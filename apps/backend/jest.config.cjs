@@ -27,6 +27,11 @@ config.coveragePathIgnorePatterns = [
   "<rootDir>/apps/backend/src/lib/prisma/middleware.ts"
 ];
 
+config.transformIgnorePatterns = [
+  ...(config.transformIgnorePatterns || []),
+  "node_modules/(?!embedded-postgres/|@embedded-postgres/)"
+];
+
 config.moduleNameMapper = {
   "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
   ...(config.moduleNameMapper || {}),

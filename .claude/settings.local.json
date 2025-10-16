@@ -6,7 +6,13 @@
       "Bash(node -e \"const cov = require(''''./$file''''); const totals = {}; Object.keys(cov).forEach(k => { Object.keys(cov[k]).forEach(metric => { if(!totals[metric]) totals[metric] = {covered:0, total:0}; const m = cov[k][metric]; if(m.total) { totals[metric].total += m.total; totals[metric].covered += m.covered; }})}); console.log(JSON.stringify(totals, null, 2));\")",
       "Bash(done)",
       "Bash(cat:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(find:*)",
+      "Bash(while read dir)",
+      "Bash(do [ -f \"apps/backend/src/modules/$dir/$dir.repository.ts\" ])",
+      "Bash(echo:*)",
+      "Bash(echo \"❌ $dir\")",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

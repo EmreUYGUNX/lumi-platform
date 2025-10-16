@@ -24,7 +24,7 @@ services:
       dockerfile: apps/backend/Dockerfile
       target: development
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.12.2}
+        NODE_VERSION: ${NODE_VERSION:-20.18.1}
         PNPM_VERSION: ${PNPM_VERSION:-9.0.6}
         VCS_REF: ${GIT_COMMIT_SHA:-dev}
         BUILD_DATE: ${BUILD_TIMESTAMP:-unknown}
@@ -94,7 +94,7 @@ services:
       dockerfile: apps/frontend/Dockerfile
       target: development
       args:
-        NODE_VERSION: ${NODE_VERSION:-20.12.2}
+        NODE_VERSION: ${NODE_VERSION:-20.18.1}
         PNPM_VERSION: ${PNPM_VERSION:-9.0.6}
         VCS_REF: ${GIT_COMMIT_SHA:-dev}
         BUILD_DATE: ${BUILD_TIMESTAMP:-unknown}
