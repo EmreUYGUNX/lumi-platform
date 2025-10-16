@@ -977,6 +977,419 @@ components:
               type: object
               additionalProperties: true
               nullable: true
+    PaymentRefundRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - paymentId
+            - amount
+            - currency
+            - status
+          properties:
+            id:
+              type: string
+              format: cuid
+            paymentId:
+              type: string
+              format: cuid
+            amount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            reason:
+              type: string
+              nullable: true
+            status:
+              type: string
+            refundId:
+              type: string
+              nullable: true
+            processedAt:
+              type: string
+              format: date-time
+              nullable: true
+            failureReason:
+              type: string
+              nullable: true
+            failureCode:
+              type: string
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+              nullable: true
+    InventoryRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - productVariantId
+            - quantityAvailable
+            - quantityReserved
+            - quantityOnHand
+          properties:
+            id:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantityAvailable:
+              type: integer
+              minimum: 0
+            quantityReserved:
+              type: integer
+              minimum: 0
+            quantityOnHand:
+              type: integer
+              minimum: 0
+            lowStockThreshold:
+              type: integer
+              nullable: true
+    AddressRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - label
+            - fullName
+            - line1
+            - city
+            - postalCode
+            - country
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            label:
+              type: string
+            fullName:
+              type: string
+            phone:
+              type: string
+              nullable: true
+            line1:
+              type: string
+            line2:
+              type: string
+              nullable: true
+            city:
+              type: string
+            state:
+              type: string
+              nullable: true
+            postalCode:
+              type: string
+            country:
+              type: string
+            isDefault:
+              type: boolean
+    SavedCardRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - cardToken
+            - lastFourDigits
+            - expiryMonth
+            - expiryYear
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            cardToken:
+              type: string
+            cardAlias:
+              type: string
+              nullable: true
+            binNumber:
+              type: string
+              nullable: true
+            lastFourDigits:
+              type: string
+            cardType:
+              type: string
+              nullable: true
+            cardAssociation:
+              type: string
+              nullable: true
+            cardFamily:
+              type: string
+              nullable: true
+            cardBankName:
+              type: string
+              nullable: true
+            cardHolderName:
+              type: string
+              nullable: true
+            expiryMonth:
+              type: integer
+              minimum: 1
+              maximum: 12
+            expiryYear:
+              type: integer
+            isDefault:
+              type: boolean
+    ReviewRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - productId
+            - userId
+            - rating
+            - title
+            - status
+          properties:
+            id:
+              type: string
+              format: cuid
+            productId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+              nullable: true
+            rating:
+              type: integer
+              minimum: 1
+              maximum: 5
+            title:
+              type: string
+            content:
+              type: string
+              nullable: true
+            isVerifiedPurchase:
+              type: boolean
+            status:
+              type: string
+              enum:
+                - PENDING
+                - APPROVED
+                - REJECTED
+            helpfulCount:
+              type: integer
+              minimum: 0
+            notHelpfulCount:
+              type: integer
+              minimum: 0
+    ReviewMediaRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - reviewId
+            - mediaId
+          properties:
+            reviewId:
+              type: string
+              format: cuid
+            mediaId:
+              type: string
+              format: cuid
+            sortOrder:
+              type: integer
+              nullable: true
+    CouponResource:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - code
+            - type
+            - value
+            - isActive
+          properties:
+            id:
+              type: string
+              format: cuid
+            code:
+              type: string
+            description:
+              type: string
+              nullable: true
+            type:
+              type: string
+              enum:
+                - PERCENTAGE
+                - FIXED_AMOUNT
+                - FREE_SHIPPING
+            value:
+              $ref: "#/components/schemas/Money"
+            minOrderAmount:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            maxDiscountAmount:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            usageLimit:
+              type: integer
+              nullable: true
+            usageCount:
+              type: integer
+              minimum: 0
+            startsAt:
+              type: string
+              format: date-time
+              nullable: true
+            expiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            isActive:
+              type: boolean
+    CouponUsageRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - couponId
+            - userId
+            - orderId
+            - discountAmount
+            - usedAt
+          properties:
+            id:
+              type: string
+              format: cuid
+            couponId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            discountAmount:
+              $ref: "#/components/schemas/Money"
+            usedAt:
+              type: string
+              format: date-time
+    UserSessionToken:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - refreshTokenHash
+            - expiresAt
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            refreshTokenHash:
+              type: string
+            fingerprint:
+              type: string
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
+            expiresAt:
+              type: string
+              format: date-time
+            revokedAt:
+              type: string
+              format: date-time
+              nullable: true
+    SecurityEventRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - type
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            type:
+              type: string
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
+            payload:
+              type: object
+              additionalProperties: true
+              nullable: true
+    AuditLogEntry:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - actorType
+            - action
+            - entity
+            - entityId
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            actorType:
+              type: string
+            action:
+              type: string
+            entity:
+              type: string
+            entityId:
+              type: string
+            before:
+              type: object
+              additionalProperties: true
+              nullable: true
+            after:
+              type: object
+              additionalProperties: true
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
     PaginationMeta:
       type: object
       required:

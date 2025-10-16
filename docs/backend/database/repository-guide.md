@@ -66,9 +66,39 @@ Each repository favours eager-loading (`include`) to avoid N+1 queries and suppo
 
 ## Transactions
 
+### Core Guidelines
+
 - Always perform multi-record mutations inside `withTransaction`.
 - The callback receives `(repo, client)`; use `repo` for model operations and `client` when additional delegates (e.g. `tx.cartItem`) are required.
 - Do not capture transaction clients outside the callback—return plain values instead.
+
+### Patterns
+
+1. **Checkout Flow**
+
+   ```ts
+   await orderRepo.withTransaction(async (repo, tx) => {
+     const cart = await repo.cartRepository.assertActiveCart(cartId, { tx });
+     const order = await repo.orderRepository.createFromCart(cart, { tx });
+     await repo.paymentRepository.recordAuthorization(order.id, paymentInput, { tx });
+     await repo.inventoryRepository.reserveItems(cart.items, { tx });
+     return order;
+   });
+   ```
+
+   - Locks the cart row first to avoid duplicate orders.
+   - Avoids N+1 queries by using repositories that project needed relations.
+
+2. **User Merge (Guest → Authenticated)**
+   - Load the guest cart with `include` payload.
+   - Start a transaction, upsert the user's active cart, migrate items, then soft-delete the guest cart.
+   - Handle conflicts via repository-level `ConflictError`.
+
+3. **Bulk Status Updates**
+   - Use `repo.orderRepository.lockForFulfilment(ids, { tx })` (exposes `FOR UPDATE`).
+   - Apply deterministic ordering to prevent deadlocks (`ORDER BY id ASC`).
+
+> Document additional patterns in this section whenever new high-touch flows are implemented.
 
 ## Error Handling
 
@@ -89,4 +119,4 @@ Each repository favours eager-loading (`include`) to avoid N+1 queries and suppo
 2. Provide default `orderBy`, `primaryKey`, and `softDeleteField` when applicable.
 3. Ensure all query helpers accept overrides for `select`/`include` to allow projection.
 4. Add test coverage for every complex method (search, hierarchy building, transactions).
-5. Update this guide when introducing new repository patterns.
+5. Update this guide when introducing new repository patterns and cross-link supporting docs such as [Common Query Patterns](./query-patterns.md).

@@ -19,6 +19,8 @@ Slow query detection is always active. When a query exceeds the threshold:
 - In non-production environments an `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` plan is captured and logged at debug level. Plans are throttled to once every five minutes per unique query signature to keep output manageable.
 - If a query exceeds the Prisma timeout it is escalated with severity `error`.
 
+> Pair this document with the [Common Query Patterns](./query-patterns.md) reference when designing new data access helpers. The pattern catalogue lists the expected indexes and repository APIs for frequent workloads.
+
 ### Prometheus / Grafana quickstart
 
 1. Add a dashboard panel with query
