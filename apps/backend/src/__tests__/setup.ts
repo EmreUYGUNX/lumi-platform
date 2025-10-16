@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { afterAll, afterEach, beforeAll, beforeEach } from "@jest/globals";
+import { afterAll, afterEach, beforeAll, beforeEach, jest } from "@jest/globals";
 
 import { resetEnvironmentCache } from "../config/env.js";
 import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.js";
@@ -12,6 +12,13 @@ import { disposeSharedTestDatabase, getTestDatabaseManager } from "./helpers/db.
 const LOG_DIR_ROOT = fs.realpathSync(os.tmpdir());
 
 const testDatabaseManager = getTestDatabaseManager();
+
+const parsedTestTimeout = Number.parseInt(process.env.LUMI_TEST_TIMEOUT_MS ?? "", 10);
+if (Number.isFinite(parsedTestTimeout) && parsedTestTimeout > 0) {
+  jest.setTimeout(parsedTestTimeout);
+} else {
+  jest.setTimeout(120_000);
+}
 
 beforeAll(async () => {
   await testDatabaseManager.getPrismaClient();

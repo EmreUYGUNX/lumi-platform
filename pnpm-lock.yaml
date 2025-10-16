@@ -29,6 +29,7 @@ overrides:
   "@stoplight/spectral-functions": 1.7.2
   jsonpath-plus: 10.3.0
   dotenv-expand: ^11.0.7
+  "@types/ssh2": 1.15.5
   validator: link:vendor/validator
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
@@ -3372,18 +3373,6 @@ packages:
     resolution:
       {
         integrity: sha512-UE7oxhQLLd9gub6JKIAhDq06T0F6FnztwMNRvYgjeQSBeMc1ZG/tA47EwfduvkuQS8apbkM/lpLpWsaCeYsXVg==,
-      }
-
-  "@types/ssh2-streams@0.1.12":
-    resolution:
-      {
-        integrity: sha512-Sy8tpEmCce4Tq0oSOYdfqaBpA3hDM8SoxoFh5vzFsu2oL+znzGz8oVWW7xb4K920yYMUY+PIG31qZnFMfPWNCg==,
-      }
-
-  "@types/ssh2@0.5.52":
-    resolution:
-      {
-        integrity: sha512-lbLLlXxdCZOSJMCInKH2+9V/77ET2J6NPQHpFI0kda61Dd1KglJs+fPQBchizmzYSOJBgdTajhPqBO1xxLywvg==,
       }
 
   "@types/ssh2@1.15.5":
@@ -13242,15 +13231,6 @@ snapshots:
 
   "@types/shimmer@1.2.0": {}
 
-  "@types/ssh2-streams@0.1.12":
-    dependencies:
-      "@types/node": 20.19.19
-
-  "@types/ssh2@0.5.52":
-    dependencies:
-      "@types/node": 20.19.19
-      "@types/ssh2-streams": 0.1.12
-
   "@types/ssh2@1.15.5":
     dependencies:
       "@types/node": 18.19.130
@@ -17519,7 +17499,7 @@ snapshots:
 
   ssh-remote-port-forward@1.0.4:
     dependencies:
-      "@types/ssh2": 0.5.52
+      "@types/ssh2": 1.15.5
       ssh2: 1.17.0
 
   ssh2@1.17.0:

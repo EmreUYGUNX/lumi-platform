@@ -165,6 +165,7 @@
       "@stoplight/spectral-functions": "1.7.2",
       "jsonpath-plus": "10.3.0",
       "dotenv-expand": "^11.0.7",
+      "@types/ssh2": "1.15.5",
       "validator": "link:vendor/validator"
     },
     "packageExtensions": {
