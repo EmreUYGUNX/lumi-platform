@@ -688,7 +688,7 @@ packages:
       }
     engines: { node: ">=6.9.0" }
     dependencies:
-      "@babel/types": 7.17.0
+      "@babel/types": 7.28.4
       jsesc: 2.5.2
       source-map: 0.5.7
     dev: true
