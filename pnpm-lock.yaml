@@ -7170,6 +7170,12 @@ packages:
         integrity: sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==,
       }
 
+  fs-constants@1.0.0:
+    resolution:
+      {
+        integrity: sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==,
+      }
+
   fs-extra@10.1.0:
     resolution:
       {
@@ -11628,6 +11634,32 @@ packages:
       }
     engines: { node: ">=10.0.0" }
 
+  tapable@2.3.0:
+    resolution:
+      {
+        integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==,
+      }
+    engines: { node: ">=6" }
+
+  tar-fs@2.1.4:
+    resolution:
+      {
+        integrity: sha512-mDAjwmZdh7LTT6pNleZ05Yt65HC3E+NiQzl672vQG38jIrehtJk/J3mNwIg+vShQPcLF/LV7CMnDW6vjj6sfYQ==,
+      }
+
+  tar-fs@3.1.1:
+    resolution:
+      {
+        integrity: sha512-LZA0oaPOc2fVo82Txf3gw+AkEd38szODlptMYejQUhndHMLQ9M059uXR+AfS7DNo0NpINvSqDsvyaCrBVkptWg==,
+      }
+
+  tar-stream@2.2.0:
+    resolution:
+      {
+        integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==,
+      }
+    engines: { node: ">=6" }
+
   tailwind-merge@3.3.1:
     resolution:
       {
@@ -11645,9 +11677,8 @@ packages:
   tapable@2.3.0:
     resolution:
       {
-        integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==,
+        integrity: sha512-qJj60CXt7IU1Ffyc3NJMjh6EkuCFej46zUqJ4J7pqYlThyd9bO0XBTmcOIhSzZJVWfsLks0+nle/j538YAW9RQ==,
       }
-    engines: { node: ">=6" }
 
   tar-fs@2.1.4:
     resolution:
@@ -15023,6 +15054,17 @@ snapshots:
       "@types/d3-timer": 3.0.2
       "@types/d3-transition": 3.0.9
       "@types/d3-zoom": 3.0.8
+
+  "@types/docker-modem@3.0.6":
+    dependencies:
+      "@types/node": 20.19.19
+      "@types/ssh2": 1.15.5
+
+  "@types/dockerode@3.3.44":
+    dependencies:
+      "@types/docker-modem": 3.0.6
+      "@types/node": 20.19.19
+      "@types/ssh2": 1.15.5
 
   "@types/docker-modem@3.0.6":
     dependencies:
