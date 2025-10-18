@@ -245,6 +245,9 @@ importers:
       "@sentry/node":
         specifier: ^8.47.0
         version: 8.55.0
+      bcryptjs:
+        specifier: ^3.0.2
+        version: 3.0.2
       compression:
         specifier: ^1.8.1
         version: 1.8.1
