@@ -20,6 +20,7 @@ import { UnauthorizedError } from "@/lib/errors.js";
 import { type LogMetadata, createChildLogger, logError } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 
+import { SessionService } from "./session.service.js";
 import { type TokenBlacklist, createTokenBlacklist } from "./token.blacklist.js";
 import type {
   AccessTokenClaims,
@@ -71,6 +72,7 @@ export interface TokenServiceOptions {
   now?: () => Date;
   cleanupIntervalMs?: number;
   disableCleanupJob?: boolean;
+  sessionService?: SessionService;
 }
 
 const toUnixSeconds = (date: Date): number => Math.floor(date.getTime() / 1000);
@@ -191,6 +193,8 @@ export class TokenService {
 
   private readonly config: AuthConfig;
 
+  private readonly sessionService: SessionService;
+
   private readonly logger: ReturnType<typeof createChildLogger>;
 
   private readonly now: () => Date;
@@ -209,6 +213,13 @@ export class TokenService {
       });
     this.logger = options.logger ?? createChildLogger(TOKEN_LOGGER_COMPONENT);
     this.now = options.now ?? (() => new Date());
+    this.sessionService =
+      options.sessionService ??
+      new SessionService({
+        prisma: this.prisma,
+        authConfig: this.config,
+        now: this.now,
+      });
     this.cleanupInterval = options.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
 
     if (!options.disableCleanupJob) {
@@ -387,54 +398,14 @@ export class TokenService {
     }
   }
 
-  private async fetchSession(sessionId: string): Promise<SessionWithSecurity | null> {
-    return this.prisma.userSession.findUnique({
-      where: { id: sessionId },
-    }) as Promise<SessionWithSecurity | null>;
-  }
-
-  private async assertSessionActive(
-    session: SessionWithSecurity | null,
-    expectedUserId: string,
-  ): Promise<SessionWithSecurity> {
-    if (!session) {
-      throw new UnauthorizedError("Authentication session could not be found.", {
-        details: { reason: "session_not_found" },
-      });
-    }
-
-    if (session.userId !== expectedUserId) {
-      throw new UnauthorizedError("Authentication session does not belong to this user.", {
-        details: { reason: "session_user_mismatch" },
-      });
-    }
-
-    if (session.revokedAt) {
-      throw new UnauthorizedError("Authentication session has been revoked.", {
-        details: { reason: "session_revoked" },
-      });
-    }
-
-    if (session.expiresAt.getTime() <= this.now().getTime()) {
-      await this.prisma.userSession.update({
-        where: { id: session.id },
-        data: { revokedAt: this.now() },
-      });
-
-      throw new UnauthorizedError("Authentication session has expired.", {
-        details: { reason: "session_expired" },
-      });
-    }
-
-    return session;
-  }
-
   async verifyAccessToken(token: string): Promise<AccessTokenClaims> {
     const payload = this.decodeAccessToken(token);
     await this.ensureBlacklistAllows(payload.jti, "access");
 
-    const session = await this.fetchSession(payload.sessionId);
-    await this.assertSessionActive(session, payload.sub);
+    await this.sessionService.validateSession({
+      sessionId: payload.sessionId,
+      expectedUserId: payload.sub,
+    });
 
     return payload;
   }
@@ -462,8 +433,10 @@ export class TokenService {
     const payload = this.decodeRefreshToken(token);
     await this.ensureBlacklistAllows(payload.jti, "refresh");
 
-    const session = await this.fetchSession(payload.sessionId);
-    const activeSession = await this.assertSessionActive(session, payload.sub);
+    const activeSession = await this.sessionService.validateSession({
+      sessionId: payload.sessionId,
+      expectedUserId: payload.sub,
+    });
     await this.compareRefreshTokenHash(token, activeSession, payload.jti, payload.exp);
 
     return {
@@ -473,33 +446,7 @@ export class TokenService {
   }
 
   async revokeToken(sessionId: string, reason = "manual_revocation"): Promise<void> {
-    const session = await this.prisma.userSession.findUnique({
-      where: { id: sessionId },
-    });
-
-    if (!session) {
-      this.logger.warn("Attempted to revoke session that does not exist", {
-        sessionId,
-        reason,
-      });
-      return;
-    }
-
-    if (session.revokedAt) {
-      this.logger.debug("Session already revoked", { sessionId, reason });
-      return;
-    }
-
-    await this.prisma.userSession.update({
-      where: { id: sessionId },
-      data: { revokedAt: this.now() },
-    });
-
-    this.logger.info("Authentication session revoked", {
-      sessionId,
-      userId: session.userId,
-      reason,
-    });
+    await this.sessionService.revokeSession(sessionId, reason);
   }
 
   private async loadUser(userId: string): Promise<UserWithAuthRelations> {
@@ -576,19 +523,11 @@ export class TokenService {
   }
 
   private async cleanupExpiredSessions(): Promise<void> {
-    const now = this.now();
-    const result = await this.prisma.userSession.updateMany({
-      where: {
-        expiresAt: { lt: now },
-        // eslint-disable-next-line unicorn/no-null -- Prisma schema uses null sentinel values
-        revokedAt: null,
-      },
-      data: { revokedAt: now },
-    });
+    const revokedCount = await this.sessionService.cleanupExpiredSessions();
 
-    if (result.count > 0) {
+    if (revokedCount > 0) {
       this.logger.info("Revoked expired authentication sessions", {
-        count: result.count,
+        count: revokedCount,
         job: CLEANUP_JOB_NAME,
       });
     }

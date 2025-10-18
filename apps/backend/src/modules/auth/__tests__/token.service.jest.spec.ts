@@ -7,6 +7,7 @@ import type { AuthConfig } from "@lumi/types";
 import { hashPassword } from "@/lib/crypto/password.js";
 import { UnauthorizedError } from "@/lib/errors.js";
 
+import { SessionService } from "../session.service.js";
 import type { TokenBlacklist } from "../token.blacklist.js";
 import { TokenService } from "../token.service.js";
 
@@ -203,6 +204,7 @@ describe("TokenService", () => {
   let userFixture: TokenServiceUser;
   let sessionFixture: TokenServiceSession;
   let blacklist: TokenBlacklist;
+  let sessionService: SessionService;
 
   beforeEach(async () => {
     const fixtures = await createFixtures();
@@ -213,12 +215,18 @@ describe("TokenService", () => {
     const prismaResult = createMockPrisma(userFixture, sessionFixture);
     prisma = prismaResult.prisma;
     setSessionState = prismaResult.setSessionState;
+    sessionService = new SessionService({
+      prisma,
+      authConfig,
+      now: () => new Date(),
+    });
 
     service = new TokenService({
       prisma,
       authConfig,
       blacklist,
       disableCleanupJob: true,
+      sessionService,
     });
   });
 
