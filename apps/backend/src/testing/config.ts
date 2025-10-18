@@ -141,6 +141,35 @@ export const createTestConfig = (
         maxBodySizeKb: 512,
       },
     },
+    auth: {
+      jwt: {
+        access: {
+          secret: "access-token-secret-placeholder-value-32!!",
+          ttlSeconds: 15 * 60,
+        },
+        refresh: {
+          secret: "refresh-token-secret-placeholder-value-32!!",
+          ttlSeconds: 14 * 24 * 60 * 60,
+        },
+      },
+      cookies: {
+        domain: "localhost",
+        secret: "cookie-secret-placeholder-value-32!!",
+      },
+      tokens: {
+        emailVerification: {
+          ttlSeconds: 24 * 60 * 60,
+        },
+        passwordReset: {
+          ttlSeconds: 60 * 60,
+        },
+      },
+      session: {
+        fingerprintSecret: "fingerprint-secret-placeholder-value-32!!",
+        lockoutDurationSeconds: 15 * 60,
+        maxLoginAttempts: 5,
+      },
+    },
     observability: {
       sentryDsn: undefined,
       logs: {

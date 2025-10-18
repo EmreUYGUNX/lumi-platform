@@ -18,11 +18,22 @@ const REQUIRED_ENV = {
   STORAGE_BUCKET: "lumi-testing",
   LOG_LEVEL: "info",
   JWT_SECRET: "12345678901234567890123456789012",
+  JWT_ACCESS_SECRET: "abcdefghijklmnopqrstuvwxyzABCDEFG",
+  JWT_REFRESH_SECRET: "hijklmnopqrstuvwxyzABCDEFGHIJKLMNOP",
+  JWT_ACCESS_TTL: "15m",
+  JWT_REFRESH_TTL: "14d",
+  COOKIE_DOMAIN: "localhost",
+  COOKIE_SECRET: "cookie-secret-placeholder-value-32!!",
   SENTRY_DSN: "",
   FEATURE_FLAGS: '{"betaCheckout":true}',
   CONFIG_HOT_RELOAD: "false",
   CONFIG_ENCRYPTION_KEY: "",
   CI: "true",
+  EMAIL_VERIFICATION_TTL: "24h",
+  PASSWORD_RESET_TTL: "1h",
+  SESSION_FINGERPRINT_SECRET: "fingerprint-secret-placeholder-32chars!!",
+  LOCKOUT_DURATION: "15m",
+  MAX_LOGIN_ATTEMPTS: "5",
 } as const;
 
 interface ConfigInternals {
@@ -85,6 +96,36 @@ const createSecuritySection = (): ApplicationConfig["security"] => ({
   },
 });
 
+const createAuthSection = (): ApplicationConfig["auth"] => ({
+  jwt: {
+    access: {
+      secret: "access-token-secret-placeholder-value-32!!",
+      ttlSeconds: 15 * 60,
+    },
+    refresh: {
+      secret: "refresh-token-secret-placeholder-value-32!!",
+      ttlSeconds: 14 * 24 * 60 * 60,
+    },
+  },
+  cookies: {
+    domain: "localhost",
+    secret: "cookie-secret-placeholder-value-32!!",
+  },
+  tokens: {
+    emailVerification: {
+      ttlSeconds: 24 * 60 * 60,
+    },
+    passwordReset: {
+      ttlSeconds: 60 * 60,
+    },
+  },
+  session: {
+    fingerprintSecret: "fingerprint-secret-placeholder-value-32!!",
+    lockoutDurationSeconds: 15 * 60,
+    maxLoginAttempts: 5,
+  },
+});
+
 describe("configuration internals", () => {
   let internals: ConfigInternals;
   let restoreEnv: NodeJS.ProcessEnv;
@@ -139,6 +180,7 @@ describe("configuration internals", () => {
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
       security: createSecuritySection(),
+      auth: createAuthSection(),
       observability: {
         sentryDsn: undefined,
         logs: {
@@ -204,6 +246,7 @@ describe("configuration internals", () => {
       cache: { redisUrl: "redis://localhost:6379" },
       storage: { bucket: "lumi-local" },
       security: createSecuritySection(),
+      auth: createAuthSection(),
       observability: {
         sentryDsn: undefined,
         logs: {

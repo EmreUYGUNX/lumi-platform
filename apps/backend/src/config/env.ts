@@ -91,6 +91,185 @@ const optionalString = (value: unknown) => {
   return trimmed === "" ? undefined : trimmed;
 };
 
+/* eslint-disable security/detect-object-injection */
+const setEnvDefault = (key: keyof NodeJS.ProcessEnv, value: string) => {
+  if (!process.env[key] || process.env[key] === "") {
+    process.env[key] = value;
+  }
+};
+/* eslint-enable security/detect-object-injection */
+
+const applyTestEnvironmentDefaults = () => {
+  if (process.env.NODE_ENV !== "test") {
+    return;
+  }
+
+  if (process.env.LUMI_TEST_SKIP_DEFAULTS === "1") {
+    return;
+  }
+
+  setEnvDefault("JWT_SECRET", "test-secret-placeholder-32-chars!!");
+  setEnvDefault("JWT_ACCESS_SECRET", "test-access-secret-placeholder-32-chars!!");
+  setEnvDefault("JWT_REFRESH_SECRET", "test-refresh-secret-placeholder-32-chars!!");
+  setEnvDefault("JWT_ACCESS_TTL", "900");
+  setEnvDefault("JWT_REFRESH_TTL", `${14 * 24 * 60 * 60}`);
+  setEnvDefault("COOKIE_DOMAIN", "localhost");
+  setEnvDefault("COOKIE_SECRET", "test-cookie-secret-placeholder-32-chars!!");
+  setEnvDefault("EMAIL_VERIFICATION_TTL", `${24 * 60 * 60}`);
+  setEnvDefault("PASSWORD_RESET_TTL", `${60 * 60}`);
+  setEnvDefault("SESSION_FINGERPRINT_SECRET", "test-fingerprint-secret-placeholder-32-chars!!");
+  setEnvDefault("LOCKOUT_DURATION", "900");
+  setEnvDefault("MAX_LOGIN_ATTEMPTS", "5");
+};
+
+const DURATION_UNITS_IN_SECONDS = {
+  s: 1,
+  m: 60,
+  h: 60 * 60,
+  d: 60 * 60 * 24,
+} as const;
+
+type DurationUnit = keyof typeof DURATION_UNITS_IN_SECONDS;
+
+const durationUnits: DurationUnit[] = ["s", "m", "h", "d"];
+
+interface DurationParseOptions {
+  minSeconds?: number;
+}
+
+const isPlainNumeric = (value: string): boolean => {
+  if (value.length === 0) {
+    return false;
+  }
+
+  let seenDecimalSeparator = false;
+  return [...value].every((char, index) => {
+    if (char === ".") {
+      if (seenDecimalSeparator || index === 0 || index === value.length - 1) {
+        return false;
+      }
+
+      seenDecimalSeparator = true;
+      return true;
+    }
+
+    return char >= "0" && char <= "9";
+  });
+};
+
+const parseDurationToSeconds = (
+  raw: string,
+  ctx: z.RefinementCtx,
+  field: string,
+  { minSeconds = 1 }: DurationParseOptions = {},
+): number => {
+  const trimmed = raw.trim();
+
+  if (trimmed.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${field} is required`,
+    });
+
+    return z.NEVER;
+  }
+
+  if (isPlainNumeric(trimmed)) {
+    const numericSeconds = Number.parseFloat(trimmed);
+
+    if (!Number.isFinite(numericSeconds)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${field} must be a positive number of seconds`,
+      });
+
+      return z.NEVER;
+    }
+
+    const seconds = Math.floor(numericSeconds);
+    if (seconds < minSeconds) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${field} must be at least ${minSeconds} seconds`,
+      });
+
+      return z.NEVER;
+    }
+
+    return seconds;
+  }
+
+  const unit = trimmed.slice(-1).toLowerCase() as DurationUnit;
+  if (!durationUnits.includes(unit)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${field} must end with one of: ${durationUnits.join(", ")}`,
+    });
+
+    return z.NEVER;
+  }
+
+  const magnitudePortion = trimmed.slice(0, -1);
+  if (!isPlainNumeric(magnitudePortion)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${field} must use a numeric magnitude (e.g. 15m, 1h)`,
+    });
+
+    return z.NEVER;
+  }
+
+  const magnitude = Number.parseFloat(magnitudePortion);
+  if (!Number.isFinite(magnitude) || magnitude <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${field} must be greater than zero`,
+    });
+
+    return z.NEVER;
+  }
+
+  let unitSeconds: number;
+  switch (unit) {
+    case "s": {
+      unitSeconds = DURATION_UNITS_IN_SECONDS.s;
+      break;
+    }
+    case "m": {
+      unitSeconds = DURATION_UNITS_IN_SECONDS.m;
+      break;
+    }
+    case "h": {
+      unitSeconds = DURATION_UNITS_IN_SECONDS.h;
+      break;
+    }
+    case "d": {
+      unitSeconds = DURATION_UNITS_IN_SECONDS.d;
+      break;
+    }
+    default: {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${field} must end with one of: ${durationUnits.join(", ")}`,
+      });
+
+      return z.NEVER;
+    }
+  }
+
+  const seconds = Math.round(magnitude * unitSeconds);
+  if (seconds < minSeconds) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${field} must be at least ${minSeconds} seconds`,
+    });
+
+    return z.NEVER;
+  }
+
+  return seconds;
+};
+
 const normaliseRedactFields = (raw: string[]): string[] => {
   const unique = new Set<string>();
   raw.forEach((value) => {
@@ -188,6 +367,22 @@ const EnvSchema = z
     STORAGE_BUCKET: z.string().min(1, "STORAGE_BUCKET is required"),
     LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+    JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+    JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+    JWT_ACCESS_TTL: z
+      .string()
+      .min(1, "JWT_ACCESS_TTL is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "JWT_ACCESS_TTL", { minSeconds: 60 }),
+      ),
+    JWT_REFRESH_TTL: z
+      .string()
+      .min(1, "JWT_REFRESH_TTL is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "JWT_REFRESH_TTL", { minSeconds: 60 }),
+      ),
+    COOKIE_DOMAIN: z.string().optional().transform(optionalString),
+    COOKIE_SECRET: z.string().min(32, "COOKIE_SECRET must be at least 32 characters"),
     CORS_ENABLED: z
       .any()
       .transform((value) => booleanTransformer(value, true))
@@ -386,6 +581,28 @@ const EnvSchema = z
         (value) => value === undefined || value.length >= 32,
         "CONFIG_ENCRYPTION_KEY must be at least 32 characters when provided",
       ),
+    EMAIL_VERIFICATION_TTL: z
+      .string()
+      .min(1, "EMAIL_VERIFICATION_TTL is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "EMAIL_VERIFICATION_TTL", { minSeconds: 300 }),
+      ),
+    PASSWORD_RESET_TTL: z
+      .string()
+      .min(1, "PASSWORD_RESET_TTL is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "PASSWORD_RESET_TTL", { minSeconds: 300 }),
+      ),
+    SESSION_FINGERPRINT_SECRET: z
+      .string()
+      .min(32, "SESSION_FINGERPRINT_SECRET must be at least 32 characters"),
+    LOCKOUT_DURATION: z
+      .string()
+      .min(1, "LOCKOUT_DURATION is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "LOCKOUT_DURATION", { minSeconds: 60 }),
+      ),
+    MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3, "MAX_LOGIN_ATTEMPTS must be at least 3"),
     CI: z
       .any()
       .transform((value) => booleanTransformer(value, false))
@@ -493,6 +710,12 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   storageBucket: parsed.STORAGE_BUCKET,
   logLevel: parsed.LOG_LEVEL,
   jwtSecret: parsed.JWT_SECRET,
+  jwtAccessSecret: parsed.JWT_ACCESS_SECRET,
+  jwtRefreshSecret: parsed.JWT_REFRESH_SECRET,
+  jwtAccessTtlSeconds: parsed.JWT_ACCESS_TTL,
+  jwtRefreshTtlSeconds: parsed.JWT_REFRESH_TTL,
+  cookieDomain: parsed.COOKIE_DOMAIN,
+  cookieSecret: parsed.COOKIE_SECRET,
   cors: {
     enabled: parsed.CORS_ENABLED,
     allowedOrigins: csvTransformer(parsed.CORS_ORIGIN ?? parsed.CORS_ALLOWED_ORIGINS, [
@@ -577,6 +800,11 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   configHotReload: parsed.CONFIG_HOT_RELOAD,
   configEncryptionKey: parsed.CONFIG_ENCRYPTION_KEY ?? undefined,
   ci: parsed.CI,
+  emailVerificationTtlSeconds: parsed.EMAIL_VERIFICATION_TTL,
+  passwordResetTtlSeconds: parsed.PASSWORD_RESET_TTL,
+  sessionFingerprintSecret: parsed.SESSION_FINGERPRINT_SECRET,
+  lockoutDurationSeconds: parsed.LOCKOUT_DURATION,
+  maxLoginAttempts: parsed.MAX_LOGIN_ATTEMPTS,
 });
 
 interface LoadEnvironmentOptions {
@@ -595,6 +823,8 @@ export function loadEnvironment(options: LoadEnvironmentOptions = {}): ResolvedE
   files.forEach((file) => {
     applyEnvFile(file);
   });
+
+  applyTestEnvironmentDefaults();
 
   const parsed = EnvSchema.parse(process.env);
   const resolved = toResolvedEnvironment(parsed);

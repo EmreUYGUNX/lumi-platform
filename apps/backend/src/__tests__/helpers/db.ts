@@ -284,7 +284,15 @@ export class TestDatabaseManager {
       this.connectionString = container.getConnectionUri();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes("could not find a working container runtime strategy")) {
+      const loweredMessage = message.toLowerCase();
+      const isRuntimeUnavailable = loweredMessage.includes(
+        "could not find a working container runtime strategy",
+      );
+      const isReaperUnavailable = loweredMessage.includes("failed to connect to reaper");
+      const isPortUnavailable =
+        loweredMessage.includes("port") && loweredMessage.includes("not bound");
+
+      if (isRuntimeUnavailable || isReaperUnavailable || isPortUnavailable) {
         await this.startEmbeddedInstance();
       } else {
         throw error;

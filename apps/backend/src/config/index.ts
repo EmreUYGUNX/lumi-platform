@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 
 import type { ApplicationConfig, ConfigurationChange, ResolvedEnvironment } from "@lumi/types";
 
+import { buildAuthConfig } from "./auth.config.js";
 import { getEnvironment, loadEnvironment, onEnvironmentChange } from "./env.js";
 import { createFeatureFlagRegistry } from "./feature-flags.js";
 
@@ -95,6 +96,7 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
     rateLimit: env.rateLimit,
     validation: env.validation,
   },
+  auth: buildAuthConfig(env),
   observability: {
     sentryDsn: env.sentryDsn,
     logs: {
@@ -189,6 +191,10 @@ export const getConfig = (): ApplicationConfig => cachedConfig;
 export const getFeatureFlags = () => featureFlagRegistry.snapshot();
 
 export const isFeatureEnabled = (flag: string): boolean => featureFlagRegistry.isEnabled(flag);
+
+export const getAuthConfig = () => getConfig().auth;
+export const getJwtConfig = () => getAuthConfig().jwt;
+export const getSessionSecurityConfig = () => getAuthConfig().session;
 
 export const reloadConfiguration = (
   reason = "manual",

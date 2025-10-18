@@ -18,6 +18,17 @@ const REQUIRED_ENV: EnvOverrides = {
   REDIS_URL: "redis://localhost:6379/0",
   STORAGE_BUCKET: "lumi-test-bucket",
   JWT_SECRET: "abcdefghijklmnopqrstuvwxyzABCDEF",
+  JWT_ACCESS_SECRET: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL",
+  JWT_REFRESH_SECRET: "mnopqrstuvwxyzABCDEFGHIJKLabcdefghijkl",
+  JWT_ACCESS_TTL: "15m",
+  JWT_REFRESH_TTL: "14d",
+  COOKIE_DOMAIN: "localhost",
+  COOKIE_SECRET: "cookie-secret-placeholder-value-32!!",
+  EMAIL_VERIFICATION_TTL: "24h",
+  PASSWORD_RESET_TTL: "1h",
+  SESSION_FINGERPRINT_SECRET: "fingerprint-secret-placeholder-32chars!!",
+  LOCKOUT_DURATION: "15m",
+  MAX_LOGIN_ATTEMPTS: "5",
 };
 
 const createEnv = (overrides: EnvOverrides = {}) => ({
@@ -39,6 +50,22 @@ describe("loadEnvironment", () => {
       const reloaded = loadEnvironment({ reload: true, reason: "explicit-reload" });
       expect(reloaded).not.toBe(initialEnv);
       expect(reloaded.appPort).toBe(initialEnv.appPort);
+    });
+  });
+
+  it("parses authentication-related configuration entries", async () => {
+    await withTemporaryEnvironment(createEnv(), async (env) => {
+      expect(env.jwtAccessSecret).toBe(REQUIRED_ENV.JWT_ACCESS_SECRET);
+      expect(env.jwtRefreshSecret).toBe(REQUIRED_ENV.JWT_REFRESH_SECRET);
+      expect(env.jwtAccessTtlSeconds).toBe(15 * 60);
+      expect(env.jwtRefreshTtlSeconds).toBe(14 * 24 * 60 * 60);
+      expect(env.cookieDomain).toBe(REQUIRED_ENV.COOKIE_DOMAIN);
+      expect(env.cookieSecret).toBe(REQUIRED_ENV.COOKIE_SECRET);
+      expect(env.emailVerificationTtlSeconds).toBe(24 * 60 * 60);
+      expect(env.passwordResetTtlSeconds).toBe(60 * 60);
+      expect(env.sessionFingerprintSecret).toBe(REQUIRED_ENV.SESSION_FINGERPRINT_SECRET);
+      expect(env.lockoutDurationSeconds).toBe(15 * 60);
+      expect(env.maxLoginAttempts).toBe(Number(REQUIRED_ENV.MAX_LOGIN_ATTEMPTS));
     });
   });
 
