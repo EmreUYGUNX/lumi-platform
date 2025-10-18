@@ -8,7 +8,7 @@ import type { AccessTokenClaims, RequestAuthState } from "@/modules/auth/token.t
 const ACCESS_TOKEN_HEADER = "authorization";
 const DEFAULT_REFRESH_COOKIE = "refreshToken";
 const AUTH_LOGGER = createChildLogger("middleware:auth:deserialize");
-const BEARER_TOKEN_PATTERN = /^bearer\s+(.+)$/i;
+const BEARER_TOKEN_PATTERN = /^\s*bearer\s+(\S+)\s*$/i;
 const SAFE_COOKIE_NAME_PATTERN = /^[\w-]+$/;
 
 const toHeaderValue = (header: undefined | string | string[]): string | undefined => {
