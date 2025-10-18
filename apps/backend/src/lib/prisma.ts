@@ -46,6 +46,10 @@ const extensionFactories: PrismaExtensionFactory[] = [];
 const slowQueryAlertTimestamps = new Map<string, number>();
 const queryPlanAnalysisTimestamps = new Map<string, number>();
 let databaseHealthCheckRegistered = false;
+let poolWarmupPromise: Promise<void> | undefined;
+let poolWarmupCompleted = false;
+
+type DatabasePoolConfig = ReturnType<typeof getConfig>["database"]["pool"];
 
 const truncate = (value: string, maxLength: number) => {
   if (value.length <= maxLength) {
@@ -176,6 +180,100 @@ const scheduleQueryPlanAnalysis = (
       operation: metadata.operation,
     });
   });
+};
+
+const toPositiveInteger = (value: number, fallback: number): number => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const integer = Math.trunc(value);
+  if (integer <= 0) {
+    return fallback;
+  }
+
+  return integer;
+};
+
+const buildDatasourceUrlWithPool = (baseUrl: string, pool: DatabasePoolConfig): string => {
+  try {
+    const url = new URL(baseUrl);
+    const maxConnections = toPositiveInteger(pool.maxConnections, 20);
+    const poolTimeoutSeconds = toPositiveInteger(Math.ceil(pool.connectionTimeoutMs / 1000), 5);
+
+    url.searchParams.set("connection_limit", String(maxConnections));
+    url.searchParams.set("pool_timeout", String(poolTimeoutSeconds));
+
+    return url.toString();
+  } catch (error) {
+    logger.warn("Failed to apply connection pool parameters to datasource URL", { error });
+    return baseUrl;
+  }
+};
+
+const warmConnectionPool = async (
+  client: PrismaClientInstance,
+  minConnections: number,
+): Promise<void> => {
+  const warmupTarget = toPositiveInteger(minConnections, 0);
+  if (warmupTarget <= 1) {
+    return;
+  }
+
+  const batchSize = Math.min(5, warmupTarget);
+  let established = 0;
+
+  while (established < warmupTarget) {
+    const remaining = warmupTarget - established;
+    const currentBatchSize = Math.min(batchSize, remaining);
+    const warmupBatch: Promise<unknown>[] = [];
+
+    for (let index = 0; index < currentBatchSize; index += 1) {
+      const sequenceIndex = established + index;
+      warmupBatch.push(
+        client.$queryRaw`SELECT 1`.catch((error: unknown) => {
+          logger.debug("Prisma connection warmup query failed", {
+            error,
+            index: sequenceIndex,
+          });
+        }),
+      );
+    }
+
+    // eslint-disable-next-line no-await-in-loop -- Warmup batches run sequentially to avoid connection spikes.
+    await Promise.all(warmupBatch);
+    established += currentBatchSize;
+  }
+};
+
+const ensurePoolWarmup = async (client: PrismaClientInstance): Promise<void> => {
+  if (poolWarmupCompleted) {
+    return;
+  }
+
+  if (poolWarmupPromise) {
+    await poolWarmupPromise;
+    return;
+  }
+
+  const {
+    database: {
+      pool: { minConnections },
+    },
+    app: { environment },
+  } = getConfig();
+
+  if (environment === "test" || minConnections <= 1) {
+    return;
+  }
+
+  poolWarmupPromise = warmConnectionPool(client, minConnections).catch((error: unknown) => {
+    logger.warn("Database connection pool warmup failed", { error });
+  });
+
+  await poolWarmupPromise;
+  poolWarmupCompleted = true;
+  poolWarmupPromise = undefined;
 };
 
 /* istanbul ignore next -- Prisma instrumentation exercised in integration environments */
@@ -389,14 +487,16 @@ const registerDatabaseHealthCheck = (client: PrismaClientInstance) => {
 
 const createPrismaClient = (): PrismaClientInstance => {
   const {
-    database: { url, queryTimeoutMs },
+    database: { url, queryTimeoutMs, pool },
     app: { environment },
   } = getConfig();
+
+  const datasourceUrl = buildDatasourceUrlWithPool(url, pool);
 
   const client = new PrismaClient({
     datasources: {
       db: {
-        url,
+        url: datasourceUrl,
       },
     },
     errorFormat: environment === "production" ? "minimal" : "pretty",
@@ -426,6 +526,7 @@ const connectWithRetry = async (client: PrismaClientInstance): Promise<void> => 
 
     try {
       await client.$connect();
+      await ensurePoolWarmup(client);
       logger.info("Database connection established", { attempt });
     } catch (error) {
       logger.error("Database connection attempt failed", { attempt, error });
@@ -534,5 +635,7 @@ export const disconnectPrismaClient = async () => {
       unregisterHealthCheck(DATABASE_HEALTH_CHECK_ID);
       databaseHealthCheckRegistered = false;
     }
+    poolWarmupPromise = undefined;
+    poolWarmupCompleted = false;
   }
 };
