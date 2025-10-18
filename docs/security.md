@@ -12,6 +12,7 @@ This handbook codifies Phase 0 security requirements (S1–S4) and operational p
 
 - Password hashing must use bcrypt (>= 12 rounds). Implementation delivered in Phase 3.
 - Store only hashed credentials; never log plaintext passwords.
+- Reference the detailed requirements in [`docs/security/password-policy.md`](security/password-policy.md).
 
 ## S2 – Validation & Sanitization
 

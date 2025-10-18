@@ -37,6 +37,7 @@
     "@lumi/types": "workspace:*",
     "@prisma/client": "^5.20.0",
     "@sentry/node": "^8.47.0",
+    "bcryptjs": "^3.0.2",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
