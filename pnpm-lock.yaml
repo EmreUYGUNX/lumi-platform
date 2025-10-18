@@ -281,6 +281,9 @@ importers:
       hpp:
         specifier: ^0.2.3
         version: 0.2.3
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       prom-client:
         specifier: ^15.1.2
         version: 15.1.3
@@ -345,6 +348,9 @@ importers:
       "@types/hpp":
         specifier: ^0.2.6
         version: 0.2.6
+      "@types/jsonwebtoken":
+        specifier: ^9.0.6
+        version: 9.0.10
       "@types/node":
         specifier: ^20.12.7
         version: 20.19.20
@@ -5635,6 +5641,16 @@ packages:
       }
     dev: true
 
+  /@types/jsonwebtoken@9.0.10:
+    resolution:
+      {
+        integrity: sha512-asx5hIG9Qmf/1oStypjanR7iKTv0gXQ1Ov/jfrX6kS/EO0OFni8orbmGCn0672NHR3kXHwpAwR+B368ZGN/2rA==,
+      }
+    dependencies:
+      "@types/ms": 2.1.0
+      "@types/node": 20.19.20
+    dev: true
+
   /@types/methods@1.1.4:
     resolution:
       {
@@ -5646,6 +5662,13 @@ packages:
     resolution:
       {
         integrity: sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==,
+      }
+    dev: true
+
+  /@types/ms@2.1.0:
+    resolution:
+      {
+        integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==,
       }
     dev: true
 
@@ -7438,6 +7461,13 @@ packages:
       }
     engines: { node: ">=8.0.0" }
     dev: true
+
+  /buffer-equal-constant-time@1.0.1:
+    resolution:
+      {
+        integrity: sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==,
+      }
+    dev: false
 
   /buffer-from@1.1.2:
     resolution:
@@ -9427,6 +9457,15 @@ packages:
         integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==,
       }
     dev: true
+
+  /ecdsa-sig-formatter@1.0.11:
+    resolution:
+      {
+        integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==,
+      }
+    dependencies:
+      safe-buffer: 5.2.1
+    dev: false
 
   /ee-first@1.1.1:
     resolution:
@@ -13151,6 +13190,25 @@ packages:
     engines: { node: ">=0.10.0" }
     dev: true
 
+  /jsonwebtoken@9.0.2:
+    resolution:
+      {
+        integrity: sha512-PRp66vJ865SSqOlgqS8hujT5U4AOgMfhrwYIuIhfKaoSCZcirrmASQr8CX7cUg+RMih+hgznrjp99o+W4pJLHQ==,
+      }
+    engines: { node: ">=12", npm: ">=6" }
+    dependencies:
+      jws: 3.2.2
+      lodash.includes: 4.3.0
+      lodash.isboolean: 3.0.3
+      lodash.isinteger: 4.0.4
+      lodash.isnumber: 3.0.3
+      lodash.isplainobject: 4.0.6
+      lodash.isstring: 4.0.1
+      lodash.once: 4.1.1
+      ms: 2.1.3
+      semver: 7.7.3
+    dev: false
+
   /jsx-ast-utils@3.3.5:
     resolution:
       {
@@ -13163,6 +13221,27 @@ packages:
       object.assign: 4.1.7
       object.values: 1.2.1
     dev: true
+
+  /jwa@1.4.2:
+    resolution:
+      {
+        integrity: sha512-eeH5JO+21J78qMvTIDdBXidBd6nG2kZjg5Ohz/1fpa28Z4CcsWUzJ1ZZyFq/3z3N17aZy+ZuBoHljASbL1WfOw==,
+      }
+    dependencies:
+      buffer-equal-constant-time: 1.0.1
+      ecdsa-sig-formatter: 1.0.11
+      safe-buffer: 5.2.1
+    dev: false
+
+  /jws@3.2.2:
+    resolution:
+      {
+        integrity: sha512-YHlZCB6lMTllWDtSPHz/ZXTsi8S00usEV6v1tjq8tOUZzw7DpSDWVXjXDre6ed1w/pd495ODpHZYSdkRTsa0HA==,
+      }
+    dependencies:
+      jwa: 1.4.2
+      safe-buffer: 5.2.1
+    dev: false
 
   /katex@0.16.25:
     resolution:
@@ -13461,6 +13540,20 @@ packages:
     deprecated: This package is deprecated. Use the optional chaining (?.) operator instead.
     dev: false
 
+  /lodash.includes@4.3.0:
+    resolution:
+      {
+        integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==,
+      }
+    dev: false
+
+  /lodash.isboolean@3.0.3:
+    resolution:
+      {
+        integrity: sha512-Bz5mupy2SVbPHURB98VAcw+aHh4vRV5IPNhILUCsOzRmsTmSQ17jIuqopAentWoehktxGd9e/hbIXq980/1QJg==,
+      }
+    dev: false
+
   /lodash.isequal@4.5.0:
     resolution:
       {
@@ -13469,12 +13562,32 @@ packages:
     deprecated: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
     dev: false
 
+  /lodash.isinteger@4.0.4:
+    resolution:
+      {
+        integrity: sha512-DBwtEWN2caHQ9/imiNeEA5ys1JoRtRfY3d7V9wkqtbycnAmTvRRmbHKDV4a0EYc678/dia0jrte4tjYwVBaZUA==,
+      }
+    dev: false
+
+  /lodash.isnumber@3.0.3:
+    resolution:
+      {
+        integrity: sha512-QYqzpfwO3/CWf3XP+Z+tkQsfaLL/EnUlXWVkIk5FUPc4sBdTehEqZONuyRt2P67PXAk+NXmTBcc97zw9t1FQrw==,
+      }
+    dev: false
+
   /lodash.isplainobject@4.0.6:
     resolution:
       {
         integrity: sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==,
       }
-    dev: true
+
+  /lodash.isstring@4.0.1:
+    resolution:
+      {
+        integrity: sha512-0wJxfxH1wgO3GrbuP+dTTk7op+6L41QCXbGINEmD+ny/G/eCqGzxyCsh7159S+mgDDcoarnBw6PC1PS5+wUGgw==,
+      }
+    dev: false
 
   /lodash.kebabcase@4.1.1:
     resolution:
@@ -13502,6 +13615,13 @@ packages:
       {
         integrity: sha512-GK3g5RPZWTRSeLSpgP8Xhra+pnjBC56q9FZYe1d5RN3TJ35dbkGy3YqBSMbyCrlbi+CM9Z3Jk5yTL7RCsqboyQ==,
       }
+
+  /lodash.once@4.1.1:
+    resolution:
+      {
+        integrity: sha512-Sb487aTOCr9drQVL8pIxOzVhafOjZN9UU54hiN8PU3uAiSV7lx1yYNpbNmex2PK6dSJoNTSJUUswT651yww3Mg==,
+      }
+    dev: false
 
   /lodash.snakecase@4.1.1:
     resolution:

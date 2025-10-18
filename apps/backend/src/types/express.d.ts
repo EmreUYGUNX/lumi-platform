@@ -1,3 +1,5 @@
+import type { AuthenticatedUser, RequestAuthState } from "../modules/auth/token.types.js";
+
 declare global {
   namespace Express {
     interface Request {
@@ -5,6 +7,10 @@ declare global {
        * Unique identifier assigned to the current request.
        */
       id: string;
+      /**
+       * Authenticated user context resolved by the authentication middleware.
+       */
+      user?: AuthenticatedUser;
     }
 
     /**
@@ -12,6 +18,7 @@ declare global {
      */
     interface Locals {
       requestId?: string;
+      auth?: RequestAuthState;
     }
   }
 }
