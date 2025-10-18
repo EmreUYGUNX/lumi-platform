@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, jest } from "@jest/globals"
 
 import { resetEnvironmentCache } from "../config/env.js";
 import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.js";
+import "./env-defaults.js";
 import { disposeSharedTestDatabase, getTestDatabaseManager } from "./helpers/db.js";
 
 // eslint-disable-next-line security/detect-non-literal-fs-filename -- resolves a controlled temp directory root for tests

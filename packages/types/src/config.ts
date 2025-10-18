@@ -124,6 +124,39 @@ export interface HealthConfig {
   uptimeGracePeriodSeconds: number;
 }
 
+export interface AuthTokenConfig {
+  secret: string;
+  ttlSeconds: number;
+}
+
+export interface AuthCookiesConfig {
+  domain?: string;
+  secret: string;
+}
+
+export interface AuthSessionConfig {
+  fingerprintSecret: string;
+  lockoutDurationSeconds: number;
+  maxLoginAttempts: number;
+}
+
+export interface AuthConfig {
+  jwt: {
+    access: AuthTokenConfig;
+    refresh: AuthTokenConfig;
+  };
+  cookies: AuthCookiesConfig;
+  tokens: {
+    emailVerification: {
+      ttlSeconds: number;
+    };
+    passwordReset: {
+      ttlSeconds: number;
+    };
+  };
+  session: AuthSessionConfig;
+}
+
 export interface ResolvedEnvironment {
   nodeEnv: RuntimeEnvironment;
   appName: string;
@@ -141,6 +174,17 @@ export interface ResolvedEnvironment {
   storageBucket: string;
   logLevel: LogLevel;
   jwtSecret: string;
+  jwtAccessSecret: string;
+  jwtRefreshSecret: string;
+  jwtAccessTtlSeconds: number;
+  jwtRefreshTtlSeconds: number;
+  cookieDomain?: string;
+  cookieSecret: string;
+  emailVerificationTtlSeconds: number;
+  passwordResetTtlSeconds: number;
+  sessionFingerprintSecret: string;
+  lockoutDurationSeconds: number;
+  maxLoginAttempts: number;
   cors: CorsConfig;
   securityHeaders: SecurityHeadersConfig;
   rateLimit: RateLimitConfig;
@@ -198,6 +242,7 @@ export interface ApplicationConfig {
     rateLimit: RateLimitConfig;
     validation: ValidationConfig;
   };
+  auth: AuthConfig;
   observability: {
     sentryDsn?: string;
     logs: LogTransportConfig;

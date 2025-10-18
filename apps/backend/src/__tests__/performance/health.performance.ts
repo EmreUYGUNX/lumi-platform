@@ -90,6 +90,17 @@ const applyEnvironmentFromConfig = (config: ApplicationConfig) => {
   process.env.REDIS_URL = config.cache.redisUrl;
   process.env.STORAGE_BUCKET = config.storage.bucket;
   process.env.JWT_SECRET = config.security.jwtSecret;
+  process.env.JWT_ACCESS_SECRET = config.auth.jwt.access.secret;
+  process.env.JWT_REFRESH_SECRET = config.auth.jwt.refresh.secret;
+  process.env.JWT_ACCESS_TTL = String(config.auth.jwt.access.ttlSeconds);
+  process.env.JWT_REFRESH_TTL = String(config.auth.jwt.refresh.ttlSeconds);
+  process.env.COOKIE_DOMAIN = config.auth.cookies.domain ?? "";
+  process.env.COOKIE_SECRET = config.auth.cookies.secret;
+  process.env.EMAIL_VERIFICATION_TTL = String(config.auth.tokens.emailVerification.ttlSeconds);
+  process.env.PASSWORD_RESET_TTL = String(config.auth.tokens.passwordReset.ttlSeconds);
+  process.env.SESSION_FINGERPRINT_SECRET = config.auth.session.fingerprintSecret;
+  process.env.LOCKOUT_DURATION = String(config.auth.session.lockoutDurationSeconds);
+  process.env.MAX_LOGIN_ATTEMPTS = String(config.auth.session.maxLoginAttempts);
   process.env.LOG_LEVEL = config.app.logLevel;
 };
 
