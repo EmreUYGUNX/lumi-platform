@@ -272,6 +272,31 @@ export class TestDatabaseManager {
       return;
     }
 
+    const preferredStrategy =
+      process.env.LUMI_TEST_DATABASE_STRATEGY?.trim().toLowerCase() ?? "auto";
+    await (preferredStrategy === "embedded"
+      ? this.startEmbeddedInstance()
+      : this.startDockerContainerWithFallback());
+
+    if (!this.connectionString) {
+      throw new Error("Failed to initialise test database connection.");
+    }
+
+    const adminUrl = new URL(this.connectionString);
+    adminUrl.pathname = "/postgres";
+
+    const shadowName = createShadowDatabaseName(this.databaseName);
+    await ensureShadowDatabaseExists(adminUrl.toString(), shadowName, this.username);
+    this.shadowConnectionString = normaliseDatabaseUrl(this.connectionString, shadowName);
+
+    process.env.DATABASE_URL = this.connectionString;
+    process.env.SHADOW_DATABASE_URL = this.shadowConnectionString;
+    process.env.DATABASE_POOL_MIN = "5";
+    process.env.DATABASE_POOL_MAX = "20";
+    process.env.DATABASE_SLOW_QUERY_THRESHOLD_MS = "200";
+  }
+
+  private async startDockerContainerWithFallback(): Promise<void> {
     try {
       const container = await new PostgreSqlContainer(this.image)
         .withDatabase(this.databaseName)
@@ -298,23 +323,6 @@ export class TestDatabaseManager {
         throw error;
       }
     }
-
-    if (!this.connectionString) {
-      throw new Error("Failed to initialise test database connection.");
-    }
-
-    const adminUrl = new URL(this.connectionString);
-    adminUrl.pathname = "/postgres";
-
-    const shadowName = createShadowDatabaseName(this.databaseName);
-    await ensureShadowDatabaseExists(adminUrl.toString(), shadowName, this.username);
-    this.shadowConnectionString = normaliseDatabaseUrl(this.connectionString, shadowName);
-
-    process.env.DATABASE_URL = this.connectionString;
-    process.env.SHADOW_DATABASE_URL = this.shadowConnectionString;
-    process.env.DATABASE_POOL_MIN = "5";
-    process.env.DATABASE_POOL_MAX = "20";
-    process.env.DATABASE_SLOW_QUERY_THRESHOLD_MS = "200";
   }
 
   private async startEmbeddedInstance(): Promise<void> {

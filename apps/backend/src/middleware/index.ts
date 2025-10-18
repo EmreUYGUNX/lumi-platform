@@ -7,6 +7,7 @@ import hpp from "hpp";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createSentryRequestMiddleware } from "../lib/sentry.js";
+import { createDeserializeUserMiddleware } from "./auth/deserializeUser.js";
 import { createCorsMiddleware } from "./cors.js";
 import { createMetricsMiddleware } from "./metrics.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
@@ -54,6 +55,8 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
 
   const sanitizationMiddleware = createSanitizationMiddleware(config.security.validation);
   sanitizationMiddleware.forEach((middleware) => app.use(middleware));
+
+  app.use(createDeserializeUserMiddleware());
 
   const requestLogger = createRequestLoggingMiddleware(config);
 
