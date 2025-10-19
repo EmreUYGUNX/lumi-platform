@@ -1,5 +1,4 @@
 import compression from "compression";
-import cookieParser from "cookie-parser";
 import express from "express";
 import type { Express } from "express";
 import hpp from "hpp";
@@ -9,6 +8,7 @@ import type { ApplicationConfig } from "@lumi/types";
 import { createSentryRequestMiddleware } from "../lib/sentry.js";
 import { createDeserializeUserMiddleware } from "./auth/deserializeUser.js";
 import { createCorsMiddleware } from "./cors.js";
+import { createCookieAndCsrfMiddleware } from "./csrf.js";
 import { createMetricsMiddleware } from "./metrics.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
 import { createRequestIdMiddleware } from "./requestId.js";
@@ -46,7 +46,7 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
     }),
   );
 
-  app.use(cookieParser());
+  app.use(createCookieAndCsrfMiddleware(config));
   app.use(
     compression({
       threshold: COMPRESSION_THRESHOLD_BYTES,

@@ -24,6 +24,7 @@ COPY apps/frontend/package.json apps/frontend/
 COPY packages/shared/package.json packages/shared/
 COPY packages/types/package.json packages/types/
 COPY packages/ui/package.json packages/ui/
+COPY patches ./patches/
 RUN pnpm fetch --filter @lumi/frontend...
 
 FROM base AS development

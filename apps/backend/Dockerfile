@@ -7,11 +7,28 @@ FROM node:${NODE_VERSION}-alpine AS base
 
 ARG PNPM_VERSION
 
-RUN apk add --no-cache bash curl libc6-compat openssl tini
+RUN apk add --no-cache \
+  bash \
+  curl \
+  git \
+  libc6-compat \
+  openssl \
+  tini \
+  python3 \
+  py3-setuptools \
+  build-base \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont
 ENV PNPM_HOME=/usr/local/share/pnpm
 ENV PNPM_STORE_PATH=/workspace/.pnpm-store
 ENV PATH=${PNPM_HOME}:${PATH}
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 WORKDIR /workspace
 RUN mkdir -p ${PNPM_HOME} ${PNPM_STORE_PATH}
 RUN addgroup -S nodejs && adduser -S lumi -G nodejs -u 1001
@@ -24,6 +41,7 @@ COPY apps/backend/package.json apps/backend/
 COPY packages/shared/package.json packages/shared/
 COPY packages/types/package.json packages/types/
 COPY packages/ui/package.json packages/ui/
+COPY patches ./patches/
 RUN pnpm fetch --filter @lumi/backend...
 
 FROM base AS development
@@ -48,7 +66,7 @@ RUN NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfil
 RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 
-FROM base AS production
+FROM node:${NODE_VERSION}-alpine AS production
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=dev
@@ -58,6 +76,9 @@ LABEL org.opencontainers.image.title="Lumi Backend Service" \
   org.opencontainers.image.revision="${VCS_REF}" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.security.scan-status="required"
+
+RUN apk add --no-cache tini ca-certificates openssl
+RUN addgroup -S nodejs && adduser -S lumi -G nodejs -u 1001
 
 ENV NODE_ENV=production \
   PORT=4000

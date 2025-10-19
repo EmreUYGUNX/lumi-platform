@@ -7,6 +7,7 @@ import type { AuthConfig } from "@lumi/types";
 import { hashPassword } from "@/lib/crypto/password.js";
 import { UnauthorizedError } from "@/lib/errors.js";
 
+import type { RbacService } from "../rbac.service.js";
 import { SessionService } from "../session.service.js";
 import type { TokenBlacklist } from "../token.blacklist.js";
 import { TokenService } from "../token.service.js";
@@ -49,44 +50,10 @@ const authConfig: AuthConfig = {
 };
 
 const createFixtures = async () => {
-  const now = new Date();
-
   const user: TokenServiceUser = {
     id: "user_1",
     email: "user@example.com",
     status: "ACTIVE",
-    roles: [
-      {
-        roleId: "role_admin",
-        assignedAt: now,
-        createdAt: now,
-        updatedAt: now,
-        role: {
-          id: "role_admin",
-          name: "admin",
-          description: "Administrator",
-          createdAt: now,
-          updatedAt: now,
-        },
-        userId: "user_1",
-      },
-    ],
-    permissions: [
-      {
-        userId: "user_1",
-        permissionId: "perm_manage_users",
-        assignedAt: now,
-        createdAt: now,
-        updatedAt: now,
-        permission: {
-          id: "perm_manage_users",
-          key: "manage:users",
-          description: "Manage users",
-          createdAt: now,
-          updatedAt: now,
-        },
-      },
-    ],
   };
 
   const session: TokenServiceSession = {
@@ -205,6 +172,25 @@ describe("TokenService", () => {
   let sessionFixture: TokenServiceSession;
   let blacklist: TokenBlacklist;
   let sessionService: SessionService;
+  let rbacService: RbacService;
+  let rbacMock: jest.Mocked<RbacService>;
+
+  const createRbacStub = (): RbacService => {
+    const stub = {
+      getUserRoles: jest.fn(async () => [{ id: "role_admin", name: "admin" }]),
+      getUserPermissions: jest.fn(async () => ["manage:users"]),
+      hasRole: jest.fn(async () => true),
+      hasPermission: jest.fn(async () => true),
+      invalidateUserPermissions: jest.fn(async () => {}),
+      assignRole: jest.fn(async () => {}),
+      revokeRole: jest.fn(async () => {}),
+      grantPermission: jest.fn(async () => {}),
+      revokePermission: jest.fn(async () => {}),
+      shutdown: jest.fn(async () => {}),
+    } as Partial<RbacService>;
+
+    return stub as RbacService;
+  };
 
   beforeEach(async () => {
     const fixtures = await createFixtures();
@@ -220,6 +206,8 @@ describe("TokenService", () => {
       authConfig,
       now: () => new Date(),
     });
+    rbacService = createRbacStub();
+    rbacMock = rbacService as unknown as jest.Mocked<RbacService>;
 
     service = new TokenService({
       prisma,
@@ -227,6 +215,7 @@ describe("TokenService", () => {
       blacklist,
       disableCleanupJob: true,
       sessionService,
+      rbacService,
     });
   });
 
@@ -240,6 +229,8 @@ describe("TokenService", () => {
     expect(accessToken.payload.sub).toBe(userFixture.id);
     expect(accessToken.payload.roleIds).toContain("role_admin");
     expect(accessToken.payload.permissions).toContain("manage:users");
+    expect(rbacMock.getUserRoles).toHaveBeenCalledWith("user_1");
+    expect(rbacMock.getUserPermissions).toHaveBeenCalledWith("user_1");
 
     const decoded = await service.verifyAccessToken(accessToken.token);
     expect(decoded.sessionId).toBe(sessionFixture.id);

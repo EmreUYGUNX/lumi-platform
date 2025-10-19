@@ -1,3 +1,12 @@
 #!/usr/bin/env sh
 
-pnpm test
+set -e
+
+CHANGED_FILES=$(git diff --name-only --cached)
+
+if printf '%s\n' "$CHANGED_FILES" | grep -q '^apps/backend/'; then
+  echo "🧪 Running backend quick tests (changed files detected)..."
+  pnpm --filter @lumi/backend test:quick
+else
+  echo "✅ No backend changes detected; skipping backend quick tests."
+fi

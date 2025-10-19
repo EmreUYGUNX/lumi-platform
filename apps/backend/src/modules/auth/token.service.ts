@@ -1,15 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  Permission,
-  PrismaClient,
-  Role,
-  User,
-  UserPermission,
-  UserRole,
-  UserSession,
-} from "@prisma/client";
-import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
+import type { PrismaClient, User, UserSession } from "@prisma/client";
+import jwt from "jsonwebtoken";
 
 // eslint-disable-next-line import/order -- import grouping follows Prettier sort order
 import type { AuthConfig } from "@lumi/types";
@@ -20,6 +12,7 @@ import { UnauthorizedError } from "@/lib/errors.js";
 import { type LogMetadata, createChildLogger, logError } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 
+import { type RbacService, createRbacService, getSharedRbacService } from "./rbac.service.js";
 import { SessionService } from "./session.service.js";
 import { type TokenBlacklist, createTokenBlacklist } from "./token.blacklist.js";
 import type {
@@ -33,6 +26,8 @@ import type {
   VerifiedRefreshToken,
 } from "./token.types.js";
 
+const { JsonWebTokenError, TokenExpiredError } = jwt;
+
 const DEFAULT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const CLEANUP_JOB_NAME = "auth:token.cleanup";
 const TOKEN_LOGGER_COMPONENT = "auth:token-service";
@@ -40,10 +35,7 @@ const DEFAULT_BLACKLIST_METADATA: LogMetadata = {
   component: TOKEN_LOGGER_COMPONENT,
 };
 
-type UserWithAuthRelations = Pick<User, "id" | "email" | "status"> & {
-  roles?: (UserRole & { role?: Role | null })[];
-  permissions?: (UserPermission & { permission?: Permission | null })[];
-};
+type UserRecord = Pick<User, "id" | "email" | "status">;
 
 type SessionWithSecurity = Pick<
   UserSession,
@@ -51,7 +43,7 @@ type SessionWithSecurity = Pick<
 >;
 
 export interface GenerateAccessTokenInput {
-  user: UserWithAuthRelations;
+  user: UserRecord;
   session: SessionWithSecurity;
 }
 
@@ -73,38 +65,10 @@ export interface TokenServiceOptions {
   cleanupIntervalMs?: number;
   disableCleanupJob?: boolean;
   sessionService?: SessionService;
+  rbacService?: RbacService;
 }
 
 const toUnixSeconds = (date: Date): number => Math.floor(date.getTime() / 1000);
-
-const normaliseRoles = (user: UserWithAuthRelations): AuthenticatedRole[] => {
-  const roles = user.roles ?? [];
-  const roleIds = new Map<string, string>();
-
-  roles.forEach((entry) => {
-    const id = entry.role?.id ?? entry.roleId;
-    const name = entry.role?.name ?? entry.roleId;
-    if (id) {
-      roleIds.set(id, name);
-    }
-  });
-
-  return [...roleIds.entries()].map(([id, name]) => ({ id, name }));
-};
-
-const normalisePermissions = (user: UserWithAuthRelations): string[] => {
-  const permissions = user.permissions ?? [];
-  const keys = new Set<string>();
-
-  permissions.forEach((entry) => {
-    const key = entry.permission?.key ?? entry.permissionId;
-    if (key) {
-      keys.add(key);
-    }
-  });
-
-  return [...keys];
-};
 
 const toGeneratedToken = <TPayload extends AccessTokenClaims | RefreshTokenClaims>(
   token: string,
@@ -167,13 +131,15 @@ const isRefreshTokenClaims = (payload: unknown): payload is RefreshTokenClaims =
 };
 
 const buildAuthenticatedUser = (
-  user: UserWithAuthRelations,
+  user: UserRecord,
   accessToken: AccessTokenClaims,
+  roles: AuthenticatedRole[],
+  permissions: string[],
 ): AuthenticatedUser => ({
   id: user.id,
   email: user.email,
-  roles: normaliseRoles(user),
-  permissions: normalisePermissions(user),
+  roles,
+  permissions,
   sessionId: accessToken.sessionId,
   token: accessToken,
 });
@@ -194,6 +160,8 @@ export class TokenService {
   private readonly config: AuthConfig;
 
   private readonly sessionService: SessionService;
+
+  private readonly rbacService: RbacService;
 
   private readonly logger: ReturnType<typeof createChildLogger>;
 
@@ -220,6 +188,16 @@ export class TokenService {
         authConfig: this.config,
         now: this.now,
       });
+    if (options.rbacService) {
+      this.rbacService = options.rbacService;
+    } else if (options.prisma) {
+      this.rbacService = createRbacService({
+        prisma: this.prisma,
+        logger: createChildLogger(`${TOKEN_LOGGER_COMPONENT}:rbac`),
+      });
+    } else {
+      this.rbacService = getSharedRbacService();
+    }
     this.cleanupInterval = options.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
 
     if (!options.disableCleanupJob) {
@@ -273,16 +251,18 @@ export class TokenService {
   }
 
   private buildAccessTokenPayload(
-    user: UserWithAuthRelations,
+    user: UserRecord,
     session: SessionWithSecurity,
+    roles: AuthenticatedRole[],
+    permissions: string[],
     jti: string,
     expiresAt: Date,
   ): AccessTokenClaims {
     return {
       sub: user.id,
       email: user.email,
-      roleIds: normaliseRoles(user).map((role) => role.id),
-      permissions: normalisePermissions(user),
+      roleIds: roles.map((role) => role.id),
+      permissions,
       sessionId: session.id,
       jti,
       iat: toUnixSeconds(this.now()),
@@ -311,7 +291,11 @@ export class TokenService {
   }: GenerateAccessTokenInput): Promise<GeneratedToken<AccessTokenClaims>> {
     const expiresAt = this.computeAccessTokenExpiry();
     const jti = randomUUID();
-    const payload = this.buildAccessTokenPayload(user, session, jti, expiresAt);
+    const [roles, permissions] = await Promise.all([
+      this.rbacService.getUserRoles(user.id),
+      this.rbacService.getUserPermissions(user.id),
+    ]);
+    const payload = this.buildAccessTokenPayload(user, session, roles, permissions, jti, expiresAt);
     const token = await signToken(payload, this.config.jwt.access.secret);
 
     return toGeneratedToken(token, payload, expiresAt);
@@ -449,12 +433,13 @@ export class TokenService {
     await this.sessionService.revokeSession(sessionId, reason);
   }
 
-  private async loadUser(userId: string): Promise<UserWithAuthRelations> {
+  private async loadUser(userId: string): Promise<UserRecord> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        roles: { include: { role: true } },
-        permissions: { include: { permission: true } },
+      select: {
+        id: true,
+        email: true,
+        status: true,
       },
     });
 
@@ -511,7 +496,12 @@ export class TokenService {
 
   async fetchAuthenticatedUser(accessToken: AccessTokenClaims): Promise<AuthenticatedUser> {
     const user = await this.loadUser(accessToken.sub);
-    return buildAuthenticatedUser(user, accessToken);
+    const [roles, permissions] = await Promise.all([
+      this.rbacService.getUserRoles(user.id),
+      this.rbacService.getUserPermissions(user.id),
+    ]);
+
+    return buildAuthenticatedUser(user, accessToken, roles, permissions);
   }
 
   // eslint-disable-next-line class-methods-use-this -- Exposed for middleware helper composition
@@ -538,6 +528,7 @@ export class TokenService {
   async shutdown(): Promise<void> {
     this.stopCleanupJob();
     await this.blacklist.shutdown();
+    await this.rbacService.shutdown();
   }
 }
 

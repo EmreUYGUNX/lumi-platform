@@ -249,6 +249,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /etc/machine-id:/etc/machine-id:ro
+      - /var/lib/docker:/var/lib/docker:ro
     ports:
       - "8080:8080"
     healthcheck:
