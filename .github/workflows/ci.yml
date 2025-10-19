@@ -295,7 +295,7 @@ jobs:
           exit-code: 1
           trivyignores: .trivyignore
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
-          trivy-args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
+          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -305,7 +305,7 @@ jobs:
           format: table
           exit-code: 1
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
-          trivy-args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
+          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
       - name: Frontend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -314,8 +314,8 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          trivy-args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
 
   performance:
     name: Performance Budgets
