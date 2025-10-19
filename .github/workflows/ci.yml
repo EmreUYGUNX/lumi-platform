@@ -273,16 +273,18 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Prepare Trivy cache directories
         run: |
-          echo "TRIVY_TEMP_DIR=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
-          echo "TRIVY_CACHE_DIR=$RUNNER_TEMP/trivy-cache" >> "$GITHUB_ENV"
-          echo "TMPDIR=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
-          echo "TEMP=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
-          echo "TMP=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/trivy-temp" "$RUNNER_TEMP/trivy-cache"
+          TRIVY_ROOT="$GITHUB_WORKSPACE/.trivy"
+          echo "TRIVY_ROOT=$TRIVY_ROOT" >> "$GITHUB_ENV"
+          echo "TRIVY_TEMP_DIR=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
+          echo "TRIVY_CACHE_DIR=$TRIVY_ROOT/cache" >> "$GITHUB_ENV"
+          echo "TMPDIR=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
+          echo "TEMP=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
+          echo "TMP=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
+          mkdir -p "$TRIVY_ROOT/temp" "$TRIVY_ROOT/cache"
       - name: Purge residual Trivy artifacts
         run: |
           sudo rm -rf /tmp/fanal-* || true
-          sudo rm -rf "$RUNNER_TEMP"/fanal-* || true
+          sudo rm -rf "$TRIVY_ROOT"/fanal-* || true
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: Build frontend production image
