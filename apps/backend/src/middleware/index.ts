@@ -48,6 +48,7 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
   );
 
   app.use(cookieParser());
+  // codeql[js/missing-token-validation]: CSRF protection is installed immediately after cookie parsing.
   const csrfBundle = createCsrfMiddleware(config);
   app.use(csrfBundle.issueToken);
   app.use(csrfBundle.validate);
