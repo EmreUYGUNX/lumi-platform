@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import cookieParser from "cookie-parser";
 import type { RequestHandler } from "express";
 
 // eslint-disable-next-line import/order -- Prettier sorts type-only imports separately.
@@ -121,4 +122,35 @@ export const createCsrfMiddleware = (
     issueToken,
     validate,
   };
+};
+
+export const createCookieAndCsrfMiddleware = (
+  config: ApplicationConfig,
+  options: {
+    cookieName?: string;
+    headerName?: string;
+  } = {},
+): RequestHandler => {
+  const parser = cookieParser();
+  const bundle = createCsrfMiddleware(config, options);
+
+  const handler: RequestHandler = (req, res, next) => {
+    parser(req, res, (parserError?: unknown) => {
+      if (parserError) {
+        next(parserError as Error);
+        return;
+      }
+
+      bundle.issueToken(req, res, (issueError?: unknown) => {
+        if (issueError) {
+          next(issueError as Error);
+          return;
+        }
+
+        bundle.validate(req, res, next);
+      });
+    });
+  };
+
+  return handler;
 };

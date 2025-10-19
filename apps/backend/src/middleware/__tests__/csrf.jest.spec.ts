@@ -1,18 +1,14 @@
-import cookieParser from "cookie-parser";
 import express from "express";
 import request from "supertest";
 
 import { createTestConfig } from "../../testing/config.js";
-import { createCsrfMiddleware } from "../csrf.js";
+import { createCookieAndCsrfMiddleware } from "../csrf.js";
 
 const createApp = () => {
   const config = createTestConfig();
-  const csrfBundle = createCsrfMiddleware(config);
   const app = express();
 
-  app.use(cookieParser());
-  app.use(csrfBundle.issueToken);
-  app.use(csrfBundle.validate);
+  app.use(createCookieAndCsrfMiddleware(config));
 
   app.get("/token", (req, res) => {
     res.json({ token: res.locals.csrfToken });
