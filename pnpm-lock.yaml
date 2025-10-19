@@ -34,8 +34,14 @@ overrides:
   dotenv-expand: ^11.0.7
   "@types/ssh2": 1.15.5
   validator: link:vendor/validator
+  napi-postinstall: 0.3.4
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
+
+patchedDependencies:
+  napi-postinstall@0.3.4:
+    hash: stjtynlv6gwvxai25nuvgxswxi
+    path: patches/napi-postinstall@0.3.4.patch
 
 importers:
   .:
@@ -14138,7 +14144,7 @@ packages:
       picocolors: 1.1.1
     dev: true
 
-  /napi-postinstall@0.3.4:
+  /napi-postinstall@0.3.4(patch_hash=stjtynlv6gwvxai25nuvgxswxi):
     resolution:
       {
         integrity: sha512-PHI5f1O0EP5xJ9gQmFGMS6IZcrVvTjpXjz7Na41gTE7eE2hK11lg04CECCYEEjdc17EV4DO+fkGEtt7TpTaTiQ==,
@@ -14146,6 +14152,7 @@ packages:
     engines: { node: ^12.20.0 || ^14.18.0 || >=16.0.0 }
     hasBin: true
     dev: true
+    patched: true
 
   /natural-compare@1.4.0:
     resolution:
@@ -18445,7 +18452,7 @@ packages:
       }
     requiresBuild: true
     dependencies:
-      napi-postinstall: 0.3.4
+      napi-postinstall: 0.3.4(patch_hash=stjtynlv6gwvxai25nuvgxswxi)
     optionalDependencies:
       "@unrs/resolver-binding-android-arm-eabi": 1.11.1
       "@unrs/resolver-binding-android-arm64": 1.11.1

@@ -87,12 +87,12 @@
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^15.0.7",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
     "@types/jest": "^29.5.12",
     "@types/jest-image-snapshot": "^6.4.0",
     "@types/node": "^20.12.7",
     "@types/pg": "^8.11.6",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
     "@types/supertest": "^2.0.16",
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
@@ -124,9 +124,9 @@
     "prettier-plugin-tailwindcss": "^0.5.11",
     "prisma-erd-generator": "^2.1.0",
     "puppeteer": "^23",
-    "rimraf": "^5.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "rimraf": "^5.0.5",
     "secretlint": "^8.3.0",
     "size-limit": "^11.2.0",
     "supertest": "^6.3.4",
@@ -172,7 +172,8 @@
       "jsonpath-plus": "10.3.0",
       "dotenv-expand": "^11.0.7",
       "@types/ssh2": "1.15.5",
-      "validator": "link:vendor/validator"
+      "validator": "link:vendor/validator",
+      "napi-postinstall": "0.3.4"
     },
     "packageExtensions": {
       "react-dom@*": {
@@ -183,7 +184,10 @@
     },
     "neverBuiltDependencies": [
       "fsevents"
-    ]
+    ],
+    "patchedDependencies": {
+      "napi-postinstall@0.3.4": "patches/napi-postinstall@0.3.4.patch"
+    }
   },
   "dependencies": {
     "@faker-js/faker": "^9.1.0",

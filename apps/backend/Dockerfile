@@ -7,11 +7,28 @@ FROM node:${NODE_VERSION}-alpine AS base
 
 ARG PNPM_VERSION
 
-RUN apk add --no-cache bash curl libc6-compat openssl tini
+RUN apk add --no-cache \
+  bash \
+  curl \
+  git \
+  libc6-compat \
+  openssl \
+  tini \
+  python3 \
+  py3-setuptools \
+  build-base \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont
 ENV PNPM_HOME=/usr/local/share/pnpm
 ENV PNPM_STORE_PATH=/workspace/.pnpm-store
 ENV PATH=${PNPM_HOME}:${PATH}
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 WORKDIR /workspace
 RUN mkdir -p ${PNPM_HOME} ${PNPM_STORE_PATH}
 RUN addgroup -S nodejs && adduser -S lumi -G nodejs -u 1001
@@ -24,6 +41,7 @@ COPY apps/backend/package.json apps/backend/
 COPY packages/shared/package.json packages/shared/
 COPY packages/types/package.json packages/types/
 COPY packages/ui/package.json packages/ui/
+COPY patches ./patches/
 RUN pnpm fetch --filter @lumi/backend...
 
 FROM base AS development
