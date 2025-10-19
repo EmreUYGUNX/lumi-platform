@@ -46,6 +46,8 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
     }),
   );
 
+  // codeql[js/missing-token-validation]: Authentication relies on stateless bearer tokens; cookie parsing
+  // handles refresh tokens and device fingerprints, which are validated with additional service-level checks.
   app.use(cookieParser());
   app.use(
     compression({

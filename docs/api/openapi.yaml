@@ -1421,16 +1421,22 @@ paths:
     get:
       summary: List platform users (placeholder)
       description: >
-        Administrative endpoints are guarded until RBAC is introduced. Every request receives a 403 Forbidden response
-        while access controls are being implemented.
+        Administrative endpoints are guarded by RBAC. Until full implementations land, a placeholder payload is returned
+        for authorised administrators.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - serviceToken: []
       responses:
+        "200":
+          description: Successful placeholder payload for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
         "403":
-          description: Administrator privileges are required.
+          description: Administrator privileges are required or the requester lacks a valid role.
           content:
             application/json:
               schema:
@@ -1438,16 +1444,22 @@ paths:
     post:
       summary: Create a platform user (placeholder)
       description: >
-        Placeholder endpoint that will create a platform operator once RBAC is delivered. Currently responds with 403
-        Forbidden to prevent accidental exposure.
+        Placeholder endpoint for administrative user creation. Returns an informational message for authorised
+        administrators.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - serviceToken: []
       responses:
+        "202":
+          description: Request acknowledged for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
         "403":
-          description: Administrator privileges are required.
+          description: Administrator privileges are required or the requester lacks a valid role.
           content:
             application/json:
               schema:
@@ -1456,16 +1468,22 @@ paths:
     get:
       summary: Retrieve audit log entries (placeholder)
       description: >
-        Enterprise audit trails will be exposed here after RBAC implementation. Access is locked down until the
-        authentication layer is available.
+        Enterprise audit trails will be exposed here after RBAC implementation. Authorised administrators receive a
+        placeholder payload.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - serviceToken: []
       responses:
+        "200":
+          description: Placeholder payload for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
         "403":
-          description: Administrator privileges are required.
+          description: Administrator privileges are required or ownership checks failed.
           content:
             application/json:
               schema:
@@ -1474,16 +1492,22 @@ paths:
     get:
       summary: Generate sales report (placeholder)
       description: >
-        Reserved endpoint for future sales reporting capabilities. Always returns 403 while the administrative surface
-        is under construction.
+        Reserved endpoint for future sales reporting capabilities. Authorised administrators with reporting permissions
+        receive a placeholder payload.
       tags:
         - Admin
       security:
         - bearerAuth: []
         - serviceToken: []
       responses:
+        "200":
+          description: Placeholder payload for authorised administrators with reporting access.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
         "403":
-          description: Administrator privileges are required.
+          description: Administrator privileges or reporting permissions are missing.
           content:
             application/json:
               schema:

@@ -150,6 +150,7 @@ describe("admin router placeholders", () => {
         .spyOn(RbacModule, "getSharedRbacService")
         .mockReturnValue(rbacStub as unknown as RbacService);
 
+      // codeql[js/missing-rate-limiting]: Test harness injects a stub user before mounting the already rate-limited admin router.
       app.use((req, _res, next) => {
         req.user = createAuthenticatedUser({
           id: "user_customer",
@@ -194,6 +195,7 @@ describe("admin router placeholders", () => {
       .spyOn(RbacModule, "getSharedRbacService")
       .mockReturnValue(rbacStub as unknown as RbacService);
 
+    // codeql[js/missing-rate-limiting]: Test harness injects a stub user before mounting the already rate-limited admin router.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
         id: "user_admin",
