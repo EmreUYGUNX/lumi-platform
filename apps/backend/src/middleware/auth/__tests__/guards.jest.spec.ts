@@ -239,5 +239,81 @@ describe("auth middlewares", () => {
         });
       }
     });
+
+    it("emits UnauthorizedError when user context is missing", async () => {
+      const middleware = createAuthorizeResourceMiddleware({
+        getOwnerId: () => "owner",
+      });
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      const [maybeError] = next.mock.mock.calls[0] ?? [];
+      const error = maybeError as Error | undefined;
+      expect(error).toBeInstanceOf(UnauthorizedError);
+      if (error instanceof UnauthorizedError) {
+        expect(error.details).toEqual({ reason: "authentication_required" });
+      }
+    });
+
+    it("invokes next with errors thrown during ownership resolution", async () => {
+      const ownershipError = new Error("lookup failed");
+      const middleware = createAuthorizeResourceMiddleware({
+        getOwnerId: () => {
+          throw ownershipError;
+        },
+      });
+      const req = createMockRequest({ user: createAuthenticatedUser() });
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      expect(next.mock).toHaveBeenCalledWith(ownershipError);
+    });
+
+    it("rejects when ownership cannot be determined", async () => {
+      const middleware = createAuthorizeResourceMiddleware({
+        getOwnerId: () => {},
+      });
+      const req = createMockRequest({ user: createAuthenticatedUser() });
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      const [maybeError] = next.mock.mock.calls[0] ?? [];
+      const error = maybeError as Error | undefined;
+      expect(error).toBeInstanceOf(ForbiddenError);
+      if (error instanceof ForbiddenError) {
+        expect(error.details).toMatchObject({
+          reason: "resource_owner_unresolved",
+          resource: "resource",
+        });
+      }
+    });
+
+    it("propagates RBAC errors during admin override checks", async () => {
+      const rbac = createRbacStub();
+      const rbacError = new Error("rbac failure");
+      rbac.hasRole = jest.fn(async () => {
+        throw rbacError;
+      });
+      const middleware = createAuthorizeResourceMiddleware({
+        getOwnerId: () => "other-user",
+        rbacService: rbac,
+        adminRoles: ["admin"],
+      });
+      const req = createMockRequest({ user: createAuthenticatedUser() });
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      expect(rbac.hasRole).toHaveBeenCalledWith("user_1", ["admin"]);
+      expect(next.mock).toHaveBeenCalledWith(rbacError);
+    });
   });
 });
