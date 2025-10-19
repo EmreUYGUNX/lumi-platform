@@ -275,6 +275,9 @@ jobs:
         run: |
           echo "TRIVY_TEMP_DIR=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
           echo "TRIVY_CACHE_DIR=$RUNNER_TEMP/trivy-cache" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
+          echo "TEMP=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
+          echo "TMP=$RUNNER_TEMP/trivy-temp" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/trivy-temp" "$RUNNER_TEMP/trivy-cache"
       - name: Purge residual Trivy artifacts
         run: |
