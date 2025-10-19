@@ -7,6 +7,7 @@ import Transport from "winston-transport";
 import { resetEnvironmentCache } from "../../config/env.js";
 import { registerLogTransport, unregisterLogTransport } from "../../lib/logger.js";
 import { registerErrorHandlers } from "../../middleware/errorHandler.js";
+import { createRateLimiterBundle } from "../../middleware/rateLimiter.js";
 import type { RbacService } from "../../modules/auth/rbac.service.js";
 import * as RbacModule from "../../modules/auth/rbac.service.js";
 import type { AccessTokenClaims, AuthenticatedUser } from "../../modules/auth/token.types.js";
@@ -97,10 +98,12 @@ describe("admin router placeholders", () => {
     const transport = new MemoryTransport("warn");
     registerLogTransport(transportName, transport);
 
-    try {
-      const app = express();
-      const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
+    const app = express();
+    app.use(rateLimiterBundle.global);
 
+    try {
       app.use("/admin", createAdminRouter(config));
       registerErrorHandlers(app, config);
 
@@ -121,6 +124,7 @@ describe("admin router placeholders", () => {
         method: "GET",
       });
     } finally {
+      await rateLimiterBundle.cleanup();
       unregisterLogTransport(transportName);
     }
   });
@@ -141,16 +145,17 @@ describe("admin router placeholders", () => {
     const transport = new MemoryTransport("warn");
     registerLogTransport(transportName, transport);
 
-    try {
-      const app = express();
-      const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
+    const app = express();
+    app.use(rateLimiterBundle.global);
 
+    try {
       const rbacStub = createRbacStub();
       jest
         .spyOn(RbacModule, "getSharedRbacService")
         .mockReturnValue(rbacStub as unknown as RbacService);
 
-      // codeql[js/missing-rate-limiting]: Test harness injects a stub user before mounting the already rate-limited admin router.
       app.use((req, _res, next) => {
         req.user = createAuthenticatedUser({
           id: "user_customer",
@@ -179,13 +184,16 @@ describe("admin router placeholders", () => {
         method: "GET",
       });
     } finally {
+      await rateLimiterBundle.cleanup();
       unregisterLogTransport(transportName);
     }
   });
 
   it("allows administrators with reporting permission to access placeholder endpoints", async () => {
-    const app = express();
     const config = createTestConfig();
+    const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
+    const app = express();
+    app.use(rateLimiterBundle.global);
 
     const rbacStub = createRbacStub({
       hasRole: jest.fn(async () => true),
@@ -217,6 +225,8 @@ describe("admin router placeholders", () => {
         message: expect.stringContaining("Sales reporting will be introduced"),
       },
     });
+
+    await rateLimiterBundle.cleanup();
   });
 
   it("logs each unauthorised attempt with request metadata", async () => {
@@ -224,10 +234,12 @@ describe("admin router placeholders", () => {
     const transport = new MemoryTransport("warn");
     registerLogTransport(transportName, transport);
 
-    try {
-      const app = express();
-      const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const config = createTestConfig({ app: { name: "Lumi Test Environment" } });
+    const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
+    const app = express();
+    app.use(rateLimiterBundle.global);
 
+    try {
       app.use("/admin", createAdminRouter(config));
       registerErrorHandlers(app, config);
 
@@ -245,6 +257,7 @@ describe("admin router placeholders", () => {
         path: "/admin/reports/sales",
       });
     } finally {
+      await rateLimiterBundle.cleanup();
       unregisterLogTransport(transportName);
     }
   });

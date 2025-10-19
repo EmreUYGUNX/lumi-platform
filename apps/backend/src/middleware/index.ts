@@ -9,6 +9,7 @@ import type { ApplicationConfig } from "@lumi/types";
 import { createSentryRequestMiddleware } from "../lib/sentry.js";
 import { createDeserializeUserMiddleware } from "./auth/deserializeUser.js";
 import { createCorsMiddleware } from "./cors.js";
+import { createCsrfMiddleware } from "./csrf.js";
 import { createMetricsMiddleware } from "./metrics.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
 import { createRequestIdMiddleware } from "./requestId.js";
@@ -46,9 +47,10 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
     }),
   );
 
-  // codeql[js/missing-token-validation]: Authentication relies on stateless bearer tokens; cookie parsing
-  // handles refresh tokens and device fingerprints, which are validated with additional service-level checks.
   app.use(cookieParser());
+  const csrfBundle = createCsrfMiddleware(config);
+  app.use(csrfBundle.issueToken);
+  app.use(csrfBundle.validate);
   app.use(
     compression({
       threshold: COMPRESSION_THRESHOLD_BYTES,
