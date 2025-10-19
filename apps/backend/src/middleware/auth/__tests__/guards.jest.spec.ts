@@ -276,7 +276,7 @@ describe("auth middlewares", () => {
 
     it("rejects when ownership cannot be determined", async () => {
       const middleware = createAuthorizeResourceMiddleware({
-        getOwnerId: () => {},
+        getOwnerId: () => undefined as unknown as string | undefined,
       });
       const req = createMockRequest({ user: createAuthenticatedUser() });
       const res = createMockResponse();
