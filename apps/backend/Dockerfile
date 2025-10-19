@@ -66,7 +66,7 @@ RUN NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfil
 RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
 
-FROM base AS production
+FROM node:${NODE_VERSION}-alpine AS production
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=dev
@@ -76,6 +76,9 @@ LABEL org.opencontainers.image.title="Lumi Backend Service" \
   org.opencontainers.image.revision="${VCS_REF}" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.security.scan-status="required"
+
+RUN apk add --no-cache tini ca-certificates openssl
+RUN addgroup -S nodejs && adduser -S lumi -G nodejs -u 1001
 
 ENV NODE_ENV=production \
   PORT=4000
