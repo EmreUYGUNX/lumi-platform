@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, User } from "@prisma/client";
 
 import { createDeviceFingerprint } from "@/lib/crypto/fingerprint.js";
 import type { createChildLogger } from "@/lib/logger.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { AuthService } from "../auth.service.js";
-import type { AuthUserProfile } from "../auth.service.js";
+import type { AuthRequestContext, AuthUserProfile } from "../auth.service.js";
 import type { EmailService } from "../email.service.js";
 import type { RbacService } from "../rbac.service.js";
 import type { SecurityEventService } from "../security-event.service.js";
 import type { SessionDeviceMetadata, SessionService } from "../session.service.js";
 import type { TokenService } from "../token.service.js";
+
+/* eslint-disable unicorn/no-null -- Test fixtures intentionally exercise null database states. */
 
 jest.mock("@/lib/crypto/fingerprint.js", () => ({
   createDeviceFingerprint: jest.fn(),
@@ -30,6 +32,9 @@ interface InternalAuthService {
     scope: "email_verification" | "password_reset",
   ) => void;
   assertFingerprintMatches: (fingerprint: string | null, device: SessionDeviceMetadata) => void;
+  refreshLockoutState: (user: User) => Promise<User>;
+  handleFailedLogin: (user: User, context: AuthRequestContext) => Promise<void>;
+  getLockoutRemainingSeconds: (lockoutUntil?: Date | null) => number;
 }
 
 const createConfig = (): ApplicationConfig =>
@@ -70,6 +75,7 @@ const createConfig = (): ApplicationConfig =>
 interface PrismaMock {
   user: {
     findUnique: jest.Mock;
+    update: jest.Mock;
   };
 }
 
@@ -77,6 +83,7 @@ const createPrismaMock = (): PrismaMock =>
   ({
     user: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
   }) as unknown as PrismaMock;
 
@@ -117,6 +124,7 @@ const createEmailServiceMock = (): EmailService =>
     sendPasswordChangedNotification: jest.fn(),
     sendAccountLockoutNotification: jest.fn(),
     sendNewDeviceLoginAlert: jest.fn(),
+    sendSecurityAlertEmail: jest.fn(),
   }) as unknown as EmailService;
 
 const createSecurityEventsMock = (): SecurityEventService =>
@@ -196,6 +204,156 @@ describe("AuthService internal helpers", () => {
       const internal = service as unknown as InternalAuthService;
 
       await expect(internal.buildUserProfile("missing")).rejects.toThrowError("User not found.");
+    });
+  });
+
+  describe("refreshLockoutState", () => {
+    it("resets expired lockouts and clears counters", async () => {
+      const prisma = createPrismaMock();
+      const securityEvents = createSecurityEventsMock();
+      const emailService = createEmailServiceMock();
+      const { service } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        securityEventService: securityEvents,
+        emailService,
+      });
+      const internal = service as unknown as InternalAuthService;
+
+      const lockedUser = {
+        id: "user_locked",
+        email: "locked@example.com",
+        passwordHash: "hash",
+        firstName: "Locked",
+        lastName: "User",
+        phone: null,
+        emailVerified: false,
+        emailVerifiedAt: null,
+        failedLoginCount: 5,
+        lockoutUntil: new Date(fixedNow.getTime() - 60 * 1000),
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        status: "ACTIVE",
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      } as unknown as User;
+
+      const result = await internal.refreshLockoutState(lockedUser);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user_locked" },
+        data: {
+          failedLoginCount: 0,
+          lockoutUntil: null,
+        },
+      });
+      expect(result.failedLoginCount).toBe(0);
+      expect(result.lockoutUntil).toBeNull();
+    });
+
+    it("returns user unchanged when lockout is still active", async () => {
+      const { service } = createAuthService();
+      const internal = service as unknown as InternalAuthService;
+      const futureLockout = new Date(fixedNow.getTime() + 5 * 60 * 1000);
+      const user = {
+        id: "user_lock",
+        email: "lock@example.com",
+        passwordHash: "hash",
+        firstName: "Lock",
+        lastName: "User",
+        phone: null,
+        emailVerified: false,
+        emailVerifiedAt: null,
+        failedLoginCount: 5,
+        lockoutUntil: futureLockout,
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        status: "ACTIVE",
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      } as unknown as User;
+
+      const result = await internal.refreshLockoutState(user);
+      expect(result.lockoutUntil).toBe(futureLockout);
+    });
+  });
+
+  describe("handleFailedLogin", () => {
+    it("logs lockout events and dispatches notification when threshold reached", async () => {
+      const prisma = createPrismaMock();
+      const securityEvents = createSecurityEventsMock();
+      const emailService = createEmailServiceMock();
+      const { service } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        securityEventService: securityEvents,
+        emailService,
+      });
+      const internal = service as unknown as InternalAuthService;
+
+      const user = {
+        id: "user_lock",
+        email: "lock@example.com",
+        passwordHash: "hash",
+        firstName: "Lock",
+        lastName: "User",
+        phone: null,
+        emailVerified: false,
+        emailVerifiedAt: null,
+        failedLoginCount: 4,
+        lockoutUntil: null,
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        status: "ACTIVE",
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      } as unknown as User;
+
+      const context: AuthRequestContext = {
+        device: {
+          ipAddress: "203.0.113.10",
+          userAgent: "UnitTest/1.0",
+          accept: "application/json",
+        },
+      };
+
+      await internal.handleFailedLogin(user, context);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user_lock" },
+        data: {
+          failedLoginCount: { increment: 1 },
+          lockoutUntil: expect.any(Date),
+        },
+      });
+
+      expect(securityEvents.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "login_failed",
+          userId: "user_lock",
+        }),
+      );
+
+      expect(securityEvents.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "account_locked",
+          userId: "user_lock",
+        }),
+      );
+
+      expect(emailService.sendAccountLockoutNotification).toHaveBeenCalledWith({
+        to: "lock@example.com",
+        firstName: "Lock",
+        unlockAt: expect.any(Date),
+      });
+    });
+  });
+
+  describe("getLockoutRemainingSeconds", () => {
+    it("calculates remaining seconds for a future lockout", () => {
+      const { service } = createAuthService();
+      const internal = service as unknown as InternalAuthService;
+      const future = new Date(fixedNow.getTime() + 2 * 60 * 1000);
+      const remaining = internal.getLockoutRemainingSeconds(future);
+      expect(remaining).toBeGreaterThan(0);
     });
   });
 
@@ -283,3 +441,5 @@ describe("AuthService internal helpers", () => {
     });
   });
 });
+
+/* eslint-enable unicorn/no-null */

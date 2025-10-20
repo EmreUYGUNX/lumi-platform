@@ -3,6 +3,118 @@ import type { RequestHandler } from "express";
 import { ForbiddenError, UnauthorizedError } from "@/lib/errors.js";
 import { createChildLogger, mergeRequestContext } from "@/lib/logger.js";
 import { type RbacService, getSharedRbacService } from "@/modules/auth/rbac.service.js";
+import {
+  type SecurityEventService,
+  createSecurityEventService,
+} from "@/modules/auth/security-event.service.js";
+
+interface AuthorizeResourceDependencies {
+  logger: ReturnType<typeof createChildLogger>;
+  securityEvents: SecurityEventService;
+}
+
+const logSecurityEventSafe = async (
+  deps: AuthorizeResourceDependencies,
+  event: Parameters<SecurityEventService["log"]>[0],
+  fallbackMessage: string,
+  metadata: Record<string, unknown>,
+) => {
+  try {
+    await deps.securityEvents.log(event);
+  } catch (error) {
+    deps.logger.warn(fallbackMessage, { error, ...metadata });
+  }
+};
+
+const handleMissingUser = async (
+  deps: AuthorizeResourceDependencies,
+  req: Parameters<RequestHandler>[0],
+  next: Parameters<RequestHandler>[2],
+) => {
+  next(
+    new UnauthorizedError("Authentication required.", {
+      details: { reason: "authentication_required" },
+    }),
+  );
+
+  deps.logger.warn("Unauthenticated access attempt", {
+    path: req.originalUrl,
+    method: req.method,
+    requestId: req.id,
+  });
+
+  await logSecurityEventSafe(
+    deps,
+    {
+      type: "permission_denied",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
+      payload: {
+        reason: "authentication_required",
+        method: req.method,
+        path: req.originalUrl,
+        requestId: req.id,
+      },
+      severity: "warning",
+    },
+    "Failed to write unauthenticated access security event",
+    { requestId: req.id },
+  );
+};
+
+const logDeniedAccess = async (
+  deps: AuthorizeResourceDependencies,
+  req: Parameters<RequestHandler>[0],
+  resource: string,
+  ownerId: string,
+  reason: string,
+) => {
+  await logSecurityEventSafe(
+    deps,
+    {
+      type: "permission_denied",
+      userId: req.user?.id,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
+      payload: {
+        reason,
+        resource,
+        ownerId,
+        method: req.method,
+        path: req.originalUrl,
+        requestId: req.id,
+      },
+      severity: "warning",
+    },
+    "Failed to write resource denial security event",
+    { userId: req.user?.id, requestId: req.id },
+  );
+};
+
+const determineAccessDecision = async (
+  req: Parameters<RequestHandler>[0],
+  ownerId: string,
+  allowAdminOverride: boolean,
+  adminRoles: string[],
+  rbacService: RbacService,
+  next: Parameters<RequestHandler>[2],
+): Promise<"granted" | "denied" | "handled"> => {
+  if (req.user?.id === ownerId) {
+    return "granted";
+  }
+
+  if (!allowAdminOverride || adminRoles.length === 0) {
+    return "denied";
+  }
+
+  try {
+    const hasAdminRole = await rbacService.hasRole(req.user!.id, adminRoles);
+    return hasAdminRole ? "granted" : "denied";
+  } catch (error) {
+    next(error);
+    return "handled";
+  }
+};
 
 export interface AuthorizeResourceOptions {
   getOwnerId: (
@@ -13,6 +125,7 @@ export interface AuthorizeResourceOptions {
   adminRoles?: string[];
   rbacService?: RbacService;
   logger?: ReturnType<typeof createChildLogger>;
+  securityEvents?: SecurityEventService;
 }
 
 const DEFAULT_ADMIN_ROLES = ["admin"] as const;
@@ -23,32 +136,7 @@ interface OwnerResolutionContext {
   readonly logger: ReturnType<typeof createChildLogger>;
 }
 
-interface AdminOverrideContext {
-  readonly req: Parameters<RequestHandler>[0];
-  readonly roles: string[];
-  readonly rbacService: RbacService;
-  readonly allowAdminOverride: boolean;
-}
-
 type ResolutionOutcome = "handled" | "continue";
-
-const handleMissingUser = (
-  logger: ReturnType<typeof createChildLogger>,
-  req: Parameters<RequestHandler>[0],
-  next: Parameters<RequestHandler>[2],
-) => {
-  next(
-    new UnauthorizedError("Authentication required.", {
-      details: { reason: "authentication_required" },
-    }),
-  );
-
-  logger.warn("Unauthenticated access attempt", {
-    path: req.originalUrl,
-    method: req.method,
-    requestId: req.id,
-  });
-};
 
 const resolveOwnerId = async (
   ctx: OwnerResolutionContext,
@@ -87,23 +175,6 @@ const resolveOwnerId = async (
   return { outcome: "continue", ownerId };
 };
 
-const evaluateAdminOverride = async (
-  ctx: AdminOverrideContext,
-  next: Parameters<RequestHandler>[2],
-): Promise<ResolutionOutcome | "granted"> => {
-  if (!ctx.allowAdminOverride || ctx.roles.length === 0) {
-    return "continue";
-  }
-
-  try {
-    const hasAdminRole = await ctx.rbacService.hasRole(ctx.req.user!.id, ctx.roles);
-    return hasAdminRole ? "granted" : "continue";
-  } catch (error) {
-    next(error);
-    return "handled";
-  }
-};
-
 export const createAuthorizeResourceMiddleware = (
   options: AuthorizeResourceOptions,
 ): RequestHandler => {
@@ -114,6 +185,7 @@ export const createAuthorizeResourceMiddleware = (
     adminRoles = [...DEFAULT_ADMIN_ROLES],
     rbacService: providedRbacService,
     logger: providedLogger,
+    securityEvents: providedSecurityEvents,
   } = options;
 
   if (typeof getOwnerId !== "function") {
@@ -122,11 +194,17 @@ export const createAuthorizeResourceMiddleware = (
 
   const rbacService = providedRbacService ?? getSharedRbacService();
   const logger = providedLogger ?? createChildLogger("middleware:auth:authorize-resource");
+  const securityEvents =
+    providedSecurityEvents ??
+    createSecurityEventService({
+      logger: createChildLogger("middleware:auth:authorize-resource:security-events"),
+    });
   const normalisedAdminRoles = adminRoles.map((role) => role.toLowerCase());
 
   const handler: RequestHandler = async (req, _res, next) => {
+    const deps: AuthorizeResourceDependencies = { logger, securityEvents };
     if (!req.user) {
-      handleMissingUser(logger, req, next);
+      await handleMissingUser(deps, req, next);
       return;
     }
 
@@ -137,30 +215,20 @@ export const createAuthorizeResourceMiddleware = (
       return;
     }
 
-    const { ownerId } = ownerResolution;
-    if (!ownerId) {
-      return;
-    }
-
-    if (req.user.id === ownerId) {
-      next();
-      return;
-    }
-
-    const adminOverrideResult = await evaluateAdminOverride(
-      {
-        req,
-        roles: normalisedAdminRoles,
-        rbacService,
-        allowAdminOverride,
-      },
+    const ownerId = ownerResolution.ownerId!;
+    const accessDecision = await determineAccessDecision(
+      req,
+      ownerId,
+      allowAdminOverride,
+      normalisedAdminRoles,
+      rbacService,
       next,
     );
-    if (adminOverrideResult === "handled") {
+    if (accessDecision === "handled") {
       return;
     }
 
-    if (adminOverrideResult === "granted") {
+    if (accessDecision === "granted") {
       next();
       return;
     }
@@ -173,6 +241,8 @@ export const createAuthorizeResourceMiddleware = (
       path: req.originalUrl,
       requestId: req.id,
     });
+
+    await logDeniedAccess(deps, req, resource, ownerId, "not_resource_owner");
 
     next(
       new ForbiddenError("You do not have permission to perform this action.", {
