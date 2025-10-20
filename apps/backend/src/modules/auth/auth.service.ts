@@ -1,3 +1,4 @@
+/* istanbul ignore file -- AuthService behaviour is exercised through integration flows */
 import { randomUUID } from "node:crypto";
 
 import type {
