@@ -3,14 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient, User, UserSession } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
-// eslint-disable-next-line import/order -- import grouping follows Prettier sort order
-import type { AuthConfig } from "@lumi/types";
-
 import { getAuthConfig } from "@/config/index.js";
 import { hashPassword, verifyPassword } from "@/lib/crypto/password.js";
 import { UnauthorizedError } from "@/lib/errors.js";
 import { type LogMetadata, createChildLogger, logError } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
+// eslint-disable-next-line import/order -- import grouping follows Prettier sort order
+import type { AuthConfig } from "@lumi/types";
 
 import { type RbacService, createRbacService, getSharedRbacService } from "./rbac.service.js";
 import { SessionService } from "./session.service.js";

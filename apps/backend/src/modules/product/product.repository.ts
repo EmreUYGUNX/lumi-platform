@@ -2,8 +2,6 @@
 import { Prisma, ProductStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
-import type { ProductWithRelations } from "@lumi/shared/dto";
-
 import {
   BaseRepository,
   type CursorPaginatedResult,
@@ -11,6 +9,7 @@ import {
   type PaginationOptions,
   type RepositoryContext,
 } from "@/lib/repository/base.repository.js";
+import type { ProductWithRelations } from "@lumi/shared/dto";
 
 type ProductRepositoryContext = RepositoryContext<
   Prisma.ProductDelegate,

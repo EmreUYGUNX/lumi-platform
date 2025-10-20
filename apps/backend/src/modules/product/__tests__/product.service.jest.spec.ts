@@ -2,10 +2,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma, ProductStatus } from "@prisma/client";
 
-import type { ProductWithRelations } from "@lumi/shared/dto";
-
 import { NotFoundError, ValidationError } from "@/lib/errors.js";
 import type { PaginatedResult } from "@/lib/repository/base.repository.js";
+import type { ProductWithRelations } from "@lumi/shared/dto";
 
 import type { ProductSearchFilters } from "../product.repository.js";
 import { ProductService } from "../product.service.js";

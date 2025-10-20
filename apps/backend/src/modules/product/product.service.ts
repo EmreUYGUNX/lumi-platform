@@ -2,6 +2,8 @@
 import { Prisma } from "@prisma/client";
 import type { ZodError } from "zod";
 
+import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/lib/errors.js";
+import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
 import {
   type PaginationRequest,
   type ProductFilter,
@@ -11,9 +13,6 @@ import {
   paginationRequestSchema,
   productFilterSchema,
 } from "@lumi/shared/dto";
-
-import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/lib/errors.js";
-import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
 
 /* eslint-disable unicorn/no-null */
 import type { ProductSearchFilters } from "./product.repository.js";

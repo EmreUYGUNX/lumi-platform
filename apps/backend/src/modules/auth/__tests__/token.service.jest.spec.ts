@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PrismaClient } from "@prisma/client";
 
-// eslint-disable-next-line import/order -- import grouping follows Prettier sort order
-import type { AuthConfig } from "@lumi/types";
-
 import { hashPassword } from "@/lib/crypto/password.js";
 import { UnauthorizedError } from "@/lib/errors.js";
+// eslint-disable-next-line import/order -- import grouping follows Prettier sort order
+import type { AuthConfig } from "@lumi/types";
 
 import type { RbacService } from "../rbac.service.js";
 import { SessionService } from "../session.service.js";
