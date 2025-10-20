@@ -1,9 +1,38 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PrismaClient } from "@prisma/client";
 
 import type { createChildLogger } from "@/lib/logger.js";
+import { getSentryInstance, isSentryEnabled } from "@/observability/index.js";
 
 import { SecurityEventService } from "../security-event.service.js";
+
+const captureMessageMock = jest.fn();
+const withScopeMock = jest.fn(
+  (
+    callback: (scope: {
+      setLevel: jest.Mock;
+      setTag: jest.Mock;
+      setUser: jest.Mock;
+      setContext: jest.Mock;
+    }) => void,
+  ) => {
+    const scope = {
+      setLevel: jest.fn(),
+      setTag: jest.fn(),
+      setUser: jest.fn(),
+      setContext: jest.fn(),
+    };
+    callback(scope);
+  },
+);
+
+jest.mock("@/observability/index.js", () => ({
+  isSentryEnabled: jest.fn(() => false),
+  getSentryInstance: jest.fn(() => ({
+    withScope: withScopeMock,
+    captureMessage: captureMessageMock,
+  })),
+}));
 
 interface PrismaMock {
   securityEvent: {
@@ -28,6 +57,12 @@ const createLoggerMock = (): LoggerShape & LoggerMock =>
   }) as unknown as LoggerShape & LoggerMock;
 
 describe("SecurityEventService", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    captureMessageMock.mockClear();
+    withScopeMock.mockClear();
+  });
+
   it("persists security events with associated user metadata", async () => {
     const prisma = createPrismaMock();
     const logger = createLoggerMock();
@@ -91,5 +126,45 @@ describe("SecurityEventService", () => {
       eventType: "auth.login.failed",
       userId: undefined,
     });
+  });
+
+  it("forwards critical events to Sentry when telemetry is enabled", async () => {
+    const prisma = createPrismaMock();
+    const logger = createLoggerMock();
+    const service = new SecurityEventService({
+      prisma: prisma as unknown as PrismaClient,
+      logger,
+    });
+
+    jest.mocked(isSentryEnabled).mockReturnValue(true);
+    const sentry = getSentryInstance();
+    captureMessageMock.mockClear();
+    withScopeMock.mockClear();
+
+    await service.log({
+      type: "refresh_token_replay_detected",
+      userId: "user_789",
+      ipAddress: "198.51.100.24",
+      userAgent: "SecurityAudit/1.0",
+    });
+
+    expect(prisma.securityEvent.create).toHaveBeenCalledWith({
+      data: {
+        type: "refresh_token_replay_detected",
+        ipAddress: "198.51.100.24",
+        userAgent: "SecurityAudit/1.0",
+        payload: undefined,
+        user: {
+          connect: { id: "user_789" },
+        },
+      },
+    });
+    expect(withScopeMock).toHaveBeenCalledTimes(1);
+    expect(captureMessageMock).toHaveBeenCalledWith(
+      "Security event recorded: refresh_token_replay_detected",
+      "error",
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(sentry).toBeDefined();
   });
 });

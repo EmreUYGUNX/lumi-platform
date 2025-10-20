@@ -294,4 +294,42 @@ describe("AuthController", () => {
       },
     });
   });
+
+  it("returns 501 placeholder for two-factor setup endpoint", async () => {
+    const controller = createAuthController({ service, config });
+    const req = createMockRequest({
+      user: { id: "user_123", sessionId: "session_abc" },
+    });
+    const res = createMockResponse();
+
+    const { next } = await invokeHandler(controller.setupTwoFactor, req, res);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(501);
+    expect(res.payload).toMatchObject({
+      success: false,
+      error: {
+        code: "NOT_IMPLEMENTED",
+      },
+    });
+  });
+
+  it("returns 501 placeholder for two-factor verification endpoint", async () => {
+    const controller = createAuthController({ service, config });
+    const req = createMockRequest({
+      user: { id: "user_123", sessionId: "session_abc" },
+    });
+    const res = createMockResponse();
+
+    const { next } = await invokeHandler(controller.verifyTwoFactor, req, res);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(501);
+    expect(res.payload).toMatchObject({
+      success: false,
+      error: {
+        code: "NOT_IMPLEMENTED",
+      },
+    });
+  });
 });

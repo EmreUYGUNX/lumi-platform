@@ -34,7 +34,11 @@ import { createEmailService } from "./email.service.js";
 import { type RbacService, createRbacService } from "./rbac.service.js";
 import type { SecurityEventService } from "./security-event.service.js";
 import { createSecurityEventService } from "./security-event.service.js";
-import { type SessionDeviceMetadata, SessionService } from "./session.service.js";
+import {
+  type SessionDeviceMetadata,
+  type SessionSecurityNotifier,
+  SessionService,
+} from "./session.service.js";
 import type { TokenService } from "./token.service.js";
 import { createTokenService } from "./token.service.js";
 
@@ -178,12 +182,63 @@ export class AuthService implements AuthServiceContract {
     this.logger = options.logger ?? createChildLogger(AUTH_LOGGER_COMPONENT);
     this.now = options.now ?? (() => new Date());
 
+    this.securityEvents =
+      options.securityEventService ??
+      createSecurityEventService({
+        prisma: this.prisma,
+        logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:security-events`),
+      });
+
+    const sessionNotifier: SessionSecurityNotifier = {
+      handleSessionRevoked: async ({ sessionId, userId, reason }) => {
+        try {
+          await this.securityEvents.log({
+            type: "session_revoked",
+            userId,
+            payload: {
+              sessionId,
+              reason,
+            },
+            severity: "warning",
+          });
+        } catch (error) {
+          this.logger.warn("Failed to publish session revocation security event", {
+            error,
+            sessionId,
+            userId,
+          });
+        }
+      },
+      handleFingerprintMismatch: async ({ session, device }) => {
+        try {
+          await this.securityEvents.log({
+            type: "session_fingerprint_mismatch",
+            userId: session.userId,
+            ipAddress: device?.ipAddress,
+            userAgent: device?.userAgent,
+            payload: {
+              sessionId: session.id,
+              fingerprintStored: Boolean(session.fingerprint),
+            },
+            severity: "critical",
+          });
+        } catch (error) {
+          this.logger.warn("Failed to publish fingerprint mismatch security event", {
+            error,
+            sessionId: session.id,
+            userId: session.userId,
+          });
+        }
+      },
+    };
+
     this.sessionService =
       options.sessionService ??
       new SessionService({
         prisma: this.prisma,
         authConfig: this.authConfig,
         logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:session`),
+        notifier: sessionNotifier,
       });
 
     this.tokenService =
@@ -206,13 +261,6 @@ export class AuthService implements AuthServiceContract {
       createEmailService({
         config: this.config,
         logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:email`),
-      });
-
-    this.securityEvents =
-      options.securityEventService ??
-      createSecurityEventService({
-        prisma: this.prisma,
-        logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:security-events`),
       });
   }
 
@@ -293,53 +341,70 @@ export class AuthService implements AuthServiceContract {
       });
     }
 
-    if (user.status !== "ACTIVE") {
+    const account = await this.refreshLockoutState(user);
+
+    if (account.status !== "ACTIVE") {
       await this.securityEvents.log({
         type: "login_blocked_inactive",
-        userId: user.id,
+        userId: account.id,
         ipAddress: context.device.ipAddress,
         userAgent: context.device.userAgent,
-        payload: { status: user.status },
+        payload: { status: account.status },
       });
       throw new UnauthorizedError("Account is not active. Please contact support.", {
         details: { reason: "account_inactive" },
       });
     }
 
-    if (this.isAccountLocked(user)) {
+    if (this.isAccountLocked(account)) {
+      const lockoutRemainingSeconds = this.getLockoutRemainingSeconds(account.lockoutUntil);
+      const lockoutRemainingMinutes =
+        lockoutRemainingSeconds > 0 ? Math.max(1, Math.ceil(lockoutRemainingSeconds / 60)) : 0;
       await this.securityEvents.log({
         type: "login_blocked_locked",
-        userId: user.id,
+        userId: account.id,
         ipAddress: context.device.ipAddress,
         userAgent: context.device.userAgent,
         payload: {
-          lockoutUntil: user.lockoutUntil?.toISOString(),
+          lockoutUntil: account.lockoutUntil?.toISOString(),
+          lockoutRemainingSeconds,
+          lockoutRemainingMinutes,
         },
       });
       throw new UnauthorizedError(
-        "Account is temporarily locked due to repeated failed attempts.",
+        lockoutRemainingSeconds > 0
+          ? `Account is temporarily locked due to repeated failed attempts. Please try again in approximately ${lockoutRemainingMinutes} minute${
+              lockoutRemainingMinutes === 1 ? "" : "s"
+            }.`
+          : "Account is temporarily locked due to repeated failed attempts.",
         {
-          details: { reason: "account_locked", lockoutUntil: user.lockoutUntil },
+          details: {
+            reason: "account_locked",
+            lockoutUntil: account.lockoutUntil,
+            lockoutRemainingSeconds,
+            lockoutRemainingMinutes,
+          },
+          exposeDetails: true,
         },
       );
     }
 
-    const passwordMatches = await verifyPassword(input.password, user.passwordHash);
+    const passwordMatches = await verifyPassword(input.password, account.passwordHash);
 
     if (!passwordMatches) {
-      await this.handleFailedLogin(user, context);
+      await this.handleFailedLogin(account, context);
       throw new UnauthorizedError(INVALID_CREDENTIALS_ERROR, {
         details: { reason: "invalid_credentials" },
       });
     }
 
-    await this.resetFailedLoginState(user.id);
+    await this.resetFailedLoginState(account.id);
 
-    const sessionResult = await this.issueSessionAndTokens(user, context.device);
+    const sessionResult = await this.issueSessionAndTokens(account, context.device);
 
     await this.securityEvents.log({
       type: "login_success",
-      userId: user.id,
+      userId: account.id,
       ipAddress: context.device.ipAddress,
       userAgent: context.device.userAgent,
       payload: {
@@ -348,23 +413,36 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
-    const profile = await this.buildUserProfile(user.id);
+    const profile = await this.buildUserProfile(account.id);
 
     return {
       user: profile,
       tokens: sessionResult.tokens,
       sessionId: sessionResult.sessionId,
-      emailVerified: Boolean(user.emailVerified),
+      emailVerified: Boolean(account.emailVerified),
     };
   }
 
   async refresh(refreshToken: string, context: AuthRequestContext): Promise<RefreshResult> {
-    const verification = await this.tokenService.verifyRefreshToken(refreshToken);
+    let verification;
+    try {
+      verification = await this.tokenService.verifyRefreshToken(refreshToken);
+    } catch (error) {
+      await this.handleRefreshTokenReplayError(error, context);
+      throw error;
+    }
+
     const { payload, session } = verification;
 
     this.assertFingerprintMatches(session.fingerprint, context.device);
 
-    const rotation = await this.tokenService.rotateRefreshToken(refreshToken);
+    let rotation;
+    try {
+      rotation = await this.tokenService.rotateRefreshToken(refreshToken);
+    } catch (error) {
+      await this.handleRefreshTokenReplayError(error, context, payload.sub);
+      throw error;
+    }
     const profile = await this.buildUserProfile(payload.sub);
 
     await this.securityEvents.log({
@@ -687,16 +765,136 @@ export class AuthService implements AuthServiceContract {
     return { user: profile };
   }
 
-  private isAccountLocked(user: Pick<User, "lockoutUntil">): boolean {
-    if (!user.lockoutUntil) {
-      return false;
+  private async handleRefreshTokenReplayError(
+    error: unknown,
+    context: AuthRequestContext,
+    fallbackUserId?: string,
+  ): Promise<void> {
+    if (!(error instanceof UnauthorizedError)) {
+      return;
     }
-    return user.lockoutUntil.getTime() > this.now().getTime();
+
+    const details = (error.details ?? {}) as Record<string, unknown>;
+    const reason = typeof details.reason === "string" ? details.reason : undefined;
+
+    if (reason !== "token_reuse_detected") {
+      return;
+    }
+
+    const userId = typeof details.userId === "string" ? details.userId : fallbackUserId;
+    const sessionId = typeof details.sessionId === "string" ? details.sessionId : undefined;
+    const revokedCount =
+      typeof details.revokedCount === "number" ? details.revokedCount : undefined;
+
+    if (!userId) {
+      this.logger.warn("Refresh token replay detected but user could not be identified.", {
+        sessionId,
+      });
+      return;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+      },
+    });
+
+    let userNotified = false;
+
+    if (user) {
+      try {
+        await this.emailService.sendSecurityAlertEmail({
+          to: user.email,
+          firstName: user.firstName,
+          category: "refresh_token_replay",
+          metadata: {
+            sessionId,
+            revokedSessions: revokedCount,
+            ipAddress: context.device.ipAddress,
+            userAgent: context.device.userAgent,
+          },
+        });
+        userNotified = true;
+      } catch (emailError) {
+        this.logger.error("Failed to dispatch security alert email for token replay detection.", {
+          error: emailError,
+          userId,
+          sessionId,
+        });
+      }
+    } else {
+      this.logger.warn(
+        "Unable to send security alert email for token replay detection; user not found.",
+        {
+          userId,
+          sessionId,
+        },
+      );
+    }
+
+    await this.securityEvents.log({
+      type: "refresh_token_replay_detected",
+      userId: user ? userId : undefined,
+      ipAddress: context.device.ipAddress,
+      userAgent: context.device.userAgent,
+      payload: {
+        sessionId,
+        revokedSessions: revokedCount,
+        userNotified,
+        userLookupSucceeded: Boolean(user),
+      },
+    });
+  }
+
+  private getLockoutRemainingSeconds(lockoutUntil?: Date | null): number {
+    if (!lockoutUntil) {
+      return 0;
+    }
+
+    const remainingMs = lockoutUntil.getTime() - this.now().getTime();
+    if (remainingMs <= 0) {
+      return 0;
+    }
+
+    return Math.ceil(remainingMs / 1000);
+  }
+
+  private isAccountLocked(user: Pick<User, "lockoutUntil">): boolean {
+    return this.getLockoutRemainingSeconds(user.lockoutUntil) > 0;
+  }
+
+  private async refreshLockoutState(user: User): Promise<User> {
+    if (!user.lockoutUntil) {
+      return user;
+    }
+
+    const remainingSeconds = this.getLockoutRemainingSeconds(user.lockoutUntil);
+    if (remainingSeconds > 0) {
+      return user;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginCount: 0,
+        lockoutUntil: null,
+      },
+    });
+
+    return {
+      ...user,
+      failedLoginCount: 0,
+      lockoutUntil: null,
+    };
   }
 
   private async handleFailedLogin(user: User, context: AuthRequestContext): Promise<void> {
     const { maxLoginAttempts, lockoutDurationSeconds } = this.authConfig.session;
-    const shouldLock = user.failedLoginCount + 1 >= maxLoginAttempts;
+    const nextFailedCount = user.failedLoginCount + 1;
+    const shouldLock = nextFailedCount >= maxLoginAttempts;
     const lockoutUntil = shouldLock
       ? new Date(this.now().getTime() + lockoutDurationSeconds * 1000)
       : null;
@@ -715,17 +913,32 @@ export class AuthService implements AuthServiceContract {
       ipAddress: context.device.ipAddress,
       userAgent: context.device.userAgent,
       payload: {
-        failedLoginCount: user.failedLoginCount + 1,
+        failedLoginCount: nextFailedCount,
         locked: shouldLock,
         lockoutUntil: lockoutUntil?.toISOString(),
+        lockoutDurationSeconds,
       },
+      severity: shouldLock ? "warning" : "info",
     });
 
-    if (shouldLock) {
+    if (shouldLock && lockoutUntil) {
+      await this.securityEvents.log({
+        type: "account_locked",
+        userId: user.id,
+        ipAddress: context.device.ipAddress,
+        userAgent: context.device.userAgent,
+        payload: {
+          failedLoginCount: nextFailedCount,
+          lockoutUntil: lockoutUntil.toISOString(),
+          lockoutDurationSeconds,
+        },
+        severity: "warning",
+      });
+
       await this.emailService.sendAccountLockoutNotification({
         to: user.email,
         firstName: user.firstName,
-        unlockAt: lockoutUntil!,
+        unlockAt: lockoutUntil,
       });
     }
   }

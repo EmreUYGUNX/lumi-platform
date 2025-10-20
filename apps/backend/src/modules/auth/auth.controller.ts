@@ -5,7 +5,7 @@ import { getConfig } from "@/config/index.js";
 import { asyncHandler } from "@/lib/asyncHandler.js";
 import { UnauthorizedError, ValidationError } from "@/lib/errors.js";
 import type { ValidationErrorDetail } from "@/lib/errors.js";
-import { successResponse } from "@/lib/response.js";
+import { errorResponse, successResponse } from "@/lib/response.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createAuthService } from "./auth.service.js";
@@ -18,6 +18,12 @@ import type { RegisterRequest } from "./dto/register.dto.js";
 import { RegisterRequestSchema } from "./dto/register.dto.js";
 import type { ResetPasswordRequest } from "./dto/reset-password.dto.js";
 import { ResetPasswordRequestSchema } from "./dto/reset-password.dto.js";
+
+const AUTH_REQUIRED_MESSAGE = "Authentication required.";
+const TWO_FACTOR_MESSAGES = {
+  setup: "Two-factor authentication setup is scheduled for a future release.",
+  verify: "Two-factor authentication verification is scheduled for a future release.",
+} as const;
 
 const REFRESH_COOKIE_NAME = "refreshToken";
 const REFRESH_COOKIE_PATH = "/api";
@@ -135,6 +141,10 @@ export class AuthController {
 
   public readonly changePassword: RequestHandler;
 
+  public readonly setupTwoFactor: RequestHandler;
+
+  public readonly verifyTwoFactor: RequestHandler;
+
   private readonly service: AuthServiceContract;
 
   private readonly config: ApplicationConfig;
@@ -162,6 +172,8 @@ export class AuthController {
     this.forgotPassword = asyncHandler(this.handleForgotPassword.bind(this));
     this.resetPassword = asyncHandler(this.handleResetPassword.bind(this));
     this.changePassword = asyncHandler(this.handleChangePassword.bind(this));
+    this.setupTwoFactor = asyncHandler(this.handleSetupTwoFactor.bind(this));
+    this.verifyTwoFactor = asyncHandler(this.handleVerifyTwoFactor.bind(this));
   }
 
   private async handleRegister(req: Request, res: Response): Promise<void> {
@@ -245,7 +257,7 @@ export class AuthController {
 
   private async handleLogout(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const { sessionId, id: userId } = req.user;
@@ -261,7 +273,7 @@ export class AuthController {
 
   private async handleLogoutAll(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const { id: userId } = req.user;
@@ -277,7 +289,7 @@ export class AuthController {
 
   private async handleMe(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const { id: userId } = req.user;
@@ -294,7 +306,7 @@ export class AuthController {
 
   private async handleResendVerification(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const { id: userId } = req.user;
@@ -325,7 +337,7 @@ export class AuthController {
 
   private async handleChangePassword(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const { data } = parseBodyOrThrow<ChangePasswordRequest>(
@@ -338,6 +350,44 @@ export class AuthController {
     const result = await this.service.changePassword(userId, sessionId, data);
 
     res.json(successResponse({ user: serializeUserProfile(result.user) }));
+  }
+
+  private async handleSetupTwoFactor(req: Request, res: Response): Promise<void> {
+    if (!req.user) {
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
+    }
+
+    const { environment } = this.config.app;
+
+    res.status(501).json(
+      errorResponse({
+        code: "NOT_IMPLEMENTED",
+        message: TWO_FACTOR_MESSAGES.setup,
+        details: {
+          plannedFeatures: ["totp_enrollment", "recovery_codes"],
+          environment,
+        },
+      }),
+    );
+  }
+
+  private async handleVerifyTwoFactor(req: Request, res: Response): Promise<void> {
+    if (!req.user) {
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
+    }
+
+    const { environment } = this.config.app;
+
+    res.status(501).json(
+      errorResponse({
+        code: "NOT_IMPLEMENTED",
+        message: TWO_FACTOR_MESSAGES.verify,
+        details: {
+          plannedFeatures: ["totp_verification", "backup_code_verification"],
+          environment,
+        },
+      }),
+    );
   }
 
   private setRefreshCookie(res: Response, token: string, expiresAt: Date): void {

@@ -137,5 +137,11 @@ export const createAuthRouter = (
   router.put("/change-password", requireAuth, changePasswordLimiter, controller.changePassword);
   registerRoute(options.registerRoute, "PUT", "/change-password");
 
+  router.post("/2fa/setup", requireAuth, controller.setupTwoFactor);
+  registerRoute(options.registerRoute, "POST", "/2fa/setup");
+
+  router.post("/2fa/verify", requireAuth, controller.verifyTwoFactor);
+  registerRoute(options.registerRoute, "POST", "/2fa/verify");
+
   return router;
 };

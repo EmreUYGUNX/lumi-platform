@@ -1,7 +1,15 @@
 import { Router } from "express";
+import type { Request } from "express";
+import { z } from "zod";
 
+import { createAccountSecurityService } from "@/modules/auth/account-security.service.js";
+import type { AccountSecurityService } from "@/modules/auth/account-security.service.js";
+import { createSecurityEventService } from "@/modules/auth/security-event.service.js";
+import type { SecurityEventService } from "@/modules/auth/security-event.service.js";
 import type { ApplicationConfig } from "@lumi/types";
 
+import { asyncHandler } from "../lib/asyncHandler.js";
+import { ValidationError } from "../lib/errors.js";
 import { createChildLogger } from "../lib/logger.js";
 import { successResponse } from "../lib/response.js";
 import { createAuthorizeResourceMiddleware } from "../middleware/auth/authorizeResource.js";
@@ -11,12 +19,16 @@ import { createRequireRoleMiddleware } from "../middleware/auth/requireRole.js";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
+type AdminRequest = Request<Record<string, string>, unknown, unknown, Record<string, unknown>>;
+
 interface AdminRouterOptions {
   /**
    * Optional integration with the central route registry to provide
    * method-aware 404/405 responses and observability.
    */
   registerRoute?: RouteRegistrar;
+  securityEvents?: SecurityEventService;
+  accountSecurityService?: AccountSecurityService;
 }
 
 /**
@@ -131,6 +143,22 @@ const registerAdminRoute = (
   registerRoute?.(method, path);
 };
 
+const UnlockAccountRequestSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Reason must be at least 3 characters")
+    .max(200, "Reason must be at most 200 characters")
+    .optional(),
+});
+
+const formatZodIssues = (issues: z.ZodIssue[]) =>
+  issues.map((issue) => ({
+    path: issue.path.map(String).join(".") || "root",
+    message: issue.message,
+    code: issue.code,
+  }));
+
 /**
  * Creates the administrative router placeholder. The router enforces RBAC policies and returns
  * descriptive placeholders for authorised administrators while the final implementations are
@@ -147,24 +175,89 @@ export const createAdminRouter = (
 
   const { registerRoute } = options;
 
+  const securityEvents =
+    options.securityEvents ??
+    createSecurityEventService({
+      logger: createChildLogger("routes:admin:security-events"),
+    });
+  const accountSecurityService =
+    options.accountSecurityService ??
+    createAccountSecurityService({
+      securityEvents,
+      logger: createChildLogger("routes:admin:account-security"),
+    });
+
   const requireAuth = createRequireAuthMiddleware();
-  const requireAdminRole = createRequireRoleMiddleware(["admin"]);
-  const requireAuditPermission = createRequirePermissionMiddleware(["report:read"]);
+  const requireAdminRole = createRequireRoleMiddleware(["admin"], { securityEvents });
+  const requireAuditPermission = createRequirePermissionMiddleware(["report:read"], {
+    securityEvents,
+  });
   const authorizeAdminResource = createAuthorizeResourceMiddleware({
     // Placeholder implementation — future admin owner resolution will replace this.
     getOwnerId: (req) => req.user?.id,
     resource: "admin-resource",
     allowAdminOverride: true,
+    securityEvents,
   });
+
+  const logSecurityEvent = (
+    event: Parameters<SecurityEventService["log"]>[0],
+    contextMessage: string,
+    metadata: Record<string, unknown> = {},
+  ): void => {
+    Promise.resolve(securityEvents.log(event)).catch((error) => {
+      adminLogger.warn(contextMessage, { error, ...metadata });
+    });
+  };
+
+  const logAdminAccess = (req: AdminRequest, overrides: Record<string, unknown> = {}): void => {
+    logSecurityEvent(
+      {
+        type: "admin_access_granted",
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+        payload: {
+          method: req.method,
+          path: req.originalUrl,
+          requestId: req.id,
+          ...overrides,
+        },
+      },
+      "Failed to record admin access security event",
+      { userId: req.user?.id, requestId: req.id },
+    );
+  };
 
   router.use(requireAuth);
   router.use(requireAdminRole);
+
+  router.use(async (req, _res, next) => {
+    await logSecurityEvent(
+      {
+        type: "admin_access_attempt",
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+        payload: {
+          method: req.method,
+          path: req.originalUrl,
+          requestId: req.id,
+        },
+      },
+      "Failed to record admin access attempt",
+      { method: req.method, path: req.originalUrl },
+    );
+
+    next();
+  });
 
   router.get("/users", (req, res) => {
     adminLogger.info("Admin users endpoint accessed", {
       userId: req.user?.id,
       requestId: req.id,
     });
+    logAdminAccess(req);
     res.json(
       successResponse({
         message: "Administrative user listing will be implemented in a future phase.",
@@ -178,6 +271,7 @@ export const createAdminRouter = (
       userId: req.user?.id,
       requestId: req.id,
     });
+    logAdminAccess(req);
     res.status(202).json(
       successResponse({
         message: "Administrative user creation is queued for implementation.",
@@ -186,11 +280,58 @@ export const createAdminRouter = (
   });
   registerAdminRoute(registerRoute, "POST", "/users");
 
+  router.post(
+    "/users/:userId/unlock",
+    asyncHandler(async (req, res) => {
+      const userId = req.params.userId?.trim();
+
+      if (!userId) {
+        throw new ValidationError("User identifier is required.", {
+          issues: [
+            {
+              path: "userId",
+              message: "User identifier is required.",
+            },
+          ],
+        });
+      }
+
+      const parseResult = UnlockAccountRequestSchema.safeParse(req.body ?? {});
+      if (!parseResult.success) {
+        throw new ValidationError("Unlock request payload is invalid.", {
+          issues: formatZodIssues(parseResult.error.issues),
+        });
+      }
+
+      if (!req.user) {
+        throw new ValidationError("Authentication context is missing for admin unlock.");
+      }
+
+      await accountSecurityService.unlockUserAccount({
+        userId,
+        performedBy: req.user.id,
+        reason: parseResult.data.reason,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+      });
+
+      logAdminAccess(req, { action: "unlock_user", targetUserId: userId });
+
+      res.json(
+        successResponse({
+          message: "User account unlocked successfully.",
+        }),
+      );
+    }),
+  );
+  registerAdminRoute(registerRoute, "POST", "/users/:userId/unlock");
+
   router.get("/audit-log", authorizeAdminResource, (req, res) => {
     adminLogger.info("Admin audit log endpoint accessed", {
       userId: req.user?.id,
       requestId: req.id,
     });
+    logAdminAccess(req);
     res.json(
       successResponse({
         message: "Audit log retrieval will be enabled once the logging subsystem stabilises.",
@@ -204,6 +345,7 @@ export const createAdminRouter = (
       userId: req.user?.id,
       requestId: req.id,
     });
+    logAdminAccess(req);
     res.json(
       successResponse({
         message: "Sales reporting will be introduced alongside analytics integration.",

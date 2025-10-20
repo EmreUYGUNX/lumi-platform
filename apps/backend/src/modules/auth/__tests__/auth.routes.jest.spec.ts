@@ -31,6 +31,8 @@ jest.mock("../auth.controller.js", () => ({
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
+    setupTwoFactor: jest.fn(),
+    verifyTwoFactor: jest.fn(),
   })),
 }));
 
@@ -55,6 +57,8 @@ const createControllerStub = (): AuthController =>
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
+    setupTwoFactor: jest.fn(),
+    verifyTwoFactor: jest.fn(),
   }) as unknown as AuthController;
 
 describe("createAuthRouter", () => {
@@ -86,7 +90,7 @@ describe("createAuthRouter", () => {
     createAuthRouter(config, { controller, registerRoute });
 
     expect(mockedCreateAuthController).not.toHaveBeenCalled();
-    expect(registerRoute).toHaveBeenCalledTimes(11);
+    expect(registerRoute).toHaveBeenCalledTimes(13);
     expect(registerRoute).toHaveBeenCalledWith("POST", "/register");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/login");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/refresh");
@@ -98,6 +102,8 @@ describe("createAuthRouter", () => {
     expect(registerRoute).toHaveBeenCalledWith("POST", "/forgot-password");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/reset-password");
     expect(registerRoute).toHaveBeenCalledWith("PUT", "/change-password");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/2fa/setup");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/2fa/verify");
   });
 
   it("configures key generators for authenticated rate limiters", () => {

@@ -405,10 +405,19 @@ export class TokenService {
     }
 
     await this.revokeToken(session.id, "refresh_token_hash_mismatch");
+    const revokedCount = await this.sessionService.revokeAllUserSessions(
+      session.userId,
+      "refresh_token_replay_detected",
+    );
     await this.blacklist.add(tokenId, new Date(expirySeconds * 1000));
 
     throw new UnauthorizedError("Refresh token reuse detected.", {
-      details: { reason: "token_reuse_detected" },
+      details: {
+        reason: "token_reuse_detected",
+        userId: session.userId,
+        sessionId: session.id,
+        revokedCount,
+      },
     });
   }
 
