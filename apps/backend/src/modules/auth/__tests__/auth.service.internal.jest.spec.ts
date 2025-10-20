@@ -6,6 +6,7 @@ import type { createChildLogger } from "@/lib/logger.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { AuthService } from "../auth.service.js";
+import type { AuthUserProfile } from "../auth.service.js";
 import type { EmailService } from "../email.service.js";
 import type { RbacService } from "../rbac.service.js";
 import type { SecurityEventService } from "../security-event.service.js";
@@ -216,7 +217,8 @@ describe("AuthService internal helpers", () => {
       const { service } = createAuthService();
       const internal = service as unknown as InternalAuthService;
       const record = {
-        consumedAt: undefined,
+        // eslint-disable-next-line unicorn/no-null -- Prisma stores null for unconsumed tokens
+        consumedAt: null,
         expiresAt: new Date("2024-12-31T23:59:59.000Z"),
       };
 
@@ -229,7 +231,8 @@ describe("AuthService internal helpers", () => {
       const { service } = createAuthService();
       const internal = service as unknown as InternalAuthService;
       const record = {
-        consumedAt: undefined,
+        // eslint-disable-next-line unicorn/no-null -- Prisma stores null for unconsumed tokens
+        consumedAt: null,
         expiresAt: new Date("2025-01-02T00:00:00.000Z"),
       };
 
@@ -242,9 +245,9 @@ describe("AuthService internal helpers", () => {
       const { service } = createAuthService();
       const internal = service as unknown as InternalAuthService;
 
-      // eslint-disable-next-line unicorn/no-null -- Prisma stores null when no fingerprint exists
       expect(() =>
-        internal.assertFingerprintMatches(undefined, { ipAddress: "203.0.113.1" }),
+        // eslint-disable-next-line unicorn/no-null -- Prisma stores null when no fingerprint exists
+        internal.assertFingerprintMatches(null, { ipAddress: "203.0.113.1" }),
       ).not.toThrow();
     });
 

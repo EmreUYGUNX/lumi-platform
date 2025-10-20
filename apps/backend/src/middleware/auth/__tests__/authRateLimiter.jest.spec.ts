@@ -122,7 +122,7 @@ describe("createAuthRateLimiter", () => {
       keyPrefix: "test-error",
       points: 1,
       durationSeconds: 10,
-      keyGenerator: () => {},
+      keyGenerator: (): string | undefined => undefined,
     });
 
     const req = createRequest({ ip: "192.0.2.55" });

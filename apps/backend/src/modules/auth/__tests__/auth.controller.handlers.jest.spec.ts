@@ -31,7 +31,7 @@ const createProfile = (): AuthUserProfile => ({
   phone: "+905551112233",
   emailVerified: true,
   status: "ACTIVE",
-  roles: [{ id: "role_admin", name: "admin" }],
+  roles: ["role_admin"],
   permissions: ["manage:users"],
 });
 
