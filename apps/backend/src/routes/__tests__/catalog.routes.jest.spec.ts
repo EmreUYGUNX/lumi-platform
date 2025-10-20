@@ -3,11 +3,10 @@ import { describe, expect, it, jest } from "@jest/globals";
 import express from "express";
 import request from "supertest";
 
-import type { ProductSummaryDTO } from "@lumi/shared/dto";
-
 import { NotFoundError } from "@/lib/errors.js";
 import { registerErrorHandlers } from "@/middleware/errorHandler.js";
 import { createTestConfig } from "@/testing/config.js";
+import type { ProductSummaryDTO } from "@lumi/shared/dto";
 
 import type {
   ProductSearchResult,

@@ -13,8 +13,7 @@
     "^react$",
     "^next",
     "<THIRD_PARTY_MODULES>",
-    "^@lumi",
-    "^@/",
+    "^(?:@lumi|@/)",
     "^[./]"
   ],
   "importOrderSeparation": true,

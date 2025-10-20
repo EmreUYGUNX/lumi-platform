@@ -1,6 +1,8 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 
+import { createAuthRouter } from "@/modules/auth/auth.routes.js";
+import type { AuthRouterOptions } from "@/modules/auth/auth.routes.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
@@ -19,6 +21,7 @@ interface ApiRouterOptions {
    */
   registerRoute?: RouteRegistrar;
   catalogServices?: CatalogRouterOptions["services"];
+  authOptions?: AuthRouterOptions;
 }
 
 interface VersionMetadata {
@@ -105,6 +108,12 @@ export const createV1Router = (
       registerRoute: registerV1Route,
     }),
   );
+
+  const authRouterOptions: AuthRouterOptions = options.authOptions
+    ? { registerRoute: registerV1Route, ...options.authOptions }
+    : { registerRoute: registerV1Route };
+
+  router.use("/auth", createAuthRouter(config, authRouterOptions));
 
   router.use(
     "/admin",

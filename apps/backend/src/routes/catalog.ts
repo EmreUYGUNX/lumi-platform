@@ -1,14 +1,13 @@
 /* eslint-disable import/order */
 import { type RequestHandler, Router } from "express";
 
-import type { ApplicationConfig } from "@lumi/types";
-
 import { asyncHandler } from "@/lib/asyncHandler.js";
 import { ValidationError } from "@/lib/errors.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 import { paginatedResponse, successResponse } from "@/lib/response.js";
 import { ProductRepository } from "@/modules/product/product.repository.js";
 import { ProductService, type ProductServiceContract } from "@/modules/product/product.service.js";
+import type { ApplicationConfig } from "@lumi/types";
 
 type RouteRegistrar = (method: string, path: string) => void;
 

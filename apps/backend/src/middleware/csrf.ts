@@ -3,10 +3,9 @@ import { randomBytes } from "node:crypto";
 import cookieParser from "cookie-parser";
 import type { RequestHandler } from "express";
 
+import { createChildLogger } from "@/lib/logger.js";
 // eslint-disable-next-line import/order -- Prettier sorts type-only imports separately.
 import type { ApplicationConfig } from "@lumi/types";
-
-import { createChildLogger } from "@/lib/logger.js";
 
 interface CsrfMiddlewareBundle {
   issueToken: RequestHandler;
