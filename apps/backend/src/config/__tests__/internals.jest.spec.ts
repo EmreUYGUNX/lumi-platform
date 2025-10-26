@@ -100,11 +100,44 @@ const createSecuritySection = (): ApplicationConfig["security"] => ({
     durationSeconds: 60,
     blockDurationSeconds: 300,
     strategy: "memory",
+    ipWhitelist: [],
     routes: {
       auth: {
-        points: 5,
-        durationSeconds: 900,
-        blockDurationSeconds: 900,
+        global: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        login: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        register: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        forgotPassword: {
+          points: 3,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
+        resendVerification: {
+          points: 3,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
+        refresh: {
+          points: 10,
+          durationSeconds: 60,
+          blockDurationSeconds: 120,
+        },
+        changePassword: {
+          points: 5,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
       },
     },
   },
@@ -143,6 +176,16 @@ const createAuthSection = (): ApplicationConfig["auth"] => ({
     fingerprintSecret: "fingerprint-secret-placeholder-value-32!!",
     lockoutDurationSeconds: 15 * 60,
     maxLoginAttempts: 5,
+  },
+  bruteForce: {
+    enabled: true,
+    windowSeconds: 15 * 60,
+    progressiveDelays: {
+      baseDelayMs: 250,
+      stepDelayMs: 250,
+      maxDelayMs: 5000,
+    },
+    captchaThreshold: 10,
   },
 });
 

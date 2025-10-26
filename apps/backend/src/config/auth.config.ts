@@ -34,6 +34,21 @@ export const AuthConfigSchema = z.object({
       .min(60, "Lockout duration must be at least 60 seconds"),
     maxLoginAttempts: z.number().int().min(3, "Max login attempts must be at least 3"),
   }),
+  bruteForce: z.object({
+    enabled: z.boolean(),
+    windowSeconds: z.number().int().min(60, "Brute force window must be at least 60 seconds"),
+    progressiveDelays: z
+      .object({
+        baseDelayMs: z.number().int().min(0, "Base delay must be zero or positive"),
+        stepDelayMs: z.number().int().min(0, "Step delay must be zero or positive"),
+        maxDelayMs: z.number().int().min(0, "Max delay must be zero or positive"),
+      })
+      .refine(
+        (value) => value.maxDelayMs >= value.baseDelayMs,
+        "Max delay must be greater than or equal to base delay",
+      ),
+    captchaThreshold: z.number().int().min(1, "CAPTCHA threshold must be at least 1"),
+  }),
 });
 
 export type ParsedAuthConfig = z.infer<typeof AuthConfigSchema>;
@@ -66,6 +81,16 @@ export const buildAuthConfig = (env: ResolvedEnvironment): AuthConfig => {
       fingerprintSecret: env.sessionFingerprintSecret,
       lockoutDurationSeconds: env.lockoutDurationSeconds,
       maxLoginAttempts: env.maxLoginAttempts,
+    },
+    bruteForce: {
+      enabled: env.authBruteForce.enabled,
+      windowSeconds: env.authBruteForce.windowSeconds,
+      progressiveDelays: {
+        baseDelayMs: env.authBruteForce.progressiveDelays.baseDelayMs,
+        stepDelayMs: env.authBruteForce.progressiveDelays.stepDelayMs,
+        maxDelayMs: env.authBruteForce.progressiveDelays.maxDelayMs,
+      },
+      captchaThreshold: env.authBruteForce.captchaThreshold,
     },
   });
 

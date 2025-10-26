@@ -195,7 +195,7 @@ export const createRateLimiterBundle = (
     teardowns.push(globalLimiter.teardown);
   }
 
-  const authLimiter = createRateLimiter(config, config.routes.auth, "auth");
+  const authLimiter = createRateLimiter(config, config.routes.auth.global, "auth");
 
   if (authLimiter.teardown) {
     teardowns.push(authLimiter.teardown);

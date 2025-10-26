@@ -27,6 +27,10 @@ import { getPrismaClient } from "@/lib/prisma.js";
 import type { TokenPair } from "@/modules/auth/token.types.js";
 import type { ApplicationConfig } from "@lumi/types";
 
+import {
+  type BruteForceProtectionService,
+  createBruteForceProtectionService,
+} from "./brute-force.service.js";
 import type { ChangePasswordRequest } from "./dto/change-password.dto.js";
 import type { LoginRequest } from "./dto/login.dto.js";
 import type { RegisterRequest } from "./dto/register.dto.js";
@@ -143,6 +147,7 @@ export interface AuthServiceOptions {
   rbacService?: RbacService;
   emailService?: EmailService;
   securityEventService?: SecurityEventService;
+  bruteForceProtection?: BruteForceProtectionService;
   logger?: ReturnType<typeof createChildLogger>;
   now?: () => Date;
 }
@@ -170,6 +175,8 @@ export class AuthService implements AuthServiceContract {
 
   private readonly securityEvents: SecurityEventService;
 
+  private readonly bruteForceProtection: BruteForceProtectionService;
+
   private readonly logger: ReturnType<typeof createChildLogger>;
 
   private readonly now: () => Date;
@@ -189,6 +196,13 @@ export class AuthService implements AuthServiceContract {
       createSecurityEventService({
         prisma: this.prisma,
         logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:security-events`),
+      });
+
+    this.bruteForceProtection =
+      options.bruteForceProtection ??
+      createBruteForceProtectionService({
+        config: resolvedConfig,
+        logger: createChildLogger(`${AUTH_LOGGER_COMPONENT}:brute-force`),
       });
 
     const sessionNotifier: SessionSecurityNotifier = {
@@ -368,17 +382,32 @@ export class AuthService implements AuthServiceContract {
 
   async login(input: LoginRequest, context: AuthRequestContext): Promise<LoginResult> {
     const email = normaliseEmail(input.email);
+    await this.bruteForceProtection.applyDelay(email);
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
+      const bruteForce = await this.bruteForceProtection.recordFailure(email);
       await this.securityEvents.log({
         type: "login_failed",
         ipAddress: context.device.ipAddress,
         userAgent: context.device.userAgent,
-        payload: { email },
+        payload: {
+          email,
+          bruteForceAttempts: bruteForce.attempts,
+          captchaRecommended: bruteForce.captchaRequired,
+        },
       });
+      if (bruteForce.captchaRequired) {
+        await this.securityEvents.log({
+          type: "login_captcha_threshold",
+          ipAddress: context.device.ipAddress,
+          userAgent: context.device.userAgent,
+          payload: { email, attempts: bruteForce.attempts },
+          severity: "warning",
+        });
+      }
       throw new UnauthorizedError(INVALID_CREDENTIALS_ERROR, {
         details: { reason: "invalid_credentials" },
       });
@@ -442,6 +471,7 @@ export class AuthService implements AuthServiceContract {
     }
 
     await this.resetFailedLoginState(account.id);
+    await this.bruteForceProtection.reset(email);
 
     const sessionResult = await this.issueSessionAndTokens(account, context.device);
 
@@ -974,6 +1004,8 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    const bruteForce = await this.bruteForceProtection.recordFailure(user.email);
+
     await this.securityEvents.log({
       type: "login_failed",
       userId: user.id,
@@ -984,9 +1016,25 @@ export class AuthService implements AuthServiceContract {
         locked: shouldLock,
         lockoutUntil: lockoutUntil?.toISOString(),
         lockoutDurationSeconds,
+        bruteForceAttempts: bruteForce.attempts,
+        captchaRecommended: bruteForce.captchaRequired,
       },
       severity: shouldLock ? "warning" : "info",
     });
+
+    if (bruteForce.captchaRequired) {
+      await this.securityEvents.log({
+        type: "login_captcha_threshold",
+        userId: user.id,
+        ipAddress: context.device.ipAddress,
+        userAgent: context.device.userAgent,
+        payload: {
+          attempts: bruteForce.attempts,
+          email: user.email,
+        },
+        severity: "warning",
+      });
+    }
 
     if (shouldLock && lockoutUntil) {
       await this.securityEvents.log({

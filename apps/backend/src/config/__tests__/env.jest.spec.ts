@@ -86,6 +86,16 @@ describe("loadEnvironment", () => {
       expect(env.sessionFingerprintSecret).toBe(REQUIRED_ENV.SESSION_FINGERPRINT_SECRET);
       expect(env.lockoutDurationSeconds).toBe(15 * 60);
       expect(env.maxLoginAttempts).toBe(Number(REQUIRED_ENV.MAX_LOGIN_ATTEMPTS));
+      expect(env.authBruteForce).toEqual({
+        enabled: true,
+        windowSeconds: 15 * 60,
+        progressiveDelays: {
+          baseDelayMs: 250,
+          stepDelayMs: 250,
+          maxDelayMs: 5000,
+        },
+        captchaThreshold: 10,
+      });
     });
   });
 
@@ -209,6 +219,23 @@ describe("loadEnvironment", () => {
       async (env) => {
         expect(env.rateLimit.strategy).toBe("redis");
         expect(env.rateLimit.redis).toEqual({ url: "redis://localhost:6390/1" });
+      },
+    );
+  });
+
+  it("parses auth rate limit route configuration and whitelist", async () => {
+    await withTemporaryEnvironment(
+      createEnv({
+        RATE_LIMIT_IP_WHITELIST: "127.0.0.1, 10.0.0.5",
+        RATE_LIMIT_AUTH_LOGIN_POINTS: "7",
+        RATE_LIMIT_AUTH_REFRESH_BLOCK_DURATION: "90",
+      }),
+      async (env) => {
+        expect(env.rateLimit.ipWhitelist).toEqual(["127.0.0.1", "10.0.0.5"]);
+        expect(env.rateLimit.routes.auth.global.points).toBe(5);
+        expect(env.rateLimit.routes.auth.login.points).toBe(7);
+        expect(env.rateLimit.routes.auth.refresh.blockDurationSeconds).toBe(90);
+        expect(env.rateLimit.routes.auth.forgotPassword.points).toBe(3);
       },
     );
   });

@@ -470,7 +470,13 @@ export class TestDatabaseManager {
     if (this.embeddedProcess) {
       const handle = this.embeddedProcess;
       await new Promise<void>((resolve) => {
+        let killTimer: NodeJS.Timeout | undefined;
+
         const cleanup = () => {
+          if (killTimer) {
+            clearTimeout(killTimer);
+            killTimer = undefined;
+          }
           handle.removeAllListeners("exit");
           resolve();
         };
@@ -481,7 +487,7 @@ export class TestDatabaseManager {
           return;
         }
 
-        setTimeout(() => {
+        killTimer = setTimeout(() => {
           if (!handle.killed) {
             handle.kill("SIGKILL");
           }
