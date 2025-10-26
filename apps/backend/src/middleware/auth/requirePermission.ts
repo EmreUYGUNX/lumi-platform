@@ -7,6 +7,7 @@ import {
   type SecurityEventService,
   createSecurityEventService,
 } from "@/modules/auth/security-event.service.js";
+import { recordPermissionViolation } from "@/observability/auth-metrics.js";
 
 export interface RequirePermissionOptions {
   rbacService?: RbacService;
@@ -34,6 +35,7 @@ export const createRequirePermissionMiddleware = (
 
   const handler: RequestHandler = async (req, _res, next) => {
     if (!req.user) {
+      recordPermissionViolation("unauthenticated");
       next(
         new UnauthorizedError("Authentication required.", {
           details: { reason: "authentication_required" },
@@ -63,6 +65,8 @@ export const createRequirePermissionMiddleware = (
         path: req.originalUrl,
         requestId: req.id,
       });
+
+      recordPermissionViolation("permission");
 
       try {
         await securityEvents.log({
