@@ -236,6 +236,47 @@ describe("auth middlewares", () => {
         severity: "warning",
       });
     });
+
+    it("bypasses permission checks when no permissions are declared", async () => {
+      const rbac = createRbacStub();
+      const securityEvents = createSecurityEventsStub();
+      const middleware = createRequirePermissionMiddleware([], {
+        rbacService: rbac,
+        securityEvents,
+      });
+      const req = createMockRequest({ user: createAuthenticatedUser() });
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      expect(next.mock).toHaveBeenCalledTimes(1);
+      expect(rbac.hasPermission).not.toHaveBeenCalled();
+      expect(securityEvents.log).not.toHaveBeenCalled();
+    });
+
+    it("emits UnauthorizedError when user context is missing", async () => {
+      const rbac = createRbacStub();
+      const securityEvents = createSecurityEventsStub();
+      const middleware = createRequirePermissionMiddleware(["catalog:write"], {
+        rbacService: rbac,
+        securityEvents,
+      });
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createNext();
+
+      await middleware(req, res, next.handler);
+
+      const [maybeError] = next.mock.mock.calls[0] ?? [];
+      const error = maybeError as Error | undefined;
+      expect(error).toBeInstanceOf(UnauthorizedError);
+      if (error instanceof UnauthorizedError) {
+        expect(error.details).toEqual({ reason: "authentication_required" });
+      }
+      expect(rbac.hasPermission).not.toHaveBeenCalled();
+      expect(securityEvents.log).not.toHaveBeenCalled();
+    });
   });
 
   describe("authorizeResource", () => {
