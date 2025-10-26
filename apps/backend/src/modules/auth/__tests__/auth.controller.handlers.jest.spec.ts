@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import type { Request, Response } from "express";
 
 import { UnauthorizedError, ValidationError } from "@/lib/errors.js";
+import { createTestConfig } from "@/testing/config.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { AuthController } from "../auth.controller.js";
@@ -53,7 +54,7 @@ const createConfig = (
   overrides: Partial<ApplicationConfig["app"]> = {},
   environment: ApplicationConfig["app"]["environment"] = "test",
 ): ApplicationConfig =>
-  ({
+  createTestConfig({
     app: {
       name: "Lumi Platform",
       apiBaseUrl: "https://api.lumi.dev",
@@ -87,7 +88,7 @@ const createConfig = (
         passwordReset: { ttlSeconds: 3600 },
       },
     },
-  }) as unknown as ApplicationConfig;
+  });
 
 const createResponseMock = () => {
   const res = {} as Response;

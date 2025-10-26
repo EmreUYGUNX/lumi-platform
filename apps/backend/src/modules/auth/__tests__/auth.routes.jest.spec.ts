@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { Request } from "express";
 
 import { createAuthRateLimiter } from "@/middleware/auth/authRateLimiter.js";
+import { createTestConfig } from "@/testing/config.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import type { AuthController } from "../auth.controller.js";
@@ -39,10 +40,7 @@ jest.mock("../auth.controller.js", () => ({
 const mockedCreateAuthRateLimiter = jest.mocked(createAuthRateLimiter);
 const mockedCreateAuthController = jest.mocked(createAuthController);
 
-const createConfig = (): ApplicationConfig =>
-  ({
-    app: { environment: "test" },
-  }) as unknown as ApplicationConfig;
+const createConfig = (): ApplicationConfig => createTestConfig({ app: { environment: "test" } });
 
 const createControllerStub = (): AuthController =>
   ({

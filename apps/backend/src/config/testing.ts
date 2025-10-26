@@ -14,6 +14,27 @@ const setTemporaryDefault = (key: keyof NodeJS.ProcessEnv, value: string) => {
 };
 /* eslint-enable security/detect-object-injection */
 
+const applyEmailDefaults = () => {
+  setTemporaryDefault("EMAIL_ENABLED", "true");
+  setTemporaryDefault("EMAIL_FROM_ADDRESS", "no-reply@lumi.test");
+  setTemporaryDefault("EMAIL_FROM_NAME", "Lumi Commerce");
+  setTemporaryDefault("EMAIL_REPLY_TO_ADDRESS", "support@lumi.test");
+  setTemporaryDefault("EMAIL_SIGNING_SECRET", "test-email-signing-secret-placeholder-32!!");
+  setTemporaryDefault("EMAIL_SMTP_HOST", "localhost");
+  setTemporaryDefault("EMAIL_SMTP_PORT", "1025");
+  setTemporaryDefault("EMAIL_SMTP_SECURE", "false");
+  setTemporaryDefault("EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED", "false");
+  setTemporaryDefault("EMAIL_RATE_LIMIT_WINDOW", "1m");
+  setTemporaryDefault("EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT", "5");
+  setTemporaryDefault("EMAIL_QUEUE_DRIVER", "inline");
+  setTemporaryDefault("EMAIL_QUEUE_CONCURRENCY", "2");
+  setTemporaryDefault("EMAIL_LOG_DELIVERIES", "true");
+  setTemporaryDefault("EMAIL_TEMPLATE_BASE_URL", "http://localhost:3100");
+  setTemporaryDefault("EMAIL_SUPPORT_ADDRESS", "support@lumi.test");
+  setTemporaryDefault("EMAIL_SUPPORT_URL", "http://localhost:3100/support");
+  setTemporaryDefault("EMAIL_TEMPLATE_DEFAULT_LOCALE", "en-US");
+};
+
 const applyTemporaryDefaults = () => {
   setTemporaryDefault("NODE_ENV", "test");
   setTemporaryDefault("APP_NAME", "Lumi Backend Tests");
@@ -39,6 +60,7 @@ const applyTemporaryDefaults = () => {
   );
   setTemporaryDefault("LOCKOUT_DURATION", "900");
   setTemporaryDefault("MAX_LOGIN_ATTEMPTS", "5");
+  applyEmailDefaults();
 };
 
 const restoreProcessEnv = (snapshot: NodeJS.ProcessEnv) => {
@@ -62,6 +84,7 @@ export const withTemporaryEnvironment = async <TResult>(
   try {
     // eslint-disable-next-line security/detect-object-injection
     process.env[TEST_ENVIRONMENT_SKIP_FLAG] = "1";
+    applyEmailDefaults();
     applyTemporaryDefaults();
 
     Object.entries(overrides).forEach(([key, value]) => {

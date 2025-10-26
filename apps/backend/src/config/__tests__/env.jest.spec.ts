@@ -29,6 +29,26 @@ const REQUIRED_ENV: EnvOverrides = {
   SESSION_FINGERPRINT_SECRET: "fingerprint-secret-placeholder-32chars!!",
   LOCKOUT_DURATION: "15m",
   MAX_LOGIN_ATTEMPTS: "5",
+  EMAIL_ENABLED: "true",
+  EMAIL_FROM_ADDRESS: "notifications@lumi.dev",
+  EMAIL_FROM_NAME: "Lumi Notifications",
+  EMAIL_REPLY_TO_ADDRESS: "reply@lumi.dev",
+  EMAIL_SIGNING_SECRET: "email-signing-secret-placeholder-value-32!!",
+  EMAIL_SMTP_HOST: "localhost",
+  EMAIL_SMTP_PORT: "1025",
+  EMAIL_SMTP_SECURE: "false",
+  EMAIL_SMTP_USERNAME: "mailer",
+  EMAIL_SMTP_PASSWORD: "mailer-password",
+  EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED: "false",
+  EMAIL_RATE_LIMIT_WINDOW: "2m",
+  EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT: "8",
+  EMAIL_QUEUE_DRIVER: "inline",
+  EMAIL_QUEUE_CONCURRENCY: "4",
+  EMAIL_LOG_DELIVERIES: "true",
+  EMAIL_TEMPLATE_BASE_URL: "http://localhost:3100/app",
+  EMAIL_SUPPORT_ADDRESS: "support@lumi.dev",
+  EMAIL_SUPPORT_URL: "https://support.lumi.dev",
+  EMAIL_TEMPLATE_DEFAULT_LOCALE: "en-GB",
 };
 
 const createEnv = (overrides: EnvOverrides = {}) => ({
@@ -66,6 +86,32 @@ describe("loadEnvironment", () => {
       expect(env.sessionFingerprintSecret).toBe(REQUIRED_ENV.SESSION_FINGERPRINT_SECRET);
       expect(env.lockoutDurationSeconds).toBe(15 * 60);
       expect(env.maxLoginAttempts).toBe(Number(REQUIRED_ENV.MAX_LOGIN_ATTEMPTS));
+    });
+  });
+
+  it("parses email configuration entries", async () => {
+    await withTemporaryEnvironment(createEnv(), async (env) => {
+      expect(env.email.enabled).toBe(true);
+      expect(env.email.defaultSender).toEqual({
+        email: REQUIRED_ENV.EMAIL_FROM_ADDRESS,
+        name: REQUIRED_ENV.EMAIL_FROM_NAME,
+        replyTo: REQUIRED_ENV.EMAIL_REPLY_TO_ADDRESS,
+      });
+      expect(env.email.signingSecret).toBe(REQUIRED_ENV.EMAIL_SIGNING_SECRET);
+      expect(env.email.transport.smtp.host).toBe(REQUIRED_ENV.EMAIL_SMTP_HOST);
+      expect(env.email.transport.smtp.port).toBe(Number(REQUIRED_ENV.EMAIL_SMTP_PORT));
+      expect(env.email.transport.smtp.secure).toBe(false);
+      expect(env.email.transport.smtp.username).toBe(REQUIRED_ENV.EMAIL_SMTP_USERNAME);
+      expect(env.email.transport.smtp.password).toBe(REQUIRED_ENV.EMAIL_SMTP_PASSWORD);
+      expect(env.email.rateLimit.windowSeconds).toBe(120);
+      expect(env.email.rateLimit.maxPerRecipient).toBe(8);
+      expect(env.email.queue.driver).toBe("inline");
+      expect(env.email.queue.concurrency).toBe(4);
+      expect(env.email.logging.deliveries).toBe(true);
+      expect(env.email.template.baseUrl).toBe(REQUIRED_ENV.EMAIL_TEMPLATE_BASE_URL);
+      expect(env.email.template.supportEmail).toBe(REQUIRED_ENV.EMAIL_SUPPORT_ADDRESS);
+      expect(env.email.template.supportUrl).toBe(REQUIRED_ENV.EMAIL_SUPPORT_URL);
+      expect(env.email.template.defaultLocale).toBe(REQUIRED_ENV.EMAIL_TEMPLATE_DEFAULT_LOCALE);
     });
   });
 
