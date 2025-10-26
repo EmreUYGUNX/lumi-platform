@@ -1,8 +1,9 @@
 import { Router } from "express";
 
 import { createAuthRateLimiter } from "@/middleware/auth/authRateLimiter.js";
+import type { AuthRateLimiterOptions } from "@/middleware/auth/authRateLimiter.js";
 import { createRequireAuthMiddleware } from "@/middleware/auth/requireAuth.js";
-import type { ApplicationConfig } from "@lumi/types";
+import type { ApplicationConfig, RateLimitRouteConfig } from "@lumi/types";
 
 import {
   type AuthController,
@@ -22,50 +23,64 @@ const registerRoute = (registrar: RouteRegistrar | undefined, method: string, pa
   registrar?.(method, path);
 };
 
-const buildAuthRateLimiters = () => {
-  const loginLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:login",
-    points: 5,
-    durationSeconds: 15 * 60,
+const buildAuthRateLimiters = (config: ApplicationConfig["security"]["rateLimit"]) => {
+  const baseOptions = {
+    strategy: config.strategy,
+    redisUrl: config.redis?.url,
+    ipWhitelist: config.ipWhitelist,
+  } as const;
+
+  const createLimiter = (
+    scope: string,
+    routeConfig: RateLimitRouteConfig,
+    overrides: Partial<AuthRateLimiterOptions> = {},
+  ) =>
+    createAuthRateLimiter({
+      keyPrefix: `${config.keyPrefix}:${scope}`,
+      points: routeConfig.points,
+      durationSeconds: routeConfig.durationSeconds,
+      blockDurationSeconds: routeConfig.blockDurationSeconds,
+      ...baseOptions,
+      ...overrides,
+    });
+
+  const loginLimiter = createLimiter("auth:login", config.routes.auth.login, {
     message: "Too many login attempts. Please try again later.",
   });
 
-  const registerLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:register",
-    points: 5,
-    durationSeconds: 15 * 60,
+  const registerLimiter = createLimiter("auth:register", config.routes.auth.register, {
     message: "Too many registration attempts. Please try again later.",
   });
 
-  const refreshLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:refresh",
-    points: 10,
-    durationSeconds: 60,
+  const refreshLimiter = createLimiter("auth:refresh", config.routes.auth.refresh, {
     message: "Too many refresh attempts. Please slow down.",
   });
 
-  const forgotPasswordLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:forgot-password",
-    points: 3,
-    durationSeconds: 60 * 60,
-    message: "Too many password reset requests. Please try again later.",
-  });
+  const forgotPasswordLimiter = createLimiter(
+    "auth:forgot-password",
+    config.routes.auth.forgotPassword,
+    {
+      message: "Too many password reset requests. Please try again later.",
+    },
+  );
 
-  const resendVerificationLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:resend-verification",
-    points: 3,
-    durationSeconds: 60 * 60,
-    message: "Verification email already sent. Please wait before requesting again.",
-    keyGenerator: (req) => req.user?.id ?? req.ip ?? "anonymous",
-  });
+  const resendVerificationLimiter = createLimiter(
+    "auth:resend-verification",
+    config.routes.auth.resendVerification,
+    {
+      message: "Verification email already sent. Please wait before requesting again.",
+      keyGenerator: (req) => req.user?.id ?? req.ip ?? "anonymous",
+    },
+  );
 
-  const changePasswordLimiter = createAuthRateLimiter({
-    keyPrefix: "auth:change-password",
-    points: 5,
-    durationSeconds: 60 * 60,
-    message: "Too many password change attempts. Please try again later.",
-    keyGenerator: (req) => req.user?.id ?? req.ip ?? "anonymous",
-  });
+  const changePasswordLimiter = createLimiter(
+    "auth:change-password",
+    config.routes.auth.changePassword,
+    {
+      message: "Too many password change attempts. Please try again later.",
+      keyGenerator: (req) => req.user?.id ?? req.ip ?? "anonymous",
+    },
+  );
 
   return {
     loginLimiter,
@@ -97,7 +112,7 @@ export const createAuthRouter = (
     forgotPasswordLimiter,
     resendVerificationLimiter,
     changePasswordLimiter,
-  } = buildAuthRateLimiters();
+  } = buildAuthRateLimiters(config.security.rateLimit);
 
   router.post("/register", registerLimiter, controller.register);
   registerRoute(options.registerRoute, "POST", "/register");

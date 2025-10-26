@@ -46,6 +46,16 @@ const authConfig: AuthConfig = {
     lockoutDurationSeconds: 900,
     maxLoginAttempts: 5,
   },
+  bruteForce: {
+    enabled: true,
+    windowSeconds: 900,
+    progressiveDelays: {
+      baseDelayMs: 250,
+      stepDelayMs: 250,
+      maxDelayMs: 5000,
+    },
+    captchaThreshold: 10,
+  },
 };
 
 const createFixtures = async () => {

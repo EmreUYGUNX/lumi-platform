@@ -116,10 +116,16 @@ describe("createAuthRouter", () => {
     const changeOptions = calls[5]?.[0];
 
     expect(resendOptions).toMatchObject({
-      keyPrefix: "auth:resend-verification",
+      keyPrefix: `${config.security.rateLimit.keyPrefix}:auth:resend-verification`,
+      strategy: config.security.rateLimit.strategy,
+      redisUrl: config.security.rateLimit.redis?.url,
+      ipWhitelist: config.security.rateLimit.ipWhitelist,
     });
     expect(changeOptions).toMatchObject({
-      keyPrefix: "auth:change-password",
+      keyPrefix: `${config.security.rateLimit.keyPrefix}:auth:change-password`,
+      strategy: config.security.rateLimit.strategy,
+      redisUrl: config.security.rateLimit.redis?.url,
+      ipWhitelist: config.security.rateLimit.ipWhitelist,
     });
 
     const authedRequest = { user: { id: "user_123" }, ip: "198.51.100.24" } as unknown as Request;

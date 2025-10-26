@@ -207,9 +207,41 @@ describe("middleware pipeline", () => {
               strategy: "memory",
               routes: {
                 auth: {
-                  points: 5,
-                  durationSeconds: 60,
-                  blockDurationSeconds: 60,
+                  global: {
+                    points: 2,
+                    durationSeconds: 60,
+                    blockDurationSeconds: 60,
+                  },
+                  login: {
+                    points: 5,
+                    durationSeconds: 60,
+                    blockDurationSeconds: 60,
+                  },
+                  register: {
+                    points: 5,
+                    durationSeconds: 900,
+                    blockDurationSeconds: 900,
+                  },
+                  forgotPassword: {
+                    points: 3,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
+                  resendVerification: {
+                    points: 3,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
+                  refresh: {
+                    points: 10,
+                    durationSeconds: 60,
+                    blockDurationSeconds: 120,
+                  },
+                  changePassword: {
+                    points: 5,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
                 },
               },
             },
@@ -248,9 +280,41 @@ describe("middleware pipeline", () => {
               strategy: "memory",
               routes: {
                 auth: {
-                  points: 1,
-                  durationSeconds: 120,
-                  blockDurationSeconds: 120,
+                  global: {
+                    points: 10,
+                    durationSeconds: 60,
+                    blockDurationSeconds: 60,
+                  },
+                  login: {
+                    points: 1,
+                    durationSeconds: 120,
+                    blockDurationSeconds: 120,
+                  },
+                  register: {
+                    points: 5,
+                    durationSeconds: 900,
+                    blockDurationSeconds: 900,
+                  },
+                  forgotPassword: {
+                    points: 3,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
+                  resendVerification: {
+                    points: 3,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
+                  refresh: {
+                    points: 10,
+                    durationSeconds: 60,
+                    blockDurationSeconds: 120,
+                  },
+                  changePassword: {
+                    points: 5,
+                    durationSeconds: 3600,
+                    blockDurationSeconds: 3600,
+                  },
                 },
               },
             },
@@ -269,8 +333,7 @@ describe("middleware pipeline", () => {
             .send(JSON.stringify({ email: "user@example.com" }));
 
           expect(limited.status).toBe(429);
-          expect(limited.body.error.code).toBe("RATE_LIMIT_EXCEEDED");
-          expect(limited.body.error.details.scope).toBe("auth");
+          expect(limited.body.error.code).toBe("RATE_LIMITED");
         },
       );
     });

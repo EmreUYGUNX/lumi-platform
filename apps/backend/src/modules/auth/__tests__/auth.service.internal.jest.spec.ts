@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PrismaClient, User } from "@prisma/client";
 
 import { createDeviceFingerprint } from "@/lib/crypto/fingerprint.js";
+import { hashPassword } from "@/lib/crypto/password.js";
 import type { EmailService } from "@/lib/email/email.service.js";
 import type { createChildLogger } from "@/lib/logger.js";
 import { createTestConfig } from "@/testing/config.js";
@@ -9,6 +10,7 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { AuthService } from "../auth.service.js";
 import type { AuthRequestContext, AuthUserProfile } from "../auth.service.js";
+import type { BruteForceProtectionService } from "../brute-force.service.js";
 import type { RbacService } from "../rbac.service.js";
 import type { SecurityEventService } from "../security-event.service.js";
 import type { SessionDeviceMetadata, SessionService } from "../session.service.js";
@@ -38,15 +40,20 @@ interface InternalAuthService {
   getLockoutRemainingSeconds: (lockoutUntil?: Date | null) => number;
 }
 
-const createConfig = (): ApplicationConfig =>
-  createTestConfig({
+const createConfig = (): ApplicationConfig => {
+  const base = createTestConfig();
+
+  return {
+    ...base,
     app: {
+      ...base.app,
       environment: "test",
       apiBaseUrl: "https://api.example.com",
       frontendUrl: "https://app.example.com",
       port: 3000,
     },
     auth: {
+      ...base.auth,
       session: {
         fingerprintSecret: "fingerprint-secret",
         lockoutDurationSeconds: 900,
@@ -71,11 +78,12 @@ const createConfig = (): ApplicationConfig =>
         passwordReset: { ttlSeconds: 3600 },
       },
     },
-  });
+  };
+};
 
 interface PrismaMock {
   user: {
-    findUnique: jest.Mock;
+    findUnique: jest.MockedFunction<(args: Record<string, unknown>) => Promise<User | null>>;
     update: jest.Mock;
   };
   userSession: {
@@ -89,7 +97,9 @@ interface PrismaMock {
 const createPrismaMock = (): PrismaMock =>
   ({
     user: {
-      findUnique: jest.fn(),
+      findUnique: jest.fn(async () => null) as jest.MockedFunction<
+        (args: Record<string, unknown>) => Promise<User | null>
+      >,
       update: jest.fn(),
     },
     userSession: {
@@ -182,11 +192,36 @@ const createSecurityEventsMock = (): SecurityEventService =>
     log: jest.fn(),
   }) as unknown as SecurityEventService;
 
+interface BruteForceMock {
+  applyDelay: jest.MockedFunction<BruteForceProtectionService["applyDelay"]>;
+  recordFailure: jest.MockedFunction<BruteForceProtectionService["recordFailure"]>;
+  reset: jest.MockedFunction<BruteForceProtectionService["reset"]>;
+}
+
+const createBruteForceMock = (): { stub: BruteForceMock; service: BruteForceProtectionService } => {
+  const stub: BruteForceMock = {
+    applyDelay: jest.fn(async () => {}),
+    recordFailure: jest.fn(async () => ({ attempts: 0, captchaRequired: false })),
+    reset: jest.fn(async () => {}),
+  };
+
+  return {
+    stub,
+    service: stub as unknown as BruteForceProtectionService,
+  };
+};
+
 const createAuthService = (
   overrides: Partial<ConstructorParameters<typeof AuthService>[0]> = {},
 ) => {
   const prisma = overrides.prisma ?? (createPrismaMock() as unknown as PrismaClient);
   const rbacService = overrides.rbacService ?? createRbacServiceMock();
+  const bruteForceMock = overrides.bruteForceProtection
+    ? {
+        service: overrides.bruteForceProtection,
+        stub: overrides.bruteForceProtection as unknown as BruteForceMock,
+      }
+    : createBruteForceMock();
   return {
     prisma,
     service: new AuthService({
@@ -197,12 +232,14 @@ const createAuthService = (
       rbacService,
       emailService: overrides.emailService ?? createEmailServiceMock(),
       securityEventService: overrides.securityEventService ?? createSecurityEventsMock(),
+      bruteForceProtection: bruteForceMock.service,
       logger:
         overrides.logger ??
         ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() } as unknown as LoggerStub),
       now: () => fixedNow,
     }),
     rbacService,
+    bruteForceProtection: bruteForceMock.stub,
   };
 };
 
@@ -262,7 +299,7 @@ describe("AuthService internal helpers", () => {
       const prisma = createPrismaMock();
       const securityEvents = createSecurityEventsMock();
       const emailService = createEmailServiceMock();
-      const { service } = createAuthService({
+      const { service, bruteForceProtection: _bruteForceProtection } = createAuthService({
         prisma: prisma as unknown as PrismaClient,
         securityEventService: securityEvents,
         emailService,
@@ -332,7 +369,7 @@ describe("AuthService internal helpers", () => {
       const prisma = createPrismaMock();
       const securityEvents = createSecurityEventsMock();
       const emailService = createEmailServiceMock();
-      const { service } = createAuthService({
+      const { service, bruteForceProtection } = createAuthService({
         prisma: prisma as unknown as PrismaClient,
         securityEventService: securityEvents,
         emailService,
@@ -379,8 +416,13 @@ describe("AuthService internal helpers", () => {
         expect.objectContaining({
           type: "login_failed",
           userId: "user_lock",
+          payload: expect.objectContaining({
+            captchaRecommended: false,
+            bruteForceAttempts: expect.any(Number),
+          }),
         }),
       );
+      expect(bruteForceProtection.recordFailure).toHaveBeenCalledWith("lock@example.com");
 
       expect(securityEvents.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -394,6 +436,132 @@ describe("AuthService internal helpers", () => {
         firstName: "Lock",
         unlockAt: expect.any(Date),
       });
+    });
+  });
+
+  describe("login brute force integration", () => {
+    const context: AuthRequestContext = {
+      device: {
+        ipAddress: "198.51.100.1",
+        userAgent: "JestAgent/1.0",
+      },
+    };
+
+    it("applies delay and records failure for unknown users", async () => {
+      const prisma = createPrismaMock();
+      const bruteForce = createBruteForceMock();
+      const securityEvents = createSecurityEventsMock();
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const { service, bruteForceProtection: bruteForceStub } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        bruteForceProtection: bruteForce.service,
+        securityEventService: securityEvents,
+      });
+
+      await expect(
+        service.login(
+          {
+            email: "missing@example.com",
+            password: "Password123!",
+          },
+          context,
+        ),
+      ).rejects.toThrow("Invalid credentials. Please check your email and password combination.");
+
+      expect(bruteForceStub.applyDelay).toHaveBeenCalledWith("missing@example.com");
+      expect(bruteForceStub.recordFailure).toHaveBeenCalledWith("missing@example.com");
+      expect(bruteForceStub.reset).not.toHaveBeenCalled();
+      expect(securityEvents.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "login_failed",
+          payload: expect.objectContaining({ captchaRecommended: false }),
+        }),
+      );
+    });
+
+    it("records failures when password verification fails", async () => {
+      const prisma = createPrismaMock();
+      const bruteForce = createBruteForceMock();
+      const securityEvents = createSecurityEventsMock();
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "user@example.com",
+        passwordHash: "stored-hash",
+        firstName: "Test",
+        lastName: "User",
+        phone: null,
+        emailVerified: true,
+        emailVerifiedAt: fixedNow,
+        failedLoginCount: 0,
+        lockoutUntil: null,
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        status: "ACTIVE",
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      });
+
+      const { service, bruteForceProtection: bruteForceStub } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        bruteForceProtection: bruteForce.service,
+        securityEventService: securityEvents,
+      });
+
+      await expect(
+        service.login(
+          {
+            email: "user@example.com",
+            password: "WrongPassword!",
+          },
+          context,
+        ),
+      ).rejects.toThrow("Invalid credentials. Please check your email and password combination.");
+
+      expect(bruteForceStub.applyDelay).toHaveBeenCalledWith("user@example.com");
+      expect(bruteForceStub.recordFailure).toHaveBeenCalledWith("user@example.com");
+      expect(bruteForceStub.reset).not.toHaveBeenCalled();
+    });
+
+    it("resets brute force counters when login succeeds", async () => {
+      const prisma = createPrismaMock();
+      const bruteForce = createBruteForceMock();
+      const hashed = await hashPassword("Password123!");
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-2",
+        email: "user@example.com",
+        passwordHash: hashed,
+        firstName: "Auth",
+        lastName: "Tester",
+        phone: null,
+        emailVerified: true,
+        emailVerifiedAt: fixedNow,
+        failedLoginCount: 0,
+        lockoutUntil: null,
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        status: "ACTIVE",
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      });
+
+      const { service, bruteForceProtection: bruteForceStub } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        bruteForceProtection: bruteForce.service,
+      });
+
+      const result = await service.login(
+        {
+          email: "user@example.com",
+          password: "Password123!",
+        },
+        context,
+      );
+
+      expect(result.user.email).toBe("user@example.com");
+      expect(bruteForceStub.applyDelay).toHaveBeenCalledWith("user@example.com");
+      expect(bruteForceStub.recordFailure).not.toHaveBeenCalled();
+      expect(bruteForceStub.reset).toHaveBeenCalledWith("user@example.com");
     });
   });
 

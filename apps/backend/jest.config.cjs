@@ -32,6 +32,12 @@ config.transformIgnorePatterns = [
   "node_modules/(?!embedded-postgres/|@embedded-postgres/)"
 ];
 
+config.modulePathIgnorePatterns = [
+  ...(config.modulePathIgnorePatterns || []),
+  "<rootDir>/apps/frontend/.next",
+  "<rootDir>/.next"
+];
+
 config.moduleNameMapper = {
   "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
   ...(config.moduleNameMapper || {}),

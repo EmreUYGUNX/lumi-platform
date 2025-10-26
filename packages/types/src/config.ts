@@ -50,6 +50,16 @@ export interface RateLimitRouteConfig {
   blockDurationSeconds: number;
 }
 
+export interface AuthRateLimitRouteMap {
+  global: RateLimitRouteConfig;
+  login: RateLimitRouteConfig;
+  register: RateLimitRouteConfig;
+  forgotPassword: RateLimitRouteConfig;
+  resendVerification: RateLimitRouteConfig;
+  refresh: RateLimitRouteConfig;
+  changePassword: RateLimitRouteConfig;
+}
+
 export interface RateLimitConfig {
   enabled: boolean;
   keyPrefix: string;
@@ -58,12 +68,26 @@ export interface RateLimitConfig {
   blockDurationSeconds: number;
   strategy: RateLimitStrategy;
   inmemoryBlockOnConsumed?: number;
+  ipWhitelist: string[];
   redis?: {
     url: string;
   };
   routes: {
-    auth: RateLimitRouteConfig;
+    auth: AuthRateLimitRouteMap;
   };
+}
+
+export interface ProgressiveDelayConfig {
+  baseDelayMs: number;
+  stepDelayMs: number;
+  maxDelayMs: number;
+}
+
+export interface AuthBruteForceConfig {
+  enabled: boolean;
+  windowSeconds: number;
+  progressiveDelays: ProgressiveDelayConfig;
+  captchaThreshold: number;
 }
 
 export interface ValidationConfig {
@@ -210,6 +234,7 @@ export interface AuthConfig {
     };
   };
   session: AuthSessionConfig;
+  bruteForce: AuthBruteForceConfig;
 }
 
 export interface ResolvedEnvironment {
@@ -264,6 +289,12 @@ export interface ResolvedEnvironment {
   sessionFingerprintSecret: string;
   lockoutDurationSeconds: number;
   maxLoginAttempts: number;
+  authBruteForce: {
+    enabled: boolean;
+    windowSeconds: number;
+    progressiveDelays: ProgressiveDelayConfig;
+    captchaThreshold: number;
+  };
   cors: CorsConfig;
   securityHeaders: SecurityHeadersConfig;
   rateLimit: RateLimitConfig;

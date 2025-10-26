@@ -86,6 +86,42 @@ describe("loadEnvironment", () => {
       expect(env.sessionFingerprintSecret).toBe(REQUIRED_ENV.SESSION_FINGERPRINT_SECRET);
       expect(env.lockoutDurationSeconds).toBe(15 * 60);
       expect(env.maxLoginAttempts).toBe(Number(REQUIRED_ENV.MAX_LOGIN_ATTEMPTS));
+      expect(env.authBruteForce).toEqual({
+        enabled: true,
+        windowSeconds: 15 * 60,
+        progressiveDelays: {
+          baseDelayMs: 250,
+          stepDelayMs: 250,
+          maxDelayMs: 5000,
+        },
+        captchaThreshold: 10,
+      });
+    });
+  });
+
+  it("parses email configuration entries", async () => {
+    await withTemporaryEnvironment(createEnv(), async (env) => {
+      expect(env.email.enabled).toBe(true);
+      expect(env.email.defaultSender).toEqual({
+        email: REQUIRED_ENV.EMAIL_FROM_ADDRESS,
+        name: REQUIRED_ENV.EMAIL_FROM_NAME,
+        replyTo: REQUIRED_ENV.EMAIL_REPLY_TO_ADDRESS,
+      });
+      expect(env.email.signingSecret).toBe(REQUIRED_ENV.EMAIL_SIGNING_SECRET);
+      expect(env.email.transport.smtp.host).toBe(REQUIRED_ENV.EMAIL_SMTP_HOST);
+      expect(env.email.transport.smtp.port).toBe(Number(REQUIRED_ENV.EMAIL_SMTP_PORT));
+      expect(env.email.transport.smtp.secure).toBe(false);
+      expect(env.email.transport.smtp.username).toBe(REQUIRED_ENV.EMAIL_SMTP_USERNAME);
+      expect(env.email.transport.smtp.password).toBe(REQUIRED_ENV.EMAIL_SMTP_PASSWORD);
+      expect(env.email.rateLimit.windowSeconds).toBe(120);
+      expect(env.email.rateLimit.maxPerRecipient).toBe(8);
+      expect(env.email.queue.driver).toBe("inline");
+      expect(env.email.queue.concurrency).toBe(4);
+      expect(env.email.logging.deliveries).toBe(true);
+      expect(env.email.template.baseUrl).toBe(REQUIRED_ENV.EMAIL_TEMPLATE_BASE_URL);
+      expect(env.email.template.supportEmail).toBe(REQUIRED_ENV.EMAIL_SUPPORT_ADDRESS);
+      expect(env.email.template.supportUrl).toBe(REQUIRED_ENV.EMAIL_SUPPORT_URL);
+      expect(env.email.template.defaultLocale).toBe(REQUIRED_ENV.EMAIL_TEMPLATE_DEFAULT_LOCALE);
     });
   });
 
@@ -209,6 +245,23 @@ describe("loadEnvironment", () => {
       async (env) => {
         expect(env.rateLimit.strategy).toBe("redis");
         expect(env.rateLimit.redis).toEqual({ url: "redis://localhost:6390/1" });
+      },
+    );
+  });
+
+  it("parses auth rate limit route configuration and whitelist", async () => {
+    await withTemporaryEnvironment(
+      createEnv({
+        RATE_LIMIT_IP_WHITELIST: "127.0.0.1, 10.0.0.5",
+        RATE_LIMIT_AUTH_LOGIN_POINTS: "7",
+        RATE_LIMIT_AUTH_REFRESH_BLOCK_DURATION: "90",
+      }),
+      async (env) => {
+        expect(env.rateLimit.ipWhitelist).toEqual(["127.0.0.1", "10.0.0.5"]);
+        expect(env.rateLimit.routes.auth.global.points).toBe(5);
+        expect(env.rateLimit.routes.auth.login.points).toBe(7);
+        expect(env.rateLimit.routes.auth.refresh.blockDurationSeconds).toBe(90);
+        expect(env.rateLimit.routes.auth.forgotPassword.points).toBe(3);
       },
     );
   });

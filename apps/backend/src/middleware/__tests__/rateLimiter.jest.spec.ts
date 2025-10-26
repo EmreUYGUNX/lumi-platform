@@ -175,24 +175,22 @@ describe("createRateLimiterBundle", () => {
 
   it("derives key generators and handlers with contextual metadata", async () => {
     const { createRateLimiterBundle } = await import("../rateLimiter.js");
-    const config = createTestConfig({
-      security: {
-        rateLimit: {
-          enabled: true,
-          keyPrefix: "backend",
-          points: 5,
-          durationSeconds: 30,
-          blockDurationSeconds: 90,
-          routes: {
-            auth: {
-              points: 3,
-              durationSeconds: 10,
-              blockDurationSeconds: 60,
-            },
-          },
-        },
-      },
-    }).security.rateLimit;
+    const config = createTestConfig().security.rateLimit;
+    config.enabled = true;
+    config.keyPrefix = "backend";
+    config.points = 5;
+    config.durationSeconds = 30;
+    config.blockDurationSeconds = 90;
+    config.routes.auth.global = {
+      points: 5,
+      durationSeconds: 30,
+      blockDurationSeconds: 90,
+    };
+    config.routes.auth.login = {
+      points: 3,
+      durationSeconds: 10,
+      blockDurationSeconds: 60,
+    };
 
     createRateLimiterBundle(config);
 

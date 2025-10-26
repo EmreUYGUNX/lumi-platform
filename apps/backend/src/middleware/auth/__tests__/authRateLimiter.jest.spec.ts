@@ -5,6 +5,17 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { createAuthRateLimiter } from "../authRateLimiter.js";
 import type { AuthRateLimiterOptions } from "../authRateLimiter.js";
 
+const redisConnectMock = jest.fn(async () => {});
+const redisOnMock = jest.fn();
+const createClientMock = jest.fn(() => ({
+  on: redisOnMock,
+  connect: redisConnectMock,
+}));
+
+jest.mock("redis", () => ({
+  createClient: () => createClientMock(),
+}));
+
 jest.mock("@/lib/logger.js", () => ({
   createChildLogger: jest.fn(() => ({
     warn: jest.fn(),
@@ -50,6 +61,12 @@ type LimitExceededHook = NonNullable<AuthRateLimiterOptions["onLimitExceeded"]>;
 describe("createAuthRateLimiter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    redisConnectMock.mockImplementation(async () => {});
+    redisOnMock.mockImplementation(() => {});
+    createClientMock.mockImplementation(() => ({
+      on: redisOnMock,
+      connect: redisConnectMock,
+    }));
   });
 
   it("allows requests when under the configured rate limit", async () => {
@@ -57,6 +74,7 @@ describe("createAuthRateLimiter", () => {
       keyPrefix: "test-allow",
       points: 2,
       durationSeconds: 60,
+      strategy: "memory",
     });
     const req = createRequest();
     const { res } = createResponse();
@@ -75,6 +93,7 @@ describe("createAuthRateLimiter", () => {
       points: 1,
       durationSeconds: 60,
       onLimitExceeded,
+      strategy: "memory",
     });
     const req = createRequest({
       headers: { "x-forwarded-for": "198.51.100.10, 203.0.113.50" },
@@ -123,6 +142,7 @@ describe("createAuthRateLimiter", () => {
       points: 1,
       durationSeconds: 10,
       keyGenerator: (): string | undefined => undefined,
+      strategy: "memory",
     });
 
     const req = createRequest({ ip: "192.0.2.55" });
@@ -134,7 +154,79 @@ describe("createAuthRateLimiter", () => {
     expect(next.mock).toHaveBeenCalledTimes(1);
     expect(next.mock.mock.calls[0]?.[0]).toBeInstanceOf(Error);
     expect(consumeSpy.mock.calls[0]?.[0]).toBe("192.0.2.55");
-
     consumeSpy.mockRestore();
+  });
+
+  it("bypasses limiting for whitelisted IPs", async () => {
+    const limiter = createAuthRateLimiter({
+      keyPrefix: "test-whitelist",
+      points: 1,
+      durationSeconds: 60,
+      ipWhitelist: ["203.0.113.100"],
+      strategy: "memory",
+    });
+
+    const req = createRequest();
+    const { res } = createResponse();
+    const next = createNext();
+
+    for (let index = 0; index < 5; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- sequential requests emulate real traffic ordering.
+      await limiter(req, res, next.handler);
+    }
+
+    expect(next.mock).toHaveBeenCalledTimes(5);
+  });
+
+  it("falls back to in-memory limiting when Redis client creation throws", async () => {
+    createClientMock.mockImplementationOnce(() => {
+      throw new Error("redis unavailable");
+    });
+
+    const limiter = createAuthRateLimiter({
+      keyPrefix: "test-redis-fallback",
+      points: 1,
+      durationSeconds: 60,
+      strategy: "redis",
+      redisUrl: "redis://localhost:6379/0",
+    });
+
+    const req = createRequest();
+    const { res } = createResponse();
+    const next = createNext();
+
+    await limiter(req, res, next.handler);
+    await limiter(req, res, next.handler);
+
+    const limited = createResponse();
+    await limiter(req, limited.res, next.handler);
+    await flushAsync();
+
+    expect(limited.status).toHaveBeenCalledWith(429);
+  });
+
+  it("uses redis-backed storage when available", async () => {
+    const connectSpy = jest.fn(async () => {});
+    createClientMock.mockImplementationOnce(() => ({
+      on: redisOnMock,
+      connect: connectSpy,
+    }));
+
+    const limiter = createAuthRateLimiter({
+      keyPrefix: "test-redis-success",
+      points: 1,
+      durationSeconds: 60,
+      strategy: "redis",
+      redisUrl: "redis://localhost:6379/2",
+    });
+
+    const req = createRequest();
+    const { res } = createResponse();
+    const next = createNext();
+
+    await limiter(req, res, next.handler);
+
+    expect(connectSpy).toHaveBeenCalled();
+    expect(next.mock).toHaveBeenCalledTimes(1);
   });
 });

@@ -495,8 +495,128 @@ const EnvSchema = z
       .int()
       .min(0, "RATE_LIMIT_AUTH_BLOCK_DURATION must not be negative")
       .default(900),
+    RATE_LIMIT_AUTH_LOGIN_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_LOGIN_POINTS must be at least 1")
+      .default(5),
+    RATE_LIMIT_AUTH_LOGIN_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_LOGIN_DURATION must be at least 1 second")
+      .default(900),
+    RATE_LIMIT_AUTH_LOGIN_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_LOGIN_BLOCK_DURATION must not be negative")
+      .default(900),
+    RATE_LIMIT_AUTH_REGISTER_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_REGISTER_POINTS must be at least 1")
+      .default(5),
+    RATE_LIMIT_AUTH_REGISTER_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_REGISTER_DURATION must be at least 1 second")
+      .default(900),
+    RATE_LIMIT_AUTH_REGISTER_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_REGISTER_BLOCK_DURATION must not be negative")
+      .default(900),
+    RATE_LIMIT_AUTH_FORGOT_PASSWORD_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_FORGOT_PASSWORD_POINTS must be at least 1")
+      .default(3),
+    RATE_LIMIT_AUTH_FORGOT_PASSWORD_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_FORGOT_PASSWORD_DURATION must be at least 1 second")
+      .default(3600),
+    RATE_LIMIT_AUTH_FORGOT_PASSWORD_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_FORGOT_PASSWORD_BLOCK_DURATION must not be negative")
+      .default(3600),
+    RATE_LIMIT_AUTH_RESEND_VERIFICATION_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_RESEND_VERIFICATION_POINTS must be at least 1")
+      .default(3),
+    RATE_LIMIT_AUTH_RESEND_VERIFICATION_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_RESEND_VERIFICATION_DURATION must be at least 1 second")
+      .default(3600),
+    RATE_LIMIT_AUTH_RESEND_VERIFICATION_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_RESEND_VERIFICATION_BLOCK_DURATION must not be negative")
+      .default(3600),
+    RATE_LIMIT_AUTH_REFRESH_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_REFRESH_POINTS must be at least 1")
+      .default(10),
+    RATE_LIMIT_AUTH_REFRESH_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_REFRESH_DURATION must be at least 1 second")
+      .default(60),
+    RATE_LIMIT_AUTH_REFRESH_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_REFRESH_BLOCK_DURATION must not be negative")
+      .default(120),
+    RATE_LIMIT_AUTH_CHANGE_PASSWORD_POINTS: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_CHANGE_PASSWORD_POINTS must be at least 1")
+      .default(5),
+    RATE_LIMIT_AUTH_CHANGE_PASSWORD_DURATION: z.coerce
+      .number()
+      .int()
+      .min(1, "RATE_LIMIT_AUTH_CHANGE_PASSWORD_DURATION must be at least 1 second")
+      .default(3600),
+    RATE_LIMIT_AUTH_CHANGE_PASSWORD_BLOCK_DURATION: z.coerce
+      .number()
+      .int()
+      .min(0, "RATE_LIMIT_AUTH_CHANGE_PASSWORD_BLOCK_DURATION must not be negative")
+      .default(3600),
     RATE_LIMIT_KEY_PREFIX: z.string().default("lumi:rate-limit"),
+    RATE_LIMIT_IP_WHITELIST: z.string().optional().transform(optionalString),
     RATE_LIMIT_REDIS_URL: z.string().optional().transform(optionalString),
+    AUTH_BRUTE_FORCE_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    AUTH_BRUTE_FORCE_WINDOW: z.coerce
+      .number()
+      .int()
+      .min(60, "AUTH_BRUTE_FORCE_WINDOW must be at least 60 seconds")
+      .default(900),
+    AUTH_BRUTE_FORCE_DELAY_BASE_MS: z.coerce
+      .number()
+      .int()
+      .min(0, "AUTH_BRUTE_FORCE_DELAY_BASE_MS must be zero or positive")
+      .default(250),
+    AUTH_BRUTE_FORCE_DELAY_STEP_MS: z.coerce
+      .number()
+      .int()
+      .min(0, "AUTH_BRUTE_FORCE_DELAY_STEP_MS must be zero or positive")
+      .default(250),
+    AUTH_BRUTE_FORCE_DELAY_MAX_MS: z.coerce
+      .number()
+      .int()
+      .min(0, "AUTH_BRUTE_FORCE_DELAY_MAX_MS must be zero or positive")
+      .default(5000),
+    AUTH_BRUTE_FORCE_CAPTCHA_THRESHOLD: z.coerce
+      .number()
+      .int()
+      .min(1, "AUTH_BRUTE_FORCE_CAPTCHA_THRESHOLD must be at least 1")
+      .default(10),
     VALIDATION_STRICT: z
       .any()
       .transform((value) => booleanTransformer(value, true))
@@ -887,6 +1007,7 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
     durationSeconds: parsed.RATE_LIMIT_DURATION,
     blockDurationSeconds: parsed.RATE_LIMIT_BLOCK_DURATION,
     strategy: parsed.RATE_LIMIT_STRATEGY,
+    ipWhitelist: csvTransformer(parsed.RATE_LIMIT_IP_WHITELIST, []),
     redis:
       parsed.RATE_LIMIT_STRATEGY === "redis" && parsed.RATE_LIMIT_REDIS_URL
         ? {
@@ -895,9 +1016,41 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
         : undefined,
     routes: {
       auth: {
-        points: parsed.RATE_LIMIT_AUTH_POINTS,
-        durationSeconds: parsed.RATE_LIMIT_AUTH_DURATION,
-        blockDurationSeconds: parsed.RATE_LIMIT_AUTH_BLOCK_DURATION,
+        global: {
+          points: parsed.RATE_LIMIT_AUTH_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_BLOCK_DURATION,
+        },
+        login: {
+          points: parsed.RATE_LIMIT_AUTH_LOGIN_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_LOGIN_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_LOGIN_BLOCK_DURATION,
+        },
+        register: {
+          points: parsed.RATE_LIMIT_AUTH_REGISTER_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_REGISTER_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_REGISTER_BLOCK_DURATION,
+        },
+        forgotPassword: {
+          points: parsed.RATE_LIMIT_AUTH_FORGOT_PASSWORD_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_FORGOT_PASSWORD_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_FORGOT_PASSWORD_BLOCK_DURATION,
+        },
+        resendVerification: {
+          points: parsed.RATE_LIMIT_AUTH_RESEND_VERIFICATION_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_RESEND_VERIFICATION_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_RESEND_VERIFICATION_BLOCK_DURATION,
+        },
+        refresh: {
+          points: parsed.RATE_LIMIT_AUTH_REFRESH_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_REFRESH_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_REFRESH_BLOCK_DURATION,
+        },
+        changePassword: {
+          points: parsed.RATE_LIMIT_AUTH_CHANGE_PASSWORD_POINTS,
+          durationSeconds: parsed.RATE_LIMIT_AUTH_CHANGE_PASSWORD_DURATION,
+          blockDurationSeconds: parsed.RATE_LIMIT_AUTH_CHANGE_PASSWORD_BLOCK_DURATION,
+        },
       },
     },
   },
@@ -937,6 +1090,16 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   sessionFingerprintSecret: parsed.SESSION_FINGERPRINT_SECRET,
   lockoutDurationSeconds: parsed.LOCKOUT_DURATION,
   maxLoginAttempts: parsed.MAX_LOGIN_ATTEMPTS,
+  authBruteForce: {
+    enabled: parsed.AUTH_BRUTE_FORCE_ENABLED,
+    windowSeconds: parsed.AUTH_BRUTE_FORCE_WINDOW,
+    progressiveDelays: {
+      baseDelayMs: parsed.AUTH_BRUTE_FORCE_DELAY_BASE_MS,
+      stepDelayMs: parsed.AUTH_BRUTE_FORCE_DELAY_STEP_MS,
+      maxDelayMs: parsed.AUTH_BRUTE_FORCE_DELAY_MAX_MS,
+    },
+    captchaThreshold: parsed.AUTH_BRUTE_FORCE_CAPTCHA_THRESHOLD,
+  },
 });
 
 interface LoadEnvironmentOptions {

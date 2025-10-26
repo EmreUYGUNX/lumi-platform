@@ -50,6 +50,16 @@ describe("buildAuthConfig", () => {
       expect(config.session.fingerprintSecret).toBe(REQUIRED_ENV.SESSION_FINGERPRINT_SECRET);
       expect(config.session.lockoutDurationSeconds).toBe(15 * 60);
       expect(config.session.maxLoginAttempts).toBe(5);
+      expect(config.bruteForce).toEqual({
+        enabled: true,
+        windowSeconds: 15 * 60,
+        progressiveDelays: {
+          baseDelayMs: 250,
+          stepDelayMs: 250,
+          maxDelayMs: 5000,
+        },
+        captchaThreshold: 10,
+      });
     });
   });
 
