@@ -7,6 +7,7 @@ This directory hosts the API specifications, endpoint references, and integratio
 - `rest/` – REST endpoint specifications grouped by domain (OpenAPI YAML + markdown guides).
 - `schemas/` – Shared request/response schemas sourced from `@lumi/types`.
 - `changelog/` – Versioned change logs documenting API additions, deprecations, and removals.
+- `auth-endpoints.md` – Narrative companion to the OpenAPI spec covering authentication flows, error semantics, and rate limits.
 
 ## Authoring Standards
 
