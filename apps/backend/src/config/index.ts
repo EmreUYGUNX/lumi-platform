@@ -62,6 +62,29 @@ const computeDiffKeys = (
   return changed;
 };
 
+const buildEmailConfig = (env: ResolvedEnvironment): ApplicationConfig["email"] => ({
+  enabled: env.email.enabled,
+  defaultSender: {
+    email: env.email.defaultSender.email,
+    name: env.email.defaultSender.name ?? env.appName,
+    replyTo: env.email.defaultSender.replyTo,
+  },
+  signingSecret: env.email.signingSecret,
+  transport: env.email.transport,
+  rateLimit: env.email.rateLimit,
+  queue: env.email.queue,
+  logging: env.email.logging,
+  template: {
+    baseUrl: env.email.template.baseUrl,
+    defaultLocale: env.email.template.defaultLocale,
+    branding: {
+      productName: env.appName,
+      supportEmail: env.email.template.supportEmail,
+      supportUrl: env.email.template.supportUrl ?? env.email.template.baseUrl,
+    },
+  },
+});
+
 const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationConfig => ({
   app: {
     name: env.appName,
@@ -97,6 +120,7 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
     validation: env.validation,
   },
   auth: buildAuthConfig(env),
+  email: buildEmailConfig(env),
   observability: {
     sentryDsn: env.sentryDsn,
     logs: {
@@ -195,6 +219,7 @@ export const isFeatureEnabled = (flag: string): boolean => featureFlagRegistry.i
 export const getAuthConfig = () => getConfig().auth;
 export const getJwtConfig = () => getAuthConfig().jwt;
 export const getSessionSecurityConfig = () => getAuthConfig().session;
+export const getEmailConfig = () => getConfig().email;
 
 export const reloadConfiguration = (
   reason = "manual",

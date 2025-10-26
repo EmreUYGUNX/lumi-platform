@@ -19,6 +19,8 @@ import {
   serialiseToken,
   verifyTokenSecret,
 } from "@/lib/crypto/token.js";
+import type { EmailService } from "@/lib/email/email.service.js";
+import { createEmailService } from "@/lib/email/email.service.js";
 import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from "@/lib/errors.js";
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
@@ -29,8 +31,6 @@ import type { ChangePasswordRequest } from "./dto/change-password.dto.js";
 import type { LoginRequest } from "./dto/login.dto.js";
 import type { RegisterRequest } from "./dto/register.dto.js";
 import type { ResetPasswordRequest } from "./dto/reset-password.dto.js";
-import type { EmailService } from "./email.service.js";
-import { createEmailService } from "./email.service.js";
 import { type RbacService, createRbacService } from "./rbac.service.js";
 import type { SecurityEventService } from "./security-event.service.js";
 import { createSecurityEventService } from "./security-event.service.js";
@@ -48,6 +48,8 @@ const AUTH_LOGGER_COMPONENT = "auth:service";
 const DEFAULT_CUSTOMER_ROLE = "customer";
 const INVALID_CREDENTIALS_ERROR =
   "Invalid credentials. Please check your email and password combination.";
+const USER_NOT_FOUND_ERROR = "User not found.";
+const VERIFICATION_TOKEN_INVALID_ERROR = "Verification token is invalid or has already been used.";
 
 export interface AuthRequestContext {
   device: SessionDeviceMetadata;
@@ -190,7 +192,7 @@ export class AuthService implements AuthServiceContract {
       });
 
     const sessionNotifier: SessionSecurityNotifier = {
-      handleSessionRevoked: async ({ sessionId, userId, reason }) => {
+      handleSessionRevoked: async ({ sessionId, userId, reason, revokedAt, ipAddress }) => {
         try {
           await this.securityEvents.log({
             type: "session_revoked",
@@ -206,6 +208,47 @@ export class AuthService implements AuthServiceContract {
             error,
             sessionId,
             userId,
+          });
+        }
+
+        if (reason === "manual_logout" || reason === "bulk_logout") {
+          return;
+        }
+
+        if (!this.config.email.enabled) {
+          return;
+        }
+
+        try {
+          const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              email: true,
+              firstName: true,
+            },
+          });
+
+          if (!user) {
+            this.logger.warn("Skipping session revocation notification; user not found.", {
+              userId,
+              sessionId,
+            });
+            return;
+          }
+
+          await this.emailService.sendSessionRevokedNotification({
+            to: user.email,
+            firstName: user.firstName,
+            revokedAt,
+            reason,
+            ipAddress,
+          });
+        } catch (error) {
+          this.logger.warn("Failed to dispatch session revocation email.", {
+            error,
+            userId,
+            sessionId,
+            reason,
           });
         }
       },
@@ -306,7 +349,7 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
-    await this.emailService.sendVerificationEmail({
+    await this.emailService.sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName,
       token: verification.token,
@@ -413,6 +456,10 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    if (sessionResult.newDevice) {
+      await this.notifyNewDeviceLogin(account, context.device);
+    }
+
     const profile = await this.buildUserProfile(account.id);
 
     return {
@@ -501,11 +548,11 @@ export class AuthService implements AuthServiceContract {
     });
 
     if (!record) {
-      throw new ValidationError("Verification token is invalid or has already been used.", {
+      throw new ValidationError(VERIFICATION_TOKEN_INVALID_ERROR, {
         issues: [
           {
             path: "token",
-            message: "Verification token is invalid or has already been used.",
+            message: VERIFICATION_TOKEN_INVALID_ERROR,
           },
         ],
       });
@@ -557,7 +604,7 @@ export class AuthService implements AuthServiceContract {
     });
 
     if (!user) {
-      throw new NotFoundError("User not found.", { details: { userId } });
+      throw new NotFoundError(USER_NOT_FOUND_ERROR, { details: { userId } });
     }
 
     if (user.emailVerified) {
@@ -697,6 +744,8 @@ export class AuthService implements AuthServiceContract {
     await this.emailService.sendPasswordChangedNotification({
       to: record.user.email,
       firstName: record.user.firstName,
+      changedAt: this.now(),
+      ipAddress: context.device.ipAddress,
     });
 
     await this.securityEvents.log({
@@ -724,7 +773,7 @@ export class AuthService implements AuthServiceContract {
     });
 
     if (!user) {
-      throw new NotFoundError("User not found.", { details: { userId } });
+      throw new NotFoundError(USER_NOT_FOUND_ERROR, { details: { userId } });
     }
 
     const currentMatches = await verifyPassword(input.currentPassword, user.passwordHash);
@@ -750,6 +799,7 @@ export class AuthService implements AuthServiceContract {
     await this.emailService.sendPasswordChangedNotification({
       to: user.email,
       firstName: user.firstName,
+      changedAt: this.now(),
     });
 
     await this.securityEvents.log({
@@ -763,6 +813,24 @@ export class AuthService implements AuthServiceContract {
     const profile = await this.buildUserProfile(userId);
 
     return { user: profile };
+  }
+
+  private async notifyNewDeviceLogin(user: User, device: SessionDeviceMetadata): Promise<void> {
+    try {
+      await this.emailService.sendNewDeviceLoginAlert({
+        to: user.email,
+        firstName: user.firstName,
+        deviceSummary: createDeviceSummary(device),
+        time: this.now(),
+        ipAddress: device.ipAddress,
+        userAgent: device.userAgent,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to dispatch new device login alert email.", {
+        error,
+        userId: user.id,
+      });
+    }
   }
 
   private async handleRefreshTokenReplayError(
@@ -956,11 +1024,30 @@ export class AuthService implements AuthServiceContract {
   private async issueSessionAndTokens(
     user: User,
     device: SessionDeviceMetadata,
-  ): Promise<{ tokens: TokenPair; sessionId: string }> {
+  ): Promise<{ tokens: TokenPair; sessionId: string; newDevice: boolean }> {
     const sessionId = randomUUID();
     const refreshExpiresAt = new Date(
       this.now().getTime() + this.authConfig.jwt.refresh.ttlSeconds * 1000,
     );
+
+    let newDevice = false;
+
+    if (device) {
+      const fingerprint = createDeviceFingerprint({
+        ...device,
+        secret: this.authConfig.session.fingerprintSecret,
+      });
+
+      const existingSession = await this.prisma.userSession.findFirst({
+        where: {
+          userId: user.id,
+          fingerprint,
+        },
+        select: { id: true },
+      });
+
+      newDevice = !existingSession;
+    }
 
     const sessionTemplate = {
       id: sessionId,
@@ -990,6 +1077,7 @@ export class AuthService implements AuthServiceContract {
         accessToken,
       },
       sessionId,
+      newDevice,
     };
   }
 
@@ -1074,7 +1162,7 @@ export class AuthService implements AuthServiceContract {
     });
 
     if (!user) {
-      throw new NotFoundError("User not found.", { details: { userId } });
+      throw new NotFoundError(USER_NOT_FOUND_ERROR, { details: { userId } });
     }
 
     const [roles, permissions] = await Promise.all([

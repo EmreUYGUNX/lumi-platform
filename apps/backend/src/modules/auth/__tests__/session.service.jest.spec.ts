@@ -392,11 +392,16 @@ describe("SessionService", () => {
 
     await service.revokeSession(created.id, "manual_test");
 
-    expect(notifier.handleSessionRevoked).toHaveBeenCalledWith({
-      sessionId: created.id,
-      userId: "user_8",
-      reason: "manual_test",
-    });
+    expect(notifier.handleSessionRevoked).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: created.id,
+        userId: "user_8",
+        reason: "manual_test",
+        revokedAt: now,
+        ipAddress: DEVICE_METADATA.ipAddress,
+        userAgent: DEVICE_METADATA.userAgent,
+      }),
+    );
   });
 
   it("creates a SessionService instance through the factory helper", () => {

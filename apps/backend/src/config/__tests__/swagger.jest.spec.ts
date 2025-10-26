@@ -3,6 +3,7 @@ import swaggerJsdoc from "swagger-jsdoc";
 
 import type { ApplicationConfig } from "@lumi/types";
 
+import { createTestConfig } from "../../testing/config.js";
 import { createOpenApiDocument, getSwaggerUiOptions } from "../swagger.js";
 
 jest.mock("swagger-jsdoc", () => {
@@ -16,7 +17,7 @@ jest.mock("swagger-jsdoc", () => {
 const mockedSwaggerJsdoc = jest.mocked(swaggerJsdoc);
 
 const createConfig = (overrides: Partial<ApplicationConfig["app"]> = {}): ApplicationConfig =>
-  ({
+  createTestConfig({
     app: {
       name: "Lumi Platform",
       apiBaseUrl: "https://api.lumi.dev",
@@ -25,7 +26,7 @@ const createConfig = (overrides: Partial<ApplicationConfig["app"]> = {}): Applic
       environment: "test",
       ...overrides,
     },
-  }) as unknown as ApplicationConfig;
+  });
 
 describe("swagger configuration", () => {
   beforeEach(() => {

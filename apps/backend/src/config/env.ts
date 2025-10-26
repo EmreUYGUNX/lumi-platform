@@ -120,6 +120,24 @@ const applyTestEnvironmentDefaults = () => {
   setEnvDefault("SESSION_FINGERPRINT_SECRET", "test-fingerprint-secret-placeholder-32-chars!!");
   setEnvDefault("LOCKOUT_DURATION", "900");
   setEnvDefault("MAX_LOGIN_ATTEMPTS", "5");
+  setEnvDefault("EMAIL_ENABLED", "true");
+  setEnvDefault("EMAIL_FROM_ADDRESS", "no-reply@lumi.test");
+  setEnvDefault("EMAIL_FROM_NAME", "Lumi Commerce");
+  setEnvDefault("EMAIL_REPLY_TO_ADDRESS", "support@lumi.test");
+  setEnvDefault("EMAIL_SIGNING_SECRET", "test-email-signing-secret-placeholder-32!!");
+  setEnvDefault("EMAIL_SMTP_HOST", "localhost");
+  setEnvDefault("EMAIL_SMTP_PORT", "1025");
+  setEnvDefault("EMAIL_SMTP_SECURE", "false");
+  setEnvDefault("EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED", "false");
+  setEnvDefault("EMAIL_RATE_LIMIT_WINDOW", "1m");
+  setEnvDefault("EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT", "5");
+  setEnvDefault("EMAIL_QUEUE_DRIVER", "inline");
+  setEnvDefault("EMAIL_QUEUE_CONCURRENCY", "2");
+  setEnvDefault("EMAIL_LOG_DELIVERIES", "true");
+  setEnvDefault("EMAIL_TEMPLATE_BASE_URL", "http://localhost:3100");
+  setEnvDefault("EMAIL_SUPPORT_ADDRESS", "support@lumi.test");
+  setEnvDefault("EMAIL_SUPPORT_URL", "http://localhost:3100/support");
+  setEnvDefault("EMAIL_TEMPLATE_DEFAULT_LOCALE", "en-US");
 };
 
 const DURATION_UNITS_IN_SECONDS = {
@@ -603,6 +621,81 @@ const EnvSchema = z
         parseDurationToSeconds(value, ctx, "LOCKOUT_DURATION", { minSeconds: 60 }),
       ),
     MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3, "MAX_LOGIN_ATTEMPTS must be at least 3"),
+    EMAIL_ENABLED: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    EMAIL_FROM_ADDRESS: z
+      .string()
+      .email("EMAIL_FROM_ADDRESS must be a valid email")
+      .default("no-reply@lumi.dev"),
+    EMAIL_FROM_NAME: z.union([z.string(), z.undefined()]).transform(optionalString),
+    EMAIL_REPLY_TO_ADDRESS: z
+      .union([
+        z.string().email("EMAIL_REPLY_TO_ADDRESS must be a valid email"),
+        z.literal(""),
+        z.undefined(),
+      ])
+      .transform(optionalString),
+    EMAIL_SIGNING_SECRET: z.string().min(32, "EMAIL_SIGNING_SECRET must be at least 32 characters"),
+    EMAIL_SMTP_HOST: z.string().min(1).default("localhost"),
+    EMAIL_SMTP_PORT: z.coerce
+      .number()
+      .int()
+      .min(1, "EMAIL_SMTP_PORT must be between 1 and 65535")
+      .max(65_535, "EMAIL_SMTP_PORT must be between 1 and 65535")
+      .default(1025),
+    EMAIL_SMTP_SECURE: z
+      .any()
+      .transform((value) => booleanTransformer(value, false))
+      .pipe(z.boolean()),
+    EMAIL_SMTP_USERNAME: z.union([z.string(), z.undefined()]).transform(optionalString),
+    EMAIL_SMTP_PASSWORD: z.union([z.string(), z.undefined()]).transform(optionalString),
+    EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED: z
+      .any()
+      .transform((value) => booleanTransformer(value, false))
+      .pipe(z.boolean()),
+    EMAIL_RATE_LIMIT_WINDOW: z
+      .string()
+      .min(1, "EMAIL_RATE_LIMIT_WINDOW is required")
+      .transform((value, ctx) =>
+        parseDurationToSeconds(value, ctx, "EMAIL_RATE_LIMIT_WINDOW", { minSeconds: 10 }),
+      ),
+    EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT: z.coerce
+      .number()
+      .int()
+      .min(1, "EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT must be at least 1")
+      .default(5),
+    EMAIL_QUEUE_DRIVER: z.enum(["inline", "memory", "bullmq"]).default("inline"),
+    EMAIL_QUEUE_CONCURRENCY: z.coerce
+      .number()
+      .int()
+      .min(1, "EMAIL_QUEUE_CONCURRENCY must be at least 1")
+      .max(100, "EMAIL_QUEUE_CONCURRENCY must not exceed 100")
+      .default(2),
+    EMAIL_LOG_DELIVERIES: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    EMAIL_TEMPLATE_BASE_URL: z.union([z.string(), z.undefined()]).transform(optionalString),
+    EMAIL_SUPPORT_ADDRESS: z
+      .union([
+        z.string().email("EMAIL_SUPPORT_ADDRESS must be a valid email"),
+        z.literal(""),
+        z.undefined(),
+      ])
+      .transform(optionalString),
+    EMAIL_SUPPORT_URL: z
+      .union([
+        z.string().url("EMAIL_SUPPORT_URL must be a valid URL"),
+        z.literal(""),
+        z.undefined(),
+      ])
+      .transform(optionalString),
+    EMAIL_TEMPLATE_DEFAULT_LOCALE: z
+      .string()
+      .min(2, "EMAIL_TEMPLATE_DEFAULT_LOCALE must be specified")
+      .default("en-US"),
     CI: z
       .any()
       .transform((value) => booleanTransformer(value, false))
@@ -716,6 +809,45 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
   jwtRefreshTtlSeconds: parsed.JWT_REFRESH_TTL,
   cookieDomain: parsed.COOKIE_DOMAIN,
   cookieSecret: parsed.COOKIE_SECRET,
+  email: {
+    enabled: parsed.EMAIL_ENABLED,
+    defaultSender: {
+      email: parsed.EMAIL_FROM_ADDRESS,
+      name: parsed.EMAIL_FROM_NAME ?? parsed.APP_NAME,
+      replyTo: parsed.EMAIL_REPLY_TO_ADDRESS,
+    },
+    signingSecret: parsed.EMAIL_SIGNING_SECRET,
+    transport: {
+      driver: "smtp",
+      smtp: {
+        host: parsed.EMAIL_SMTP_HOST,
+        port: parsed.EMAIL_SMTP_PORT,
+        secure: parsed.EMAIL_SMTP_SECURE,
+        username: parsed.EMAIL_SMTP_USERNAME,
+        password: parsed.EMAIL_SMTP_PASSWORD,
+        tls: {
+          rejectUnauthorized: parsed.EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED,
+        },
+      },
+    },
+    rateLimit: {
+      windowSeconds: parsed.EMAIL_RATE_LIMIT_WINDOW,
+      maxPerRecipient: parsed.EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT,
+    },
+    queue: {
+      driver: parsed.EMAIL_QUEUE_DRIVER,
+      concurrency: parsed.EMAIL_QUEUE_CONCURRENCY,
+    },
+    logging: {
+      deliveries: parsed.EMAIL_LOG_DELIVERIES,
+    },
+    template: {
+      baseUrl: parsed.EMAIL_TEMPLATE_BASE_URL ?? parsed.FRONTEND_URL,
+      supportEmail: parsed.EMAIL_SUPPORT_ADDRESS ?? parsed.EMAIL_FROM_ADDRESS,
+      supportUrl: parsed.EMAIL_SUPPORT_URL ?? parsed.EMAIL_TEMPLATE_BASE_URL ?? parsed.FRONTEND_URL,
+      defaultLocale: parsed.EMAIL_TEMPLATE_DEFAULT_LOCALE,
+    },
+  },
   cors: {
     enabled: parsed.CORS_ENABLED,
     allowedOrigins: csvTransformer(parsed.CORS_ORIGIN ?? parsed.CORS_ALLOWED_ORIGINS, [

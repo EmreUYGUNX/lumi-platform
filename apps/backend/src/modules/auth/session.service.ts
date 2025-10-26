@@ -25,6 +25,9 @@ export interface SessionRevocationContext {
   sessionId: string;
   userId: string;
   reason: string;
+  revokedAt: Date;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 export interface SessionSecurityNotifier {
@@ -191,14 +194,16 @@ export class SessionService {
       return;
     }
 
+    const revokedAt = this.now();
     await this.prisma.userSession.update({
       where: { id: sessionId },
-      data: { revokedAt: this.now() },
+      data: { revokedAt },
     });
 
     this.logger.info("Authentication session revoked", {
       sessionId,
       userId: session.userId,
+      revokedAt: revokedAt.toISOString(),
       reason,
     });
 
@@ -206,6 +211,9 @@ export class SessionService {
       sessionId,
       userId: session.userId,
       reason,
+      revokedAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
     });
   }
 

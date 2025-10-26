@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PrismaClient, User } from "@prisma/client";
 
 import { createDeviceFingerprint } from "@/lib/crypto/fingerprint.js";
+import type { EmailService } from "@/lib/email/email.service.js";
 import type { createChildLogger } from "@/lib/logger.js";
+import { createTestConfig } from "@/testing/config.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { AuthService } from "../auth.service.js";
 import type { AuthRequestContext, AuthUserProfile } from "../auth.service.js";
-import type { EmailService } from "../email.service.js";
 import type { RbacService } from "../rbac.service.js";
 import type { SecurityEventService } from "../security-event.service.js";
 import type { SessionDeviceMetadata, SessionService } from "../session.service.js";
@@ -38,7 +39,7 @@ interface InternalAuthService {
 }
 
 const createConfig = (): ApplicationConfig =>
-  ({
+  createTestConfig({
     app: {
       environment: "test",
       apiBaseUrl: "https://api.example.com",
@@ -70,12 +71,18 @@ const createConfig = (): ApplicationConfig =>
         passwordReset: { ttlSeconds: 3600 },
       },
     },
-  }) as unknown as ApplicationConfig;
+  });
 
 interface PrismaMock {
   user: {
     findUnique: jest.Mock;
     update: jest.Mock;
+  };
+  userSession: {
+    findFirst: jest.MockedFunction<
+      (args?: Record<string, unknown>) => Promise<{ id: string } | null>
+    >;
+    findMany: jest.MockedFunction<(args?: Record<string, unknown>) => Promise<{ id: string }[]>>;
   };
 }
 
@@ -84,6 +91,10 @@ const createPrismaMock = (): PrismaMock =>
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
+    },
+    userSession: {
+      findFirst: jest.fn(async () => null) as PrismaMock["userSession"]["findFirst"],
+      findMany: jest.fn(async () => []) as PrismaMock["userSession"]["findMany"],
     },
   }) as unknown as PrismaMock;
 
@@ -108,22 +119,61 @@ const createSessionServiceMock = (): SessionService =>
     createSession: jest.fn(),
   }) as unknown as SessionService;
 
-const createTokenServiceMock = (): TokenService =>
-  ({
+const createTokenServiceMock = (): jest.Mocked<TokenService> => {
+  const refreshExpires = new Date(fixedNow.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const accessExpires = new Date(fixedNow.getTime() + 15 * 60 * 1000);
+
+  const defaultRefreshToken = {
+    token: "refresh-token",
+    expiresAt: refreshExpires,
+    payload: {
+      sub: "user_default",
+      sessionId: "session_default",
+      jti: "refresh_default",
+      exp: Math.floor(refreshExpires.getTime() / 1000),
+      iat: Math.floor(fixedNow.getTime() / 1000),
+    },
+  };
+
+  const defaultAccessToken = {
+    token: "access-token",
+    expiresAt: accessExpires,
+    payload: {
+      sub: "user_default",
+      email: "default@example.com",
+      roleIds: [],
+      permissions: [],
+      sessionId: "session_default",
+      jti: "access_default",
+      exp: Math.floor(accessExpires.getTime() / 1000),
+      iat: Math.floor(fixedNow.getTime() / 1000),
+    },
+  };
+
+  const tokenService: jest.Mocked<TokenService> = {
     verifyRefreshToken: jest.fn(),
     rotateRefreshToken: jest.fn(),
     revokeToken: jest.fn(),
     generateAccessToken: jest.fn(),
     generateRefreshToken: jest.fn(),
-  }) as unknown as TokenService;
+  } as unknown as jest.Mocked<TokenService>;
+
+  tokenService.generateAccessToken.mockResolvedValue(defaultAccessToken);
+  tokenService.generateRefreshToken.mockResolvedValue(defaultRefreshToken);
+
+  return tokenService;
+};
 
 const createEmailServiceMock = (): EmailService =>
   ({
+    sendWelcomeEmail: jest.fn(),
     sendVerificationEmail: jest.fn(),
     sendPasswordResetEmail: jest.fn(),
     sendPasswordChangedNotification: jest.fn(),
     sendAccountLockoutNotification: jest.fn(),
     sendNewDeviceLoginAlert: jest.fn(),
+    sendSessionRevokedNotification: jest.fn(),
+    sendTwoFactorSetupEmail: jest.fn(),
     sendSecurityAlertEmail: jest.fn(),
   }) as unknown as EmailService;
 
@@ -436,6 +486,222 @@ describe("AuthService internal helpers", () => {
       expect(mockedCreateDeviceFingerprint).toHaveBeenCalledWith(
         expect.objectContaining({
           secret: "fingerprint-secret",
+        }),
+      );
+    });
+  });
+
+  describe("issueSessionAndTokens", () => {
+    it("marks device as new when fingerprint has not been seen", async () => {
+      const prisma = createPrismaMock();
+      const sessionService = createSessionServiceMock();
+      const refreshExpiry = new Date(fixedNow.getTime() + 30 * 60 * 1000);
+      const accessExpiry = new Date(fixedNow.getTime() + 15 * 60 * 1000);
+      const tokenService = createTokenServiceMock();
+
+      tokenService.generateRefreshToken.mockResolvedValue({
+        token: "refresh-token",
+        expiresAt: refreshExpiry,
+        payload: {
+          sub: "user_issue",
+          sessionId: "session_new",
+          jti: "refresh_jti",
+          exp: Math.floor(refreshExpiry.getTime() / 1000),
+          iat: Math.floor(fixedNow.getTime() / 1000),
+        },
+      });
+      tokenService.generateAccessToken.mockResolvedValue({
+        token: "access-token",
+        expiresAt: accessExpiry,
+        payload: {
+          sub: "user_issue",
+          email: "device@example.com",
+          roleIds: [],
+          permissions: [],
+          sessionId: "session_new",
+          jti: "access_jti",
+          exp: Math.floor(accessExpiry.getTime() / 1000),
+          iat: Math.floor(fixedNow.getTime() / 1000),
+        },
+      });
+
+      (prisma.userSession.findFirst as PrismaMock["userSession"]["findFirst"]).mockResolvedValue(
+        null,
+      );
+      mockedCreateDeviceFingerprint.mockReturnValue("fingerprint-new");
+
+      const { service } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        sessionService,
+        tokenService,
+      });
+
+      const internal = service as unknown as {
+        issueSessionAndTokens: (
+          user: User,
+          device: SessionDeviceMetadata,
+        ) => Promise<{ newDevice: boolean; sessionId: string }>;
+      };
+
+      const result = await internal.issueSessionAndTokens(
+        {
+          id: "user_issue",
+          email: "device@example.com",
+          passwordHash: "hash",
+          firstName: "Device",
+          lastName: "User",
+          phone: null,
+          emailVerified: true,
+          emailVerifiedAt: fixedNow,
+          failedLoginCount: 0,
+          lockoutUntil: null,
+          twoFactorSecret: null,
+          twoFactorEnabled: false,
+          status: "ACTIVE",
+          createdAt: fixedNow,
+          updatedAt: fixedNow,
+        } as unknown as User,
+        {
+          ipAddress: "203.0.113.55",
+          userAgent: "UnitTest/1.0",
+          accept: "application/json",
+        },
+      );
+
+      expect(result.newDevice).toBe(true);
+      expect(prisma.userSession.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: "user_issue",
+          fingerprint: "fingerprint-new",
+        },
+        select: { id: true },
+      });
+      expect(sessionService.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: result.sessionId,
+          userId: "user_issue",
+          refreshToken: "refresh-token",
+        }),
+      );
+    });
+
+    it("recognises existing devices when fingerprint matches", async () => {
+      const prisma = createPrismaMock();
+      (prisma.userSession.findFirst as PrismaMock["userSession"]["findFirst"]).mockResolvedValue({
+        id: "existing",
+      });
+      const sessionService = createSessionServiceMock();
+      const tokenService = createTokenServiceMock();
+
+      tokenService.generateRefreshToken.mockResolvedValue({
+        token: "refresh-token",
+        expiresAt: fixedNow,
+        payload: {
+          sub: "user_issue",
+          sessionId: "session_existing",
+          jti: "refresh_jti",
+          exp: Math.floor(fixedNow.getTime() / 1000),
+          iat: Math.floor(fixedNow.getTime() / 1000),
+        },
+      });
+      tokenService.generateAccessToken.mockResolvedValue({
+        token: "access-token",
+        expiresAt: fixedNow,
+        payload: {
+          sub: "user_issue",
+          email: "device@example.com",
+          roleIds: [],
+          permissions: [],
+          sessionId: "session_existing",
+          jti: "access_jti",
+          exp: Math.floor(fixedNow.getTime() / 1000),
+          iat: Math.floor(fixedNow.getTime() / 1000),
+        },
+      });
+
+      mockedCreateDeviceFingerprint.mockReturnValue("fingerprint-existing");
+
+      const { service } = createAuthService({
+        prisma: prisma as unknown as PrismaClient,
+        sessionService,
+        tokenService,
+      });
+
+      const internal = service as unknown as {
+        issueSessionAndTokens: (
+          user: User,
+          device: SessionDeviceMetadata,
+        ) => Promise<{ newDevice: boolean }>;
+      };
+
+      const result = await internal.issueSessionAndTokens(
+        {
+          id: "user_issue",
+          email: "device@example.com",
+          passwordHash: "hash",
+          firstName: "Device",
+          lastName: "User",
+          phone: null,
+          emailVerified: true,
+          emailVerifiedAt: fixedNow,
+          failedLoginCount: 0,
+          lockoutUntil: null,
+          twoFactorSecret: null,
+          twoFactorEnabled: false,
+          status: "ACTIVE",
+          createdAt: fixedNow,
+          updatedAt: fixedNow,
+        } as unknown as User,
+        {
+          ipAddress: "203.0.113.55",
+          userAgent: "UnitTest/1.0",
+          accept: "application/json",
+        },
+      );
+
+      expect(result.newDevice).toBe(false);
+    });
+  });
+
+  describe("notifyNewDeviceLogin", () => {
+    it("sends formatted new device alert email", async () => {
+      const emailService = createEmailServiceMock();
+      const { service } = createAuthService({ emailService });
+
+      await (
+        service as unknown as {
+          notifyNewDeviceLogin: (user: User, device: SessionDeviceMetadata) => Promise<void>;
+        }
+      ).notifyNewDeviceLogin(
+        {
+          id: "user_email",
+          email: "notify@example.com",
+          passwordHash: "hash",
+          firstName: "Notify",
+          lastName: "User",
+          phone: null,
+          emailVerified: true,
+          emailVerifiedAt: fixedNow,
+          failedLoginCount: 0,
+          lockoutUntil: null,
+          twoFactorSecret: null,
+          twoFactorEnabled: false,
+          status: "ACTIVE",
+          createdAt: fixedNow,
+          updatedAt: fixedNow,
+        } as unknown as User,
+        {
+          ipAddress: "198.51.100.24",
+          userAgent: "UnitTest/2.0",
+          accept: "application/json",
+        },
+      );
+
+      expect(emailService.sendNewDeviceLoginAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "notify@example.com",
+          deviceSummary: expect.stringContaining("UnitTest/2.0"),
+          ipAddress: "198.51.100.24",
         }),
       );
     });

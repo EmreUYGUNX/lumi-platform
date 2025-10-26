@@ -31,6 +31,9 @@ interface AdminRouterOptions {
   accountSecurityService?: AccountSecurityService;
 }
 
+const USER_ID_REQUIRED_ERROR = "User identifier is required.";
+const USER_AGENT_HEADER = "user-agent";
+
 /**
  * @openapi
  * /api/v1/admin/users:
@@ -216,7 +219,7 @@ export const createAdminRouter = (
         type: "admin_access_granted",
         userId: req.user?.id,
         ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        userAgent: req.get(USER_AGENT_HEADER) ?? undefined,
         payload: {
           method: req.method,
           path: req.originalUrl,
@@ -238,7 +241,7 @@ export const createAdminRouter = (
         type: "admin_access_attempt",
         userId: req.user?.id,
         ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        userAgent: req.get(USER_AGENT_HEADER) ?? undefined,
         payload: {
           method: req.method,
           path: req.originalUrl,
@@ -286,11 +289,11 @@ export const createAdminRouter = (
       const userId = req.params.userId?.trim();
 
       if (!userId) {
-        throw new ValidationError("User identifier is required.", {
+        throw new ValidationError(USER_ID_REQUIRED_ERROR, {
           issues: [
             {
               path: "userId",
-              message: "User identifier is required.",
+              message: USER_ID_REQUIRED_ERROR,
             },
           ],
         });
@@ -312,7 +315,7 @@ export const createAdminRouter = (
         performedBy: req.user.id,
         reason: parseResult.data.reason,
         ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        userAgent: req.get(USER_AGENT_HEADER) ?? undefined,
       });
 
       logAdminAccess(req, { action: "unlock_user", targetUserId: userId });

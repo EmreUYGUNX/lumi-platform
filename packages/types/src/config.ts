@@ -140,6 +140,61 @@ export interface AuthSessionConfig {
   maxLoginAttempts: number;
 }
 
+export interface EmailSmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  username?: string;
+  password?: string;
+  tls: {
+    rejectUnauthorized: boolean;
+  };
+}
+
+export type EmailQueueDriver = "inline" | "memory" | "bullmq";
+
+export interface EmailQueueConfig {
+  driver: EmailQueueDriver;
+  concurrency: number;
+}
+
+export interface EmailRateLimitConfig {
+  windowSeconds: number;
+  maxPerRecipient: number;
+}
+
+export interface EmailTemplateBrandingConfig {
+  productName: string;
+  supportEmail: string;
+  supportUrl?: string;
+}
+
+export interface EmailTemplateConfig {
+  baseUrl: string;
+  branding: EmailTemplateBrandingConfig;
+  defaultLocale: string;
+}
+
+export interface EmailConfig {
+  enabled: boolean;
+  defaultSender: {
+    email: string;
+    name?: string;
+    replyTo?: string;
+  };
+  signingSecret: string;
+  transport: {
+    driver: "smtp";
+    smtp: EmailSmtpConfig;
+  };
+  rateLimit: EmailRateLimitConfig;
+  queue: EmailQueueConfig;
+  logging: {
+    deliveries: boolean;
+  };
+  template: EmailTemplateConfig;
+}
+
 export interface AuthConfig {
   jwt: {
     access: AuthTokenConfig;
@@ -180,6 +235,30 @@ export interface ResolvedEnvironment {
   jwtRefreshTtlSeconds: number;
   cookieDomain?: string;
   cookieSecret: string;
+  email: {
+    enabled: boolean;
+    defaultSender: {
+      email: string;
+      name?: string;
+      replyTo?: string;
+    };
+    signingSecret: string;
+    transport: {
+      driver: "smtp";
+      smtp: EmailSmtpConfig;
+    };
+    rateLimit: EmailRateLimitConfig;
+    queue: EmailQueueConfig;
+    logging: {
+      deliveries: boolean;
+    };
+    template: {
+      baseUrl: string;
+      supportEmail: string;
+      supportUrl?: string;
+      defaultLocale: string;
+    };
+  };
   emailVerificationTtlSeconds: number;
   passwordResetTtlSeconds: number;
   sessionFingerprintSecret: string;
@@ -250,6 +329,7 @@ export interface ApplicationConfig {
     alerting: AlertingConfig;
     health: HealthConfig;
   };
+  email: EmailConfig;
   featureFlags: FeatureFlagMap;
   runtime: {
     ci: boolean;

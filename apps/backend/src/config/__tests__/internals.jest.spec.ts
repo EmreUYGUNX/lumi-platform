@@ -34,6 +34,26 @@ const REQUIRED_ENV = {
   SESSION_FINGERPRINT_SECRET: "fingerprint-secret-placeholder-32chars!!",
   LOCKOUT_DURATION: "15m",
   MAX_LOGIN_ATTEMPTS: "5",
+  EMAIL_ENABLED: "true",
+  EMAIL_FROM_ADDRESS: "notifications@lumi.dev",
+  EMAIL_FROM_NAME: "Lumi Notifications",
+  EMAIL_REPLY_TO_ADDRESS: "reply@lumi.dev",
+  EMAIL_SIGNING_SECRET: "email-signing-secret-placeholder-value-32!!",
+  EMAIL_SMTP_HOST: "localhost",
+  EMAIL_SMTP_PORT: "1025",
+  EMAIL_SMTP_SECURE: "false",
+  EMAIL_SMTP_USERNAME: "mailer",
+  EMAIL_SMTP_PASSWORD: "mailer-password",
+  EMAIL_SMTP_TLS_REJECT_UNAUTHORIZED: "false",
+  EMAIL_RATE_LIMIT_WINDOW: "2m",
+  EMAIL_RATE_LIMIT_MAX_PER_RECIPIENT: "8",
+  EMAIL_QUEUE_DRIVER: "inline",
+  EMAIL_QUEUE_CONCURRENCY: "4",
+  EMAIL_LOG_DELIVERIES: "true",
+  EMAIL_TEMPLATE_BASE_URL: "http://localhost:3100/app",
+  EMAIL_SUPPORT_ADDRESS: "support@lumi.dev",
+  EMAIL_SUPPORT_URL: "https://support.lumi.dev",
+  EMAIL_TEMPLATE_DEFAULT_LOCALE: "en-GB",
 } as const;
 
 interface ConfigInternals {
@@ -126,6 +146,49 @@ const createAuthSection = (): ApplicationConfig["auth"] => ({
   },
 });
 
+const createEmailSection = (): ApplicationConfig["email"] => ({
+  enabled: true,
+  defaultSender: {
+    email: "notifications@lumi.dev",
+    name: "Lumi Notifications",
+    replyTo: "reply@lumi.dev",
+  },
+  signingSecret: "email-signing-secret-placeholder-value-32!!",
+  transport: {
+    driver: "smtp" as const,
+    smtp: {
+      host: "localhost",
+      port: 1025,
+      secure: false,
+      username: "mailer",
+      password: "mailer-password",
+      tls: {
+        rejectUnauthorized: false,
+      },
+    },
+  },
+  rateLimit: {
+    windowSeconds: 120,
+    maxPerRecipient: 8,
+  },
+  queue: {
+    driver: "inline",
+    concurrency: 4,
+  },
+  logging: {
+    deliveries: true,
+  },
+  template: {
+    baseUrl: "http://localhost:3100/app",
+    defaultLocale: "en-GB",
+    branding: {
+      productName: "Lumi",
+      supportEmail: "support@lumi.dev",
+      supportUrl: "https://support.lumi.dev",
+    },
+  },
+});
+
 describe("configuration internals", () => {
   let internals: ConfigInternals;
   let restoreEnv: NodeJS.ProcessEnv;
@@ -181,6 +244,7 @@ describe("configuration internals", () => {
       storage: { bucket: "lumi-local" },
       security: createSecuritySection(),
       auth: createAuthSection(),
+      email: createEmailSection(),
       observability: {
         sentryDsn: undefined,
         logs: {
@@ -247,6 +311,7 @@ describe("configuration internals", () => {
       storage: { bucket: "lumi-local" },
       security: createSecuritySection(),
       auth: createAuthSection(),
+      email: createEmailSection(),
       observability: {
         sentryDsn: undefined,
         logs: {

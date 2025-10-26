@@ -55,6 +55,8 @@ export const mergeTestOverrides = <T>(...overrides: DeepPartial<T>[]): DeepParti
   return accumulator;
 };
 
+const LOCAL_FRONTEND_ORIGIN = "http://localhost:3100";
+
 export const createTestConfig = (
   overrides: DeepPartial<ApplicationConfig> = {},
 ): ApplicationConfig => {
@@ -64,7 +66,7 @@ export const createTestConfig = (
       environment: "test",
       port: 4100,
       apiBaseUrl: "http://localhost:4100",
-      frontendUrl: "http://localhost:3100",
+      frontendUrl: LOCAL_FRONTEND_ORIGIN,
       logLevel: "info",
     },
     database: {
@@ -89,7 +91,7 @@ export const createTestConfig = (
       jwtSecret: "abcdefghijklmnopqrstuvwxyzABCDEF",
       cors: {
         enabled: true,
-        allowedOrigins: ["http://localhost:3100"],
+        allowedOrigins: [LOCAL_FRONTEND_ORIGIN],
         allowedMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
         exposedHeaders: ["X-Request-Id"],
@@ -170,6 +172,48 @@ export const createTestConfig = (
         maxLoginAttempts: 5,
       },
     },
+    email: {
+      enabled: true,
+      defaultSender: {
+        email: "notifications@lumi.dev",
+        name: "Lumi Notifications",
+        replyTo: "support@lumi.dev",
+      },
+      signingSecret: "email-signing-secret-placeholder-value-32!!",
+      transport: {
+        driver: "smtp",
+        smtp: {
+          host: "localhost",
+          port: 1025,
+          secure: false,
+          username: "mailer",
+          password: "mailer-password",
+          tls: {
+            rejectUnauthorized: false,
+          },
+        },
+      },
+      rateLimit: {
+        windowSeconds: 120,
+        maxPerRecipient: 8,
+      },
+      queue: {
+        driver: "inline",
+        concurrency: 4,
+      },
+      logging: {
+        deliveries: true,
+      },
+      template: {
+        baseUrl: LOCAL_FRONTEND_ORIGIN,
+        defaultLocale: "en-US",
+        branding: {
+          productName: "Lumi Backend",
+          supportEmail: "support@lumi.dev",
+          supportUrl: `${LOCAL_FRONTEND_ORIGIN}/support`,
+        },
+      },
+    },
     observability: {
       sentryDsn: undefined,
       logs: {
@@ -219,5 +263,17 @@ export const createTestConfig = (
     },
   };
 
-  return deepMerge(baseConfig, overrides);
+  const merged = deepMerge(baseConfig, overrides);
+
+  if (merged?.email?.template?.branding) {
+    merged.email.template.branding.productName = merged.app.name;
+    if (!merged.email.template.branding.supportUrl) {
+      merged.email.template.branding.supportUrl = `${merged.app.frontendUrl.replace(/\/$/, "")}/support`;
+    }
+    if (!merged.email.template.baseUrl) {
+      merged.email.template.baseUrl = merged.app.frontendUrl;
+    }
+  }
+
+  return merged;
 };
