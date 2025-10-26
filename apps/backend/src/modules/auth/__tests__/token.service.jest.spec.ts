@@ -58,7 +58,7 @@ const authConfig: AuthConfig = {
   },
 };
 
-const createFixtures = async () => {
+const createFixtures = async (baseNow: Date = new Date()) => {
   const user: TokenServiceUser = {
     id: "user_1",
     email: "user@example.com",
@@ -69,7 +69,7 @@ const createFixtures = async () => {
     id: "session_1",
     userId: user.id,
     refreshTokenHash: await hashPassword("placeholder-refresh-token"),
-    expiresAt: new Date(Date.now() + authConfig.jwt.refresh.ttlSeconds * 1000),
+    expiresAt: new Date(baseNow.getTime() + authConfig.jwt.refresh.ttlSeconds * 1000),
     revokedAt: null, // eslint-disable-line unicorn/no-null -- Prisma schema stores null for active sessions
     fingerprint: null, // eslint-disable-line unicorn/no-null -- Prisma schema stores null for absent fingerprints
   };
@@ -183,6 +183,8 @@ describe("TokenService", () => {
   let sessionService: SessionService;
   let rbacService: RbacService;
   let rbacMock: jest.Mocked<RbacService>;
+  let currentNow: Date;
+  const getNow = () => new Date(currentNow.getTime());
 
   const createRbacStub = (): RbacService => {
     const stub = {
@@ -202,7 +204,8 @@ describe("TokenService", () => {
   };
 
   beforeEach(async () => {
-    const fixtures = await createFixtures();
+    currentNow = new Date();
+    const fixtures = await createFixtures(currentNow);
     userFixture = fixtures.user;
     sessionFixture = fixtures.session;
     blacklist = createStubBlacklist();
@@ -213,7 +216,7 @@ describe("TokenService", () => {
     sessionService = new SessionService({
       prisma,
       authConfig,
-      now: () => new Date(),
+      now: getNow,
     });
     rbacService = createRbacStub();
     rbacMock = rbacService as unknown as jest.Mocked<RbacService>;
@@ -225,6 +228,7 @@ describe("TokenService", () => {
       disableCleanupJob: true,
       sessionService,
       rbacService,
+      now: getNow,
     });
   });
 
@@ -287,5 +291,88 @@ describe("TokenService", () => {
     });
 
     await expect(service.verifyAccessToken(accessToken.token)).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("rejects expired access and refresh tokens", async () => {
+    const dateNowSpy = jest.spyOn(Date, "now").mockImplementation(() => currentNow.getTime());
+    try {
+      currentNow = new Date("2025-02-01T00:00:00.000Z");
+
+      const refreshedExpiry = new Date(
+        currentNow.getTime() + authConfig.jwt.refresh.ttlSeconds * 1000,
+      );
+      setSessionState({
+        expiresAt: refreshedExpiry,
+        revokedAt: null, // eslint-disable-line unicorn/no-null -- Prisma schema stores null for active sessions
+      });
+      sessionFixture = {
+        ...sessionFixture,
+        expiresAt: refreshedExpiry,
+        revokedAt: null, // eslint-disable-line unicorn/no-null -- Prisma schema stores null for active sessions
+      };
+
+      const accessToken = await service.generateAccessToken({
+        user: userFixture,
+        session: sessionFixture,
+      });
+      const refreshToken = await service.generateRefreshToken({
+        user: userFixture,
+        session: sessionFixture,
+      });
+
+      const accessExpirySeconds = authConfig.jwt.access.ttlSeconds + 5;
+      currentNow = new Date(currentNow.getTime() + accessExpirySeconds * 1000);
+
+      await expect(service.verifyAccessToken(accessToken.token)).rejects.toMatchObject({
+        details: expect.objectContaining({ reason: "access_token_expired" }),
+      });
+
+      const refreshExpirySeconds = authConfig.jwt.refresh.ttlSeconds + 5;
+      currentNow = new Date(currentNow.getTime() + refreshExpirySeconds * 1000);
+
+      await expect(service.verifyRefreshToken(refreshToken.token)).rejects.toMatchObject({
+        details: expect.objectContaining({ reason: "refresh_token_expired" }),
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it("detects refresh token reuse and blacklists the compromised token", async () => {
+    const refreshToken = await service.generateRefreshToken({
+      user: userFixture,
+      session: sessionFixture,
+    });
+
+    const prismaMock = prisma as unknown as {
+      userSession: {
+        update: jest.Mock;
+        updateMany: jest.Mock;
+      };
+    };
+
+    await expect(service.verifyRefreshToken(refreshToken.token)).rejects.toMatchObject({
+      details: expect.objectContaining({ reason: "token_reuse_detected" }),
+    });
+
+    expect(prismaMock.userSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: sessionFixture.id } }),
+    );
+    expect(prismaMock.userSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: sessionFixture.userId }),
+      }),
+    );
+
+    await expect(blacklist.has(refreshToken.payload.jti)).resolves.toBe(true);
+
+    await expect(
+      sessionService.validateSession({
+        sessionId: sessionFixture.id,
+        expectedUserId: userFixture.id,
+      }),
+    ).rejects.toMatchObject({
+      details: expect.objectContaining({ reason: "session_revoked" }),
+    });
   });
 });

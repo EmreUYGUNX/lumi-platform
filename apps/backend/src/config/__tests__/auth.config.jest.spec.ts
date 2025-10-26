@@ -77,4 +77,17 @@ describe("buildAuthConfig", () => {
       }),
     ).rejects.toThrow("JWT_ACCESS_TTL must be at least 60 seconds");
   });
+
+  it("rejects weak JWT secrets to enforce S4 compliance", async () => {
+    await expect(
+      withTemporaryEnvironment(
+        createEnv({
+          JWT_ACCESS_SECRET: "short-secret",
+        }),
+        async (resolvedEnv) => {
+          buildAuthConfig(resolvedEnv);
+        },
+      ),
+    ).rejects.toThrow(/JWT_ACCESS_SECRET must be at least 32 characters/);
+  });
 });

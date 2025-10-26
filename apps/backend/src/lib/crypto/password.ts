@@ -2,7 +2,21 @@ import { timingSafeEqual } from "node:crypto";
 
 import bcrypt from "bcryptjs";
 
-export const BCRYPT_SALT_ROUNDS = 12;
+const DEFAULT_BCRYPT_SALT_ROUNDS = 12;
+const TEST_BCRYPT_SALT_ROUNDS = 6;
+
+const parseSaltRounds = (value: string | undefined): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+export const BCRYPT_SALT_ROUNDS =
+  parseSaltRounds(process.env.BCRYPT_SALT_ROUNDS) ??
+  (process.env.NODE_ENV === "test" ? TEST_BCRYPT_SALT_ROUNDS : DEFAULT_BCRYPT_SALT_ROUNDS);
 
 export type PasswordValidationErrorCode =
   | "min_length"

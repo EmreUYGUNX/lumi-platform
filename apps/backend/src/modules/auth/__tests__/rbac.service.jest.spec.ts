@@ -437,4 +437,10 @@ describe("RbacService", () => {
 
     expect(allowed).toBe(true);
   });
+
+  it("explicitly invalidates cached permissions for a user", async () => {
+    await service.invalidateUserPermissions("user_admin");
+
+    expect(cache.delete).toHaveBeenCalledWith("user_admin");
+  });
 });
