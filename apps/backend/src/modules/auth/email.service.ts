@@ -36,6 +36,11 @@ export interface NewDeviceLoginEmailPayload extends BaseEmailPayload {
   time: Date;
 }
 
+export interface SecurityAlertEmailPayload extends BaseEmailPayload {
+  category: string;
+  metadata?: Record<string, unknown>;
+}
+
 const buildUrl = (base: string, path: string, params: Record<string, string>): string => {
   const url = new URL(path, base);
   Object.entries(params).forEach(([key, value]) => {
@@ -97,6 +102,14 @@ export class EmailService {
       deviceSummary: payload.deviceSummary,
       ipAddress: payload.ipAddress,
       time: payload.time.toISOString(),
+    });
+  }
+
+  async sendSecurityAlertEmail(payload: SecurityAlertEmailPayload): Promise<void> {
+    this.logger.error("Queued security alert email", {
+      to: payload.to,
+      category: payload.category,
+      metadata: payload.metadata,
     });
   }
 }

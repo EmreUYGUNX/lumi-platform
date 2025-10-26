@@ -4,6 +4,9 @@ import express from "express";
 import request from "supertest";
 import Transport from "winston-transport";
 
+import type { AccountSecurityService } from "@/modules/auth/account-security.service.js";
+import type { SecurityEventService } from "@/modules/auth/security-event.service.js";
+
 import { resetEnvironmentCache } from "../../config/env.js";
 import { registerLogTransport, unregisterLogTransport } from "../../lib/logger.js";
 import { registerErrorHandlers } from "../../middleware/errorHandler.js";
@@ -13,6 +16,32 @@ import * as RbacModule from "../../modules/auth/rbac.service.js";
 import type { AccessTokenClaims, AuthenticatedUser } from "../../modules/auth/token.types.js";
 import { createTestConfig } from "../../testing/config.js";
 import { createAdminRouter } from "../admin.js";
+
+const unlockAccountMock = jest.fn(() => Promise.resolve());
+jest.mock("@/modules/auth/account-security.service.js", () => ({
+  createAccountSecurityService: jest.fn(() => ({
+    unlockUserAccount: unlockAccountMock,
+  })),
+}));
+
+const securityEventLogMock = jest.fn(() => Promise.resolve());
+jest.mock("@/modules/auth/security-event.service.js", () => ({
+  createSecurityEventService: jest.fn(() => ({
+    log: securityEventLogMock,
+  })),
+}));
+
+const buildAdminRouterOptions = (): {
+  securityEvents: SecurityEventService;
+  accountSecurityService: AccountSecurityService;
+} => ({
+  securityEvents: {
+    log: securityEventLogMock,
+  } as unknown as SecurityEventService,
+  accountSecurityService: {
+    unlockUserAccount: unlockAccountMock,
+  } as unknown as AccountSecurityService,
+});
 
 class MemoryTransport extends Transport {
   public readonly events: Record<string, unknown>[] = [];
@@ -90,6 +119,8 @@ const parseResponseBody = (response: request.Response): Record<string, unknown> 
 afterEach(() => {
   resetEnvironmentCache();
   jest.restoreAllMocks();
+  unlockAccountMock.mockReset();
+  securityEventLogMock.mockReset();
 });
 
 describe("admin router placeholders", () => {
@@ -102,9 +133,10 @@ describe("admin router placeholders", () => {
     const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
     const app = express();
     app.use(rateLimiterBundle.global);
+    app.use(express.json());
 
     try {
-      app.use("/admin", createAdminRouter(config));
+      app.use("/admin", createAdminRouter(config, buildAdminRouterOptions()));
       registerErrorHandlers(app, config);
 
       const response = await request(app).get("/admin/users").expect(401);
@@ -132,10 +164,14 @@ describe("admin router placeholders", () => {
   it("registers placeholder routes with the provided registrar", () => {
     const registerRoute = jest.fn();
 
-    createAdminRouter(createTestConfig(), { registerRoute });
+    createAdminRouter(createTestConfig(), {
+      registerRoute,
+      ...buildAdminRouterOptions(),
+    });
 
     expect(registerRoute).toHaveBeenCalledWith("GET", "/users");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/users");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/users/:userId/unlock");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/audit-log");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/reports/sales");
   });
@@ -149,6 +185,7 @@ describe("admin router placeholders", () => {
     const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
     const app = express();
     app.use(rateLimiterBundle.global);
+    app.use(express.json());
 
     try {
       const rbacStub = createRbacStub();
@@ -164,7 +201,7 @@ describe("admin router placeholders", () => {
         next();
       });
 
-      app.use("/admin", createAdminRouter(config));
+      app.use("/admin", createAdminRouter(config, buildAdminRouterOptions()));
       registerErrorHandlers(app, config);
 
       const response = await request(app).get("/admin/users").expect(403);
@@ -194,6 +231,7 @@ describe("admin router placeholders", () => {
     const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
     const app = express();
     app.use(rateLimiterBundle.global);
+    app.use(express.json());
 
     const rbacStub = createRbacStub({
       hasRole: jest.fn(async () => true),
@@ -213,7 +251,7 @@ describe("admin router placeholders", () => {
       next();
     });
 
-    app.use("/admin", createAdminRouter(config));
+    app.use("/admin", createAdminRouter(config, buildAdminRouterOptions()));
     registerErrorHandlers(app, config);
 
     const response = await request(app).get("/admin/reports/sales").expect(200);
@@ -229,6 +267,59 @@ describe("admin router placeholders", () => {
     await rateLimiterBundle.cleanup();
   });
 
+  it("allows administrators to unlock user accounts manually", async () => {
+    const config = createTestConfig();
+    const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
+    const app = express();
+    app.use(rateLimiterBundle.global);
+    app.use(express.json());
+
+    const rbacStub = createRbacStub({
+      hasRole: jest.fn(async () => true),
+    });
+    jest
+      .spyOn(RbacModule, "getSharedRbacService")
+      .mockReturnValue(rbacStub as unknown as RbacService);
+
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "admin_1",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
+      next();
+    });
+
+    app.use("/admin", createAdminRouter(config, buildAdminRouterOptions()));
+    registerErrorHandlers(app, config);
+
+    try {
+      const response = await request(app)
+        .post("/admin/users/user_42/unlock")
+        .set("user-agent", "JestAgent/1.0")
+        .set("content-type", "application/json")
+        .send(JSON.stringify({ reason: "support reset" }))
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          message: expect.stringContaining("unlocked"),
+        },
+      });
+
+      expect(unlockAccountMock).toHaveBeenCalledWith({
+        userId: "user_42",
+        performedBy: "admin_1",
+        reason: "support reset",
+        ipAddress: expect.any(String),
+        userAgent: "JestAgent/1.0",
+      });
+      expect(securityEventLogMock).toHaveBeenCalled();
+    } finally {
+      await rateLimiterBundle.cleanup();
+    }
+  });
+
   it("logs each unauthorised attempt with request metadata", async () => {
     const transportName = `admin-router-test-${Date.now()}-meta`;
     const transport = new MemoryTransport("warn");
@@ -238,9 +329,10 @@ describe("admin router placeholders", () => {
     const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
     const app = express();
     app.use(rateLimiterBundle.global);
+    app.use(express.json());
 
     try {
-      app.use("/admin", createAdminRouter(config));
+      app.use("/admin", createAdminRouter(config, buildAdminRouterOptions()));
       registerErrorHandlers(app, config);
 
       await request(app)
