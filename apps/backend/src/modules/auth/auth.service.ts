@@ -459,7 +459,6 @@ export class AuthService implements AuthServiceContract {
     if (sessionResult.newDevice) {
       await this.notifyNewDeviceLogin(account, context.device);
     }
-
     const profile = await this.buildUserProfile(account.id);
 
     return {
