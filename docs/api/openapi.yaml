@@ -147,7 +147,7 @@ components:
             type: string
         permissions:
           type: array
-          description: Normalised permission keys granted to the user.
+          description: Permission keys granted to the user.
           items:
             type: string
     AuthTokenEnvelope:
@@ -330,8 +330,7 @@ components:
         password:
           type: string
           minLength: 12
-          description: >
-            Must satisfy the platform password policy (minimum 12 characters, upper and lower case, number, special
+          description: Must satisfy the platform password policy (minimum 12 characters, upper and lower case, number, special
             character).
         firstName:
           type: string
@@ -403,8 +402,7 @@ components:
         newPassword:
           type: string
           minLength: 12
-          description: >
-            Replacement password that must satisfy the platform policy and differ from the current password.
+          description: Replacement password that must satisfy the platform policy and differ from the current password.
     HealthComponent:
       type: object
       required:
@@ -1727,12 +1725,11 @@ components:
 paths:
   /api/v1/auth/register:
     post:
-      summary: Register a new user account
-      description: >
-        Creates a customer account and dispatches an email verification token. Passwords must satisfy
-        the platform policy and are hashed with bcrypt before storage.
       tags:
         - Auth
+      summary: Register a new user account
+      description: Creates a customer account and dispatches an email verification token. Passwords must satisfy the platform
+        policy and are hashed before storage.
       requestBody:
         required: true
         content:
@@ -1760,12 +1757,11 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/login:
     post:
-      summary: Authenticate with email and password
-      description: >
-        Validates credentials, records security telemetry, issues a new session, and returns access/refresh tokens.
-        The refresh token is also delivered as an HTTP-only, same-site cookie.
       tags:
         - Auth
+      summary: Authenticate with email and password
+      description: Validates credentials, records security telemetry, issues a new session, and returns access/refresh tokens.
+        The refresh token is also delivered as an HTTP-only, same-site cookie.
       requestBody:
         required: true
         content:
@@ -1777,9 +1773,9 @@ paths:
           description: Login succeeded and tokens were issued.
           headers:
             Set-Cookie:
+              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
               schema:
                 type: string
-              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
           content:
             application/json:
               schema:
@@ -1798,20 +1794,19 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/refresh:
     post:
-      summary: Rotate refresh token and obtain a new access token
-      description: >
-        Expects a valid signed refresh token via HTTP-only cookies. Performs replay detection, rotates the session,
-        and returns a fresh token pair.
       tags:
         - Auth
+      summary: Rotate refresh token and obtain a new access token
+      description: Expects a valid signed refresh token via HTTP-only cookies. Performs replay detection, rotates the session,
+        and returns a fresh token pair.
       responses:
         "200":
           description: Token rotation succeeded.
           headers:
             Set-Cookie:
+              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
               schema:
                 type: string
-              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
           content:
             application/json:
               schema:
@@ -1824,10 +1819,10 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/logout:
     post:
-      summary: Revoke the current session
-      description: Invalidates the active session and clears the refresh token cookie.
       tags:
         - Auth
+      summary: Revoke the current session
+      description: Invalidates the active session and clears the refresh token cookie.
       security:
         - bearerAuth: []
       responses:
@@ -1835,9 +1830,9 @@ paths:
           description: Session revoked successfully.
           headers:
             Set-Cookie:
+              description: Refresh token cookie cleared by setting an expired value.
               schema:
                 type: string
-              description: Refresh token cookie cleared by setting an expired value.
           content:
             application/json:
               schema:
@@ -1850,10 +1845,10 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/logout-all:
     post:
-      summary: Revoke all sessions for the authenticated user
-      description: Invalidates every active session associated with the caller and clears the refresh cookie.
       tags:
         - Auth
+      summary: Revoke all sessions for the authenticated user
+      description: Invalidates every active session associated with the caller and clears the refresh cookie.
       security:
         - bearerAuth: []
       responses:
@@ -1861,9 +1856,9 @@ paths:
           description: Active sessions revoked.
           headers:
             Set-Cookie:
+              description: Refresh token cookie cleared by setting an expired value.
               schema:
                 type: string
-              description: Refresh token cookie cleared by setting an expired value.
           content:
             application/json:
               schema:
@@ -1876,10 +1871,10 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/me:
     get:
-      summary: Retrieve the authenticated user profile
-      description: Returns the caller's profile, including roles and permissions resolved through RBAC.
       tags:
         - Auth
+      summary: Retrieve the authenticated user profile
+      description: Returns the caller's profile, including roles and permissions resolved through RBAC.
       security:
         - bearerAuth: []
       responses:
@@ -1897,12 +1892,11 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/verify-email:
     post:
-      summary: Confirm email using a verification token
-      description: >
-        Validates the verification token delivered by email, marks the user as verified, and revokes sessions if token
-        misuse is detected.
       tags:
         - Auth
+      summary: Confirm email using a verification token
+      description: Validates the verification token delivered by email, marks the user as verified, and revokes sessions if
+        token misuse is detected.
       requestBody:
         required: true
         content:
@@ -1930,10 +1924,10 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/resend-verification:
     post:
-      summary: Resend email verification for the authenticated user
-      description: Issues a new verification token provided the account is not already verified.
       tags:
         - Auth
+      summary: Resend email verification for the authenticated user
+      description: Issues a new verification token provided the account is not already verified.
       security:
         - bearerAuth: []
       responses:
@@ -1969,12 +1963,11 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/forgot-password:
     post:
-      summary: Initiate password reset
-      description: >
-        Sends a password reset email if the account exists. The response is intentionally generic to avoid user
-        enumeration.
       tags:
         - Auth
+      summary: Initiate password reset
+      description: Sends a password reset email if the account exists. The response is intentionally generic to avoid user
+        enumeration.
       requestBody:
         required: true
         content:
@@ -2002,11 +1995,10 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/reset-password:
     post:
-      summary: Complete password reset
-      description: >
-        Validates the reset token, updates the password, revokes active sessions, and logs a security event.
       tags:
         - Auth
+      summary: Complete password reset
+      description: Validates the reset token, updates the password, revokes active sessions, and logs a security event.
       requestBody:
         required: true
         content:
@@ -2034,12 +2026,11 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/change-password:
     put:
-      summary: Change password for the authenticated user
-      description: >
-        Validates the current password, enforces the password policy, updates stored credentials, and revokes other
-        sessions.
       tags:
         - Auth
+      summary: Change password for the authenticated user
+      description: Validates the current password, enforces the password policy, updates stored credentials, and revokes other
+        sessions.
       security:
         - bearerAuth: []
       requestBody:
@@ -2075,45 +2066,43 @@ paths:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/2fa/setup:
     post:
-      summary: Placeholder endpoint for two-factor enrolment
-      description: >
-        Currently returns a NOT_IMPLEMENTED response while the two-factor flow is under construction. Available to
-        authenticated callers for roadmap awareness.
       tags:
         - Auth
+      summary: Placeholder endpoint for two-factor enrolment
+      description: Currently returns a NOT_IMPLEMENTED response while the two-factor flow is under construction. Available to
+        authenticated callers for roadmap awareness.
       security:
         - bearerAuth: []
       responses:
-        "501":
-          description: Feature not yet implemented.
+        "401":
+          description: Caller is not authenticated.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StandardErrorResponse"
-        "401":
-          description: Caller is not authenticated.
+        "501":
+          description: Feature not yet implemented.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/auth/2fa/verify:
     post:
-      summary: Placeholder endpoint for two-factor verification
-      description: >
-        Returns NOT_IMPLEMENTED until two-factor verification is released. Helps clients detect feature availability.
       tags:
         - Auth
+      summary: Placeholder endpoint for two-factor verification
+      description: Returns NOT_IMPLEMENTED until two-factor verification is released. Helps clients detect feature availability.
       security:
         - bearerAuth: []
       responses:
-        "501":
-          description: Feature not yet implemented.
+        "401":
+          description: Caller is not authenticated.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StandardErrorResponse"
-        "401":
-          description: Caller is not authenticated.
+        "501":
+          description: Feature not yet implemented.
           content:
             application/json:
               schema:
