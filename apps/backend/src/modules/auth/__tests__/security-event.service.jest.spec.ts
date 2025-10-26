@@ -61,6 +61,7 @@ describe("SecurityEventService", () => {
     jest.clearAllMocks();
     captureMessageMock.mockClear();
     withScopeMock.mockClear();
+    jest.mocked(isSentryEnabled).mockReturnValue(false);
   });
 
   it("persists security events with associated user metadata", async () => {
@@ -166,5 +167,74 @@ describe("SecurityEventService", () => {
     );
     expect(logger.error).not.toHaveBeenCalled();
     expect(sentry).toBeDefined();
+  });
+
+  it("forwards permission violations to Sentry with warning severity", async () => {
+    const prisma = createPrismaMock();
+    const logger = createLoggerMock();
+    const service = new SecurityEventService({
+      prisma: prisma as unknown as PrismaClient,
+      logger,
+    });
+
+    jest.mocked(isSentryEnabled).mockReturnValue(true);
+    captureMessageMock.mockClear();
+    withScopeMock.mockClear();
+
+    await service.log({
+      type: "permission_denied",
+      userId: "user_perm",
+      ipAddress: "192.0.2.1",
+      userAgent: "JestAgent/1.0",
+      payload: {
+        requiredPermissions: ["admin:read"],
+      },
+    });
+
+    expect(withScopeMock).toHaveBeenCalledTimes(1);
+    expect(captureMessageMock).toHaveBeenCalledWith(
+      "Security event recorded: permission_denied",
+      "warning",
+    );
+  });
+
+  it("only forwards high-risk login failures to Sentry", async () => {
+    const prisma = createPrismaMock();
+    const logger = createLoggerMock();
+    const service = new SecurityEventService({
+      prisma: prisma as unknown as PrismaClient,
+      logger,
+    });
+
+    jest.mocked(isSentryEnabled).mockReturnValue(true);
+
+    await service.log({
+      type: "login_failed",
+      userId: "user_low",
+      severity: "info",
+      payload: {
+        failedLoginCount: 1,
+        locked: false,
+      },
+    });
+
+    expect(withScopeMock).not.toHaveBeenCalled();
+    expect(captureMessageMock).not.toHaveBeenCalled();
+
+    await service.log({
+      type: "login_failed",
+      userId: "user_high",
+      severity: "warning",
+      payload: {
+        failedLoginCount: 6,
+        locked: true,
+      },
+    });
+
+    expect(withScopeMock).toHaveBeenCalledTimes(1);
+    expect(captureMessageMock).toHaveBeenCalledWith(
+      "Security event recorded: login_failed",
+      "warning",
+    );
   });
 });

@@ -7,6 +7,7 @@ import {
   type SecurityEventService,
   createSecurityEventService,
 } from "@/modules/auth/security-event.service.js";
+import { recordPermissionViolation } from "@/observability/auth-metrics.js";
 
 interface AuthorizeResourceDependencies {
   logger: ReturnType<typeof createChildLogger>;
@@ -42,6 +43,8 @@ const handleMissingUser = async (
     method: req.method,
     requestId: req.id,
   });
+
+  recordPermissionViolation("unauthenticated");
 
   await logSecurityEventSafe(
     deps,
@@ -161,6 +164,8 @@ const resolveOwnerId = async (
       requestId: ctx.req.id,
     });
 
+    recordPermissionViolation("owner_unresolved");
+
     next(
       new ForbiddenError("You do not have permission to perform this action.", {
         details: {
@@ -232,6 +237,8 @@ export const createAuthorizeResourceMiddleware = (
       next();
       return;
     }
+
+    recordPermissionViolation("resource");
 
     logger.warn("Resource access denied", {
       userId: req.user.id,

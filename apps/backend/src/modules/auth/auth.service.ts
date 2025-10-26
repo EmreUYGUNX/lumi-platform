@@ -25,6 +25,14 @@ import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 import type { TokenPair } from "@/modules/auth/token.types.js";
+import {
+  recordAccountLockout,
+  recordLoginFailure,
+  recordLoginSuccess,
+  recordPasswordReset,
+  recordRegistration,
+  recordTokenRefresh,
+} from "@/observability/auth-metrics.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import {
@@ -363,6 +371,12 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("User registration completed", {
+      userId: user.id,
+      email: user.email,
+    });
+    recordRegistration("email_password");
+
     await this.emailService.sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName,
@@ -389,6 +403,14 @@ export class AuthService implements AuthServiceContract {
 
     if (!user) {
       const bruteForce = await this.bruteForceProtection.recordFailure(email);
+      recordLoginFailure("user_not_found");
+      this.logger.warn("Login attempt failed: account does not exist", {
+        email,
+        ipAddress: context.device.ipAddress,
+        userAgent: context.device.userAgent,
+        bruteForceAttempts: bruteForce.attempts,
+        captchaRequired: bruteForce.captchaRequired,
+      });
       await this.securityEvents.log({
         type: "login_failed",
         ipAddress: context.device.ipAddress,
@@ -416,6 +438,13 @@ export class AuthService implements AuthServiceContract {
     const account = await this.refreshLockoutState(user);
 
     if (account.status !== "ACTIVE") {
+      recordLoginFailure("account_inactive");
+      this.logger.warn("Login attempt blocked: account inactive", {
+        userId: account.id,
+        status: account.status,
+        ipAddress: context.device.ipAddress,
+        userAgent: context.device.userAgent,
+      });
       await this.securityEvents.log({
         type: "login_blocked_inactive",
         userId: account.id,
@@ -432,6 +461,14 @@ export class AuthService implements AuthServiceContract {
       const lockoutRemainingSeconds = this.getLockoutRemainingSeconds(account.lockoutUntil);
       const lockoutRemainingMinutes =
         lockoutRemainingSeconds > 0 ? Math.max(1, Math.ceil(lockoutRemainingSeconds / 60)) : 0;
+      recordLoginFailure("account_locked");
+      this.logger.warn("Login attempt blocked: account locked", {
+        userId: account.id,
+        ipAddress: context.device.ipAddress,
+        userAgent: context.device.userAgent,
+        lockoutUntil: account.lockoutUntil?.toISOString(),
+        lockoutRemainingSeconds,
+      });
       await this.securityEvents.log({
         type: "login_blocked_locked",
         userId: account.id,
@@ -486,6 +523,15 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("User login succeeded", {
+      userId: account.id,
+      sessionId: sessionResult.sessionId,
+      ipAddress: context.device.ipAddress,
+      userAgent: context.device.userAgent,
+      newDevice: sessionResult.newDevice,
+    });
+    recordLoginSuccess("password");
+
     if (sessionResult.newDevice) {
       await this.notifyNewDeviceLogin(account, context.device);
     }
@@ -533,6 +579,14 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("Refresh token rotation completed", {
+      userId: payload.sub,
+      sessionId: rotation.session.id,
+      previousTokenId: payload.jti,
+      nextTokenId: rotation.refreshToken.payload.jti,
+    });
+    recordTokenRefresh("success");
+
     return {
       user: profile,
       tokens: {
@@ -550,6 +604,7 @@ export class AuthService implements AuthServiceContract {
       userId,
       payload: { sessionId },
     });
+    this.logger.info("User logged out", { userId, sessionId });
     return { sessionId };
   }
 
@@ -560,6 +615,7 @@ export class AuthService implements AuthServiceContract {
       userId,
       payload: { revokedCount },
     });
+    this.logger.info("User logged out from all devices", { userId, revokedCount });
     return { revokedCount };
   }
 
@@ -622,6 +678,11 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("Email verification completed", {
+      userId: record.userId,
+      tokenId: record.id,
+    });
+
     const profile = await this.buildUserProfile(record.userId);
 
     return { user: profile };
@@ -669,6 +730,11 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("Verification email resent", {
+      userId,
+      tokenExpiresAt: verification.expiresAt.toISOString(),
+    });
+
     const profile = await this.buildUserProfile(userId);
 
     return { user: profile };
@@ -684,6 +750,10 @@ export class AuthService implements AuthServiceContract {
     });
 
     if (!user) {
+      this.logger.debug("Password reset requested for non-existent account", {
+        email: normalisedEmail,
+        ipAddress: context.device.ipAddress,
+      });
       return { success: true };
     }
 
@@ -715,6 +785,13 @@ export class AuthService implements AuthServiceContract {
         tokenExpiresAt: resetToken.expiresAt.toISOString(),
       },
     });
+
+    this.logger.info("Password reset requested", {
+      userId: user.id,
+      email: user.email,
+      tokenExpiresAt: resetToken.expiresAt.toISOString(),
+    });
+    recordPasswordReset("requested");
 
     return { success: true };
   }
@@ -787,6 +864,12 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("Password reset completed", {
+      userId: record.userId,
+      tokenId: record.id,
+    });
+    recordPasswordReset("completed");
+
     const profile = await this.buildUserProfile(record.userId);
 
     return { user: profile };
@@ -839,6 +922,11 @@ export class AuthService implements AuthServiceContract {
       },
     });
 
+    this.logger.info("Password changed by user", {
+      userId,
+      sessionId,
+    });
+
     const profile = await this.buildUserProfile(userId);
 
     return { user: profile };
@@ -878,6 +966,8 @@ export class AuthService implements AuthServiceContract {
       return;
     }
 
+    recordTokenRefresh("replay_detected");
+
     const userId = typeof details.userId === "string" ? details.userId : fallbackUserId;
     const sessionId = typeof details.sessionId === "string" ? details.sessionId : undefined;
     const revokedCount =
@@ -897,6 +987,14 @@ export class AuthService implements AuthServiceContract {
         email: true,
         firstName: true,
       },
+    });
+
+    this.logger.error("Refresh token replay detected", {
+      userId,
+      sessionId,
+      revokedSessions: revokedCount,
+      ipAddress: context.device.ipAddress,
+      userAgent: context.device.userAgent,
     });
 
     let userNotified = false;
@@ -996,6 +1094,18 @@ export class AuthService implements AuthServiceContract {
       ? new Date(this.now().getTime() + lockoutDurationSeconds * 1000)
       : null;
 
+    recordLoginFailure(shouldLock ? "account_locked" : "invalid_credentials");
+
+    this.logger.warn("Login attempt failed: invalid credentials", {
+      userId: user.id,
+      ipAddress: context.device.ipAddress,
+      userAgent: context.device.userAgent,
+      failedLoginCount: nextFailedCount,
+      maxLoginAttempts,
+      locked: shouldLock,
+      lockoutUntil: lockoutUntil?.toISOString(),
+    });
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -1037,6 +1147,14 @@ export class AuthService implements AuthServiceContract {
     }
 
     if (shouldLock && lockoutUntil) {
+      recordAccountLockout("failed_login");
+
+      this.logger.warn("Account locked after repeated failed login attempts", {
+        userId: user.id,
+        failedLoginCount: nextFailedCount,
+        lockoutUntil: lockoutUntil.toISOString(),
+      });
+
       await this.securityEvents.log({
         type: "account_locked",
         userId: user.id,

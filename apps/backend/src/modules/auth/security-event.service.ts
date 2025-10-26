@@ -35,6 +35,57 @@ const WARNING_EVENT_TYPES = new Set<string>([
   "account_unlock_manual",
 ]);
 
+type SentryLevel = "info" | "warning" | "error";
+
+const severityToSentryLevel = new Map<SecurityEventSeverity, SentryLevel>([
+  ["info", "info"],
+  ["warning", "warning"],
+  ["critical", "error"],
+]);
+
+const asBoolean = (value: unknown): boolean | undefined =>
+  typeof value === "boolean" ? value : undefined;
+
+const asNumber = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+};
+
+type SentryForwardPredicate = (payload?: SecurityEventPayload) => boolean;
+
+const SENTRY_ALERT_PREDICATES = new Map<string, SentryForwardPredicate>([
+  ["refresh_token_replay_detected", () => true],
+  ["account_locked", () => true],
+  ["permission_denied", () => true],
+  ["role_denied", () => true],
+  ["session_fingerprint_mismatch", () => true],
+  ["login_captcha_threshold", () => true],
+  [
+    "login_failed",
+    (payload) => {
+      const locked = asBoolean(payload?.locked);
+      if (locked) {
+        return true;
+      }
+
+      const failedCount = asNumber(payload?.failedLoginCount);
+      const bruteForceAttempts = asNumber(payload?.bruteForceAttempts);
+      const attempts = failedCount ?? bruteForceAttempts;
+      return typeof attempts === "number" && attempts >= 5;
+    },
+  ],
+]);
+
 const inferSeverity = (type: string, explicit?: SecurityEventSeverity): SecurityEventSeverity => {
   if (explicit) {
     return explicit;
@@ -83,15 +134,25 @@ export class SecurityEventService {
       return;
     }
 
-    if (severity !== "critical" || !isSentryEnabled()) {
+    if (!isSentryEnabled()) {
       return;
     }
+
+    const shouldForward =
+      severity === "critical" || SENTRY_ALERT_PREDICATES.get(type)?.(payload) === true;
+
+    if (!shouldForward) {
+      return;
+    }
+
+    const level = severityToSentryLevel.get(severity) ?? "info";
 
     try {
       const sentry = getSentryInstance();
       sentry.withScope((scope) => {
-        scope.setLevel("error");
+        scope.setLevel(level);
         scope.setTag("security_event_type", type);
+        scope.setTag("security_event_severity", severity);
         if (userId) {
           scope.setUser({ id: userId });
         }
@@ -100,7 +161,7 @@ export class SecurityEventService {
           userAgent: userAgent ?? undefined,
           payload,
         });
-        sentry.captureMessage(`Security event recorded: ${type}`, "error");
+        sentry.captureMessage(`Security event recorded: ${type}`, level);
       });
     } catch (error) {
       this.logger.error("Failed to forward security event to Sentry", {

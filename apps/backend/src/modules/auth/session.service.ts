@@ -8,6 +8,7 @@ import { hashPassword, timingSafeStringCompare } from "@/lib/crypto/password.js"
 import { UnauthorizedError } from "@/lib/errors.js";
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
+import { recordSessionRevoked } from "@/observability/auth-metrics.js";
 
 type SessionAuthConfig = ReturnType<typeof getAuthConfig>;
 
@@ -206,6 +207,7 @@ export class SessionService {
       revokedAt: revokedAt.toISOString(),
       reason,
     });
+    recordSessionRevoked(reason);
 
     await this.notifier?.handleSessionRevoked?.({
       sessionId,
@@ -229,6 +231,7 @@ export class SessionService {
 
     if (result.count > 0) {
       this.logger.info("Revoked active sessions for user", { userId, count: result.count, reason });
+      recordSessionRevoked(reason, result.count);
     } else {
       this.logger.debug("No active sessions found for user", { userId, reason });
     }
@@ -246,6 +249,10 @@ export class SessionService {
       },
       data: { revokedAt: now },
     });
+
+    if (result.count > 0) {
+      recordSessionRevoked("expired", result.count);
+    }
 
     return result.count;
   }
