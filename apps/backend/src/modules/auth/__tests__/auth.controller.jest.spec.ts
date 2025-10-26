@@ -57,6 +57,7 @@ const createMockResponse = (): MockResponse => {
 interface MockRequestOptions {
   body?: Record<string, unknown>;
   cookies?: Record<string, string>;
+  signedCookies?: Record<string, string>;
   user?: unknown;
   headers?: Record<string, string>;
 }
@@ -69,6 +70,7 @@ const createMockRequest = (options: MockRequestOptions = {}) => {
   return {
     body: options.body ?? {},
     cookies: options.cookies ?? {},
+    signedCookies: options.signedCookies ?? {},
     headers,
     ip: "192.168.1.10",
     user: options.user ?? undefined,
@@ -188,7 +190,10 @@ describe("AuthController", () => {
       path: "/api",
       domain: config.auth.cookies.domain,
       maxAge: config.auth.jwt.refresh.ttlSeconds * 1000,
+      secure: true,
+      signed: true,
     });
+    expect(refreshCookie.options?.expires).toEqual(refreshToken.expiresAt);
 
     expect(res.payload).toMatchObject({
       success: true,
@@ -255,7 +260,15 @@ describe("AuthController", () => {
     expect(clearedCookie).toMatchObject({
       name: "refreshToken",
       value: "",
-      options: expect.objectContaining({ maxAge: 0 }),
+      options: expect.objectContaining({
+        maxAge: 0,
+        path: "/api",
+        domain: config.auth.cookies.domain,
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        signed: true,
+      }),
     });
   });
 

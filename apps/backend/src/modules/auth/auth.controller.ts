@@ -108,9 +108,29 @@ const buildAuthContext = (req: Request): AuthRequestContext => ({
 });
 
 const resolveRefreshToken = (req: Request): string | undefined => {
-  const { cookies } = req;
-  const token = cookies?.refreshToken;
-  return typeof token === "string" ? token : undefined;
+  const requestWithSignedCookies = req as Request & {
+    signedCookies?: Record<string, unknown>;
+  };
+
+  const signedCookies = requestWithSignedCookies.signedCookies ?? {};
+  if (signedCookies && typeof signedCookies === "object") {
+    // eslint-disable-next-line security/detect-object-injection -- Cookie name is a controlled constant.
+    const signedToken = (signedCookies as Record<string, unknown>)[REFRESH_COOKIE_NAME];
+    if (typeof signedToken === "string" && signedToken.length > 0) {
+      return signedToken;
+    }
+  }
+
+  const cookies = req.cookies ?? {};
+  if (cookies && typeof cookies === "object" && REFRESH_COOKIE_NAME in cookies) {
+    // eslint-disable-next-line security/detect-object-injection -- Cookie name is a controlled constant.
+    const tokenCandidate = (cookies as Record<string, unknown>)[REFRESH_COOKIE_NAME];
+    if (typeof tokenCandidate === "string" && tokenCandidate.length > 0) {
+      return tokenCandidate;
+    }
+  }
+
+  return undefined;
 };
 
 export interface AuthControllerOptions {
@@ -399,6 +419,7 @@ export class AuthController {
       path: REFRESH_COOKIE_PATH,
       maxAge: this.config.auth.jwt.refresh.ttlSeconds * 1000,
       expires: expiresAt,
+      signed: true,
     });
   }
 
@@ -410,6 +431,8 @@ export class AuthController {
       domain: this.config.auth.cookies.domain,
       path: REFRESH_COOKIE_PATH,
       maxAge: 0,
+      expires: new Date(0),
+      signed: true,
     });
   }
 }

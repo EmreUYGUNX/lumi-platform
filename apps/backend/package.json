@@ -84,6 +84,7 @@
     "@faker-js/faker": "^9.1.0",
     "@types/pg": "^8.11.6",
     "autocannon": "^8.0.0",
+    "cookie-signature": "^1.2.2",
     "dotenv-cli": "^7.4.2",
     "embedded-postgres": "17.6.0-beta.15",
     "nodemon": "^3.1.7",

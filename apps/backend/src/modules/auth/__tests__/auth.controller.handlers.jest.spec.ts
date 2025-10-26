@@ -192,6 +192,7 @@ const createRequest = (overrides: Partial<Request> = {}): Request =>
   ({
     body: {},
     cookies: {},
+    signedCookies: {},
     headers: {},
     ip: "203.0.113.10",
     get: jest.fn((header: string): string | undefined => {
@@ -302,6 +303,7 @@ describe("AuthController handlers", () => {
     const controller = createController({ service });
     const req = createRequest({
       cookies: { refreshToken: "existing-token" },
+      signedCookies: { refreshToken: "existing-token" },
     });
     const { res, cookie } = createResponseMock();
 
@@ -315,6 +317,31 @@ describe("AuthController handlers", () => {
         secure: true,
         domain: "lumi.dev",
         path: "/api",
+        httpOnly: true,
+        sameSite: "strict",
+        signed: true,
+      }),
+    );
+  });
+
+  it("falls back to unsigned refresh cookies when signature is absent", async () => {
+    const service = createServiceStub();
+    const controller = createController({ service });
+    const req = createRequest({
+      cookies: { refreshToken: "unsigned-token" },
+      signedCookies: {},
+    });
+    const { res, cookie } = createResponseMock();
+
+    const internal = controller as unknown as InternalController;
+    await internal.handleRefresh(req, res);
+
+    expect(service.refresh).toHaveBeenCalledWith("unsigned-token", expect.any(Object));
+    expect(cookie).toHaveBeenCalledWith(
+      "refreshToken",
+      "new-refresh",
+      expect.objectContaining({
+        signed: true,
       }),
     );
   });
@@ -330,7 +357,16 @@ describe("AuthController handlers", () => {
     await internal.handleLogout(createRequest({ user: createAuthenticatedUser() }), res);
 
     expect(service.logout).toHaveBeenCalledWith("session_123", "user_123");
-    expect(cookie).toHaveBeenCalledWith("refreshToken", "", expect.objectContaining({ maxAge: 0 }));
+    expect(cookie).toHaveBeenCalledWith(
+      "refreshToken",
+      "",
+      expect.objectContaining({
+        maxAge: 0,
+        signed: true,
+        path: "/api",
+        sameSite: "strict",
+      }),
+    );
   });
 
   it("normalises email input during password reset requests", async () => {
@@ -365,6 +401,7 @@ describe("AuthController handlers", () => {
     const internal = controller as unknown as InternalController;
     const req = createRequest({
       cookies: { refreshToken: "token" },
+      signedCookies: { refreshToken: "token" },
     });
     const { res, cookie } = createResponseMock();
 
@@ -373,7 +410,7 @@ describe("AuthController handlers", () => {
     expect(cookie).toHaveBeenCalledWith(
       "refreshToken",
       "new-refresh",
-      expect.objectContaining({ secure: false }),
+      expect.objectContaining({ secure: false, signed: true }),
     );
   });
 });

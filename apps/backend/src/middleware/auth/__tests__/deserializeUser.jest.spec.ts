@@ -12,6 +12,7 @@ const buildRequest = (overrides: Partial<Request> = {}): Request =>
   ({
     headers: {},
     cookies: {},
+    signedCookies: {},
     originalUrl: "/test",
     id: "req-1",
     ...overrides,
@@ -62,7 +63,7 @@ describe("createDeserializeUserMiddleware", () => {
   });
 
   it("records refresh token presence when authorization header is missing", async () => {
-    req.cookies = { refreshToken: "refresh_token_value" };
+    req.signedCookies = { refreshToken: "refresh_token_value" };
 
     const middleware = createDeserializeUserMiddleware({ tokenService });
     await middleware(req, res, next);
@@ -97,7 +98,7 @@ describe("createDeserializeUserMiddleware", () => {
     };
 
     req.headers.authorization = `Bearer access-token`;
-    req.cookies = { refreshToken: "refresh_token_value" };
+    req.signedCookies = { refreshToken: "refresh_token_value" };
 
     tokenService.verifyAccessToken.mockResolvedValue(claims);
     tokenService.fetchAuthenticatedUser.mockResolvedValue(user);
