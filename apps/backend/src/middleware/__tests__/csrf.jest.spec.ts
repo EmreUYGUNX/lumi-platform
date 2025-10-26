@@ -1,8 +1,14 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error -- cookie-signature does not ship TypeScript declarations
+import cookieSignature from "cookie-signature";
 import express from "express";
 import request from "supertest";
 
 import { createTestConfig } from "../../testing/config.js";
 import { createCookieAndCsrfMiddleware } from "../csrf.js";
+
+const signRefreshToken = (value: string, secret: string): string =>
+  `s:${(cookieSignature as { sign: (val: string, sec: string) => string }).sign(value, secret)}`;
 
 const createApp = () => {
   const config = createTestConfig();
@@ -18,7 +24,7 @@ const createApp = () => {
     res.json({ ok: true });
   });
 
-  return { app };
+  return { app, config };
 };
 
 describe("createCsrfMiddleware", () => {
@@ -59,6 +65,34 @@ describe("createCsrfMiddleware", () => {
     await request(app)
       .post("/mutation")
       .set("Cookie", [`refreshToken=refresh-token`, `csrfToken=${csrfToken}`])
+      .set("X-CSRF-Token", csrfToken)
+      .expect(200);
+  });
+
+  it("requires CSRF header when refresh token is delivered via signed cookie", async () => {
+    const { app, config } = createApp();
+    const refreshToken = "signed-refresh-token";
+    const signedRefreshCookie = signRefreshToken(refreshToken, config.auth.cookies.secret);
+    const csrfToken = "signed-csrf";
+
+    const response = await request(app)
+      .post("/mutation")
+      .set("Cookie", [`refreshToken=${signedRefreshCookie}`, `csrfToken=${csrfToken}`])
+      .expect(403);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe("CSRF_TOKEN_INVALID");
+  });
+
+  it("accepts matching CSRF header with signed refresh cookie", async () => {
+    const { app, config } = createApp();
+    const refreshToken = "signed-refresh-token";
+    const signedRefreshCookie = signRefreshToken(refreshToken, config.auth.cookies.secret);
+    const csrfToken = "signed-match";
+
+    await request(app)
+      .post("/mutation")
+      .set("Cookie", [`refreshToken=${signedRefreshCookie}`, `csrfToken=${csrfToken}`])
       .set("X-CSRF-Token", csrfToken)
       .expect(200);
   });

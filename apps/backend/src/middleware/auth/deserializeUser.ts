@@ -57,11 +57,18 @@ export const createDeserializeUserMiddleware = (
     const { [ACCESS_TOKEN_HEADER]: authorization } = req.headers;
     const headerValue = toHeaderValue(authorization);
     const accessToken = extractBearerToken(headerValue);
+    const signedCookieStore =
+      req.signedCookies && typeof req.signedCookies === "object"
+        ? (req.signedCookies as Record<string, unknown>)
+        : {};
     const cookieStore =
       req.cookies && typeof req.cookies === "object"
         ? (req.cookies as Record<string, unknown>)
         : {};
     const cookiesMap = new Map<string, unknown>(Object.entries(cookieStore));
+    Object.entries(signedCookieStore).forEach(([key, value]) => {
+      cookiesMap.set(key, value);
+    });
     const candidateCookieName = SAFE_COOKIE_NAME_PATTERN.test(refreshCookieName)
       ? refreshCookieName
       : DEFAULT_REFRESH_COOKIE;

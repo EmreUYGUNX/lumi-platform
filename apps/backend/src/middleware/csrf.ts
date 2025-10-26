@@ -15,6 +15,7 @@ interface CsrfMiddlewareBundle {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_COOKIE_NAME = "csrfToken";
 const DEFAULT_HEADER_NAME = "x-csrf-token";
+const REFRESH_COOKIE_NAME = "refreshToken";
 
 const logger = createChildLogger("middleware:security:csrf");
 
@@ -28,8 +29,21 @@ const shouldValidateRequest = (req: Parameters<RequestHandler>[0]): boolean => {
     return false;
   }
 
+  const requestWithSignedCookies = req as Parameters<RequestHandler>[0] & {
+    signedCookies?: Record<string, unknown>;
+  };
+
+  const signedCookies = requestWithSignedCookies.signedCookies ?? {};
+  if (typeof signedCookies === "object" && signedCookies !== null) {
+    // eslint-disable-next-line security/detect-object-injection -- Cookie name is controlled constant.
+    const signedToken = (signedCookies as Record<string, unknown>)[REFRESH_COOKIE_NAME];
+    if (typeof signedToken === "string" && signedToken.length > 0) {
+      return true;
+    }
+  }
+
   const cookies = req.cookies ?? {};
-  return Boolean(typeof cookies.refreshToken === "string");
+  return Boolean(typeof cookies.refreshToken === "string" && cookies.refreshToken.length > 0);
 };
 
 const resolveCookieToken = (
@@ -130,7 +144,7 @@ export const createCookieAndCsrfMiddleware = (
     headerName?: string;
   } = {},
 ): RequestHandler => {
-  const parser = cookieParser();
+  const parser = cookieParser(config.auth.cookies.secret);
   const bundle = createCsrfMiddleware(config, options);
 
   const handler: RequestHandler = (req, res, next) => {
