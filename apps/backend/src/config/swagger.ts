@@ -16,6 +16,21 @@ const STANDARD_SUCCESS_RESPONSE_REF = "#/components/schemas/StandardSuccessRespo
 const HEALTH_SNAPSHOT_REF = "#/components/schemas/HealthSnapshot" as const;
 const HEALTH_READINESS_DATA_REF = "#/components/schemas/HealthReadinessData" as const;
 const HEALTH_LIVENESS_DATA_REF = "#/components/schemas/HealthLivenessData" as const;
+const STANDARD_ERROR_RESPONSE_REF = "#/components/schemas/StandardErrorResponse" as const;
+const AUTH_USER_PROFILE_REF = "#/components/schemas/AuthUserProfile" as const;
+const AUTH_REGISTER_RESPONSE_REF = "#/components/schemas/AuthRegisterResponse" as const;
+const AUTH_LOGIN_RESPONSE_REF = "#/components/schemas/AuthLoginResponse" as const;
+const AUTH_REFRESH_RESPONSE_REF = "#/components/schemas/AuthRefreshResponse" as const;
+const AUTH_LOGOUT_RESPONSE_REF = "#/components/schemas/AuthLogoutResponse" as const;
+const AUTH_LOGOUT_ALL_RESPONSE_REF = "#/components/schemas/AuthLogoutAllResponse" as const;
+const AUTH_USER_RESPONSE_REF = "#/components/schemas/AuthUserResponse" as const;
+const AUTH_MESSAGE_RESPONSE_REF = "#/components/schemas/AuthMessageResponse" as const;
+const REGISTER_REQUEST_REF = "#/components/schemas/RegisterRequest" as const;
+const LOGIN_REQUEST_REF = "#/components/schemas/LoginRequest" as const;
+const VERIFY_EMAIL_REQUEST_REF = "#/components/schemas/VerifyEmailRequest" as const;
+const FORGOT_PASSWORD_REQUEST_REF = "#/components/schemas/ForgotPasswordRequest" as const;
+const RESET_PASSWORD_REQUEST_REF = "#/components/schemas/ResetPasswordRequest" as const;
+const CHANGE_PASSWORD_REQUEST_REF = "#/components/schemas/ChangePasswordRequest" as const;
 
 const HEALTH_CHECK_VARIANTS = {
   comprehensive: "comprehensive",
@@ -150,6 +165,410 @@ const standardComponents = {
           type: "object",
           additionalProperties: true,
           description: "Optional metadata contextualising the error.",
+        },
+      },
+    },
+    AuthUserProfile: {
+      type: "object",
+      description: "Canonical representation of an authenticated user.",
+      required: ["id", "email", "emailVerified", "status", "roles", "permissions"],
+      properties: {
+        id: {
+          type: "string",
+          format: "uuid",
+          description: "Stable user identifier.",
+        },
+        email: {
+          type: "string",
+          format: "email",
+          description: "Normalised email address.",
+        },
+        firstName: {
+          type: "string",
+          nullable: true,
+          description: "Optional given name.",
+        },
+        lastName: {
+          type: "string",
+          nullable: true,
+          description: "Optional family name.",
+        },
+        phone: {
+          type: "string",
+          nullable: true,
+          description: "Optional E.164 formatted phone number.",
+        },
+        emailVerified: {
+          type: "boolean",
+          description: "Indicates whether the email address has been confirmed.",
+        },
+        status: {
+          type: "string",
+          description: "Account lifecycle state.",
+          enum: [...USER_STATUS_VALUES],
+        },
+        roles: {
+          type: "array",
+          description: "Role slugs assigned to the user.",
+          items: {
+            type: "string",
+          },
+        },
+        permissions: {
+          type: "array",
+          description: "Permission keys granted to the user.",
+          items: {
+            type: "string",
+          },
+        },
+      },
+    },
+    AuthTokenEnvelope: {
+      type: "object",
+      description: "Signed JWT payload metadata.",
+      required: ["token", "expiresAt"],
+      properties: {
+        token: {
+          type: "string",
+          description: "Signed JWT token value.",
+        },
+        expiresAt: {
+          type: "string",
+          format: "date-time",
+          description: "Token expiry in UTC.",
+        },
+      },
+    },
+    AuthTokenPair: {
+      type: "object",
+      description: "Access and refresh token bundle.",
+      required: ["accessToken", "refreshToken"],
+      properties: {
+        accessToken: {
+          $ref: "#/components/schemas/AuthTokenEnvelope",
+        },
+        refreshToken: {
+          $ref: "#/components/schemas/AuthTokenEnvelope",
+        },
+      },
+    },
+    AuthRegisterResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: ["user", "emailVerification"],
+              properties: {
+                user: {
+                  $ref: AUTH_USER_PROFILE_REF,
+                },
+                emailVerification: {
+                  type: "object",
+                  required: ["expiresAt"],
+                  properties: {
+                    expiresAt: {
+                      type: "string",
+                      format: "date-time",
+                      description: "Expiry timestamp for the verification token.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthLoginResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: [
+                "sessionId",
+                "accessToken",
+                "refreshToken",
+                "accessTokenExpiresAt",
+                "refreshTokenExpiresAt",
+                "user",
+              ],
+              properties: {
+                sessionId: {
+                  type: "string",
+                  format: "uuid",
+                  description: "Active session identifier.",
+                },
+                accessToken: {
+                  type: "string",
+                  description: "Signed access token for authorising API calls.",
+                },
+                refreshToken: {
+                  type: "string",
+                  description: "Signed refresh token issued alongside the cookie.",
+                },
+                accessTokenExpiresAt: {
+                  type: "string",
+                  format: "date-time",
+                  description: "Expiry for the access token.",
+                },
+                refreshTokenExpiresAt: {
+                  type: "string",
+                  format: "date-time",
+                  description: "Expiry for the refresh token.",
+                },
+                user: {
+                  $ref: AUTH_USER_PROFILE_REF,
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthRefreshResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: [
+                "sessionId",
+                "accessToken",
+                "refreshToken",
+                "accessTokenExpiresAt",
+                "refreshTokenExpiresAt",
+                "user",
+              ],
+              properties: {
+                sessionId: {
+                  type: "string",
+                  format: "uuid",
+                },
+                accessToken: {
+                  type: "string",
+                },
+                refreshToken: {
+                  type: "string",
+                },
+                accessTokenExpiresAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+                refreshTokenExpiresAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+                user: {
+                  $ref: AUTH_USER_PROFILE_REF,
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthLogoutResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: ["sessionId"],
+              properties: {
+                sessionId: {
+                  type: "string",
+                  format: "uuid",
+                  description: "Identifier of the revoked session.",
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthLogoutAllResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: ["revokedSessions"],
+              properties: {
+                revokedSessions: {
+                  type: "integer",
+                  minimum: 0,
+                  description: "Number of sessions revoked during the operation.",
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthUserResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: ["user"],
+              properties: {
+                user: {
+                  $ref: AUTH_USER_PROFILE_REF,
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    AuthMessageResponse: {
+      allOf: [
+        {
+          $ref: STANDARD_SUCCESS_RESPONSE_REF,
+        },
+        {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              required: ["message"],
+              properties: {
+                message: {
+                  type: "string",
+                  description: "Informational message for the caller.",
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    RegisterRequest: {
+      type: "object",
+      required: ["email", "password", "firstName", "lastName"],
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+          description: "Unique email address for the account.",
+        },
+        password: {
+          type: "string",
+          minLength: 12,
+          description:
+            "Must satisfy the platform password policy (minimum 12 characters, upper and lower case, number, special character).",
+        },
+        firstName: {
+          type: "string",
+          minLength: 2,
+          maxLength: 100,
+        },
+        lastName: {
+          type: "string",
+          minLength: 2,
+          maxLength: 100,
+        },
+        phone: {
+          type: "string",
+          nullable: true,
+          description: "Optional phone number in international format.",
+        },
+      },
+    },
+    LoginRequest: {
+      type: "object",
+      required: ["email", "password"],
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+        },
+        password: {
+          type: "string",
+          minLength: 1,
+          maxLength: 256,
+        },
+      },
+    },
+    VerifyEmailRequest: {
+      type: "object",
+      required: ["token"],
+      properties: {
+        token: {
+          type: "string",
+          minLength: 10,
+          description: "Signed verification token received via email.",
+        },
+      },
+    },
+    ForgotPasswordRequest: {
+      type: "object",
+      required: ["email"],
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+        },
+      },
+    },
+    ResetPasswordRequest: {
+      type: "object",
+      required: ["token", "password"],
+      properties: {
+        token: {
+          type: "string",
+          minLength: 10,
+          description: "Password reset token received via email.",
+        },
+        password: {
+          type: "string",
+          minLength: 12,
+          description: "New password satisfying the platform policy.",
+        },
+      },
+    },
+    ChangePasswordRequest: {
+      type: "object",
+      required: ["currentPassword", "newPassword"],
+      properties: {
+        currentPassword: {
+          type: "string",
+          minLength: 1,
+          maxLength: 256,
+          description: "Current password for verification.",
+        },
+        newPassword: {
+          type: "string",
+          minLength: 12,
+          description:
+            "Replacement password that must satisfy the platform policy and differ from the current password.",
         },
       },
     },
@@ -1834,6 +2253,625 @@ const standardComponents = {
 };
 /* eslint-enable sonarjs/no-duplicate-string */
 
+const authPaths: OpenApi31.PathsObject = {
+  "/api/v1/auth/register": {
+    post: {
+      tags: ["Auth"],
+      summary: "Register a new user account",
+      description:
+        "Creates a customer account and dispatches an email verification token. Passwords must satisfy the platform policy and are hashed before storage.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: REGISTER_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        201: {
+          description: "Registration succeeded and a verification email was issued.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_REGISTER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Validation failed for the supplied payload.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        409: {
+          description: "An account with the provided email already exists.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/login": {
+    post: {
+      tags: ["Auth"],
+      summary: "Authenticate with email and password",
+      description:
+        "Validates credentials, records security telemetry, issues a new session, and returns access/refresh tokens. The refresh token is also delivered as an HTTP-only, same-site cookie.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: LOGIN_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Login succeeded and tokens were issued.",
+          headers: {
+            "Set-Cookie": {
+              description: "Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.",
+              schema: {
+                type: "string",
+              },
+            },
+          },
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_LOGIN_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Validation failed for the credentials payload.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Invalid credentials, lockout in effect, or account inactive.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/refresh": {
+    post: {
+      tags: ["Auth"],
+      summary: "Rotate refresh token and obtain a new access token",
+      description:
+        "Expects a valid signed refresh token via HTTP-only cookies. Performs replay detection, rotates the session, and returns a fresh token pair.",
+      responses: {
+        200: {
+          description: "Token rotation succeeded.",
+          headers: {
+            "Set-Cookie": {
+              description: "Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.",
+              schema: {
+                type: "string",
+              },
+            },
+          },
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_REFRESH_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Missing refresh token, token reuse detected, or session no longer valid.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/logout": {
+    post: {
+      tags: ["Auth"],
+      summary: "Revoke the current session",
+      description: "Invalidates the active session and clears the refresh token cookie.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        200: {
+          description: "Session revoked successfully.",
+          headers: {
+            "Set-Cookie": {
+              description: "Refresh token cookie cleared by setting an expired value.",
+              schema: {
+                type: "string",
+              },
+            },
+          },
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_LOGOUT_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/logout-all": {
+    post: {
+      tags: ["Auth"],
+      summary: "Revoke all sessions for the authenticated user",
+      description:
+        "Invalidates every active session associated with the caller and clears the refresh cookie.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        200: {
+          description: "Active sessions revoked.",
+          headers: {
+            "Set-Cookie": {
+              description: "Refresh token cookie cleared by setting an expired value.",
+              schema: {
+                type: "string",
+              },
+            },
+          },
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_LOGOUT_ALL_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/me": {
+    get: {
+      tags: ["Auth"],
+      summary: "Retrieve the authenticated user profile",
+      description:
+        "Returns the caller's profile, including roles and permissions resolved through RBAC.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        200: {
+          description: "Profile retrieved.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_USER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated or session is invalid.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/verify-email": {
+    post: {
+      tags: ["Auth"],
+      summary: "Confirm email using a verification token",
+      description:
+        "Validates the verification token delivered by email, marks the user as verified, and revokes sessions if token misuse is detected.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: VERIFY_EMAIL_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Email verified successfully.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_USER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Token structure invalid or already consumed.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Token signature mismatch or verification failed.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/resend-verification": {
+    post: {
+      tags: ["Auth"],
+      summary: "Resend email verification for the authenticated user",
+      description: "Issues a new verification token provided the account is not already verified.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        200: {
+          description: "Verification email reissued.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_USER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        404: {
+          description:
+            "User record could not be found (should not occur for authenticated clients).",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        409: {
+          description: "Email is already verified.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        429: {
+          description: "Rate limit exceeded for resend requests.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/forgot-password": {
+    post: {
+      tags: ["Auth"],
+      summary: "Initiate password reset",
+      description:
+        "Sends a password reset email if the account exists. The response is intentionally generic to avoid user enumeration.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: FORGOT_PASSWORD_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Reset workflow triggered if the account exists.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_MESSAGE_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Email field missing or invalid.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        429: {
+          description: "Rate limit exceeded for password reset requests.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/reset-password": {
+    post: {
+      tags: ["Auth"],
+      summary: "Complete password reset",
+      description:
+        "Validates the reset token, updates the password, revokes active sessions, and logs a security event.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: RESET_PASSWORD_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Password updated successfully.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_USER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Payload validation failed.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Token mismatch or expired.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/change-password": {
+    put: {
+      tags: ["Auth"],
+      summary: "Change password for the authenticated user",
+      description:
+        "Validates the current password, enforces the password policy, updates stored credentials, and revokes other sessions.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              $ref: CHANGE_PASSWORD_REQUEST_REF,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Password updated successfully.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: AUTH_USER_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        400: {
+          description: "Validation failed (policy breach or passwords identical).",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Authentication failed or current password incorrect.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        429: {
+          description: "Rate limit exceeded for change password attempts.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/2fa/setup": {
+    post: {
+      tags: ["Auth"],
+      summary: "Placeholder endpoint for two-factor enrolment",
+      description:
+        "Currently returns a NOT_IMPLEMENTED response while the two-factor flow is under construction. Available to authenticated callers for roadmap awareness.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        501: {
+          description: "Feature not yet implemented.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "/api/v1/auth/2fa/verify": {
+    post: {
+      tags: ["Auth"],
+      summary: "Placeholder endpoint for two-factor verification",
+      description:
+        "Returns NOT_IMPLEMENTED until two-factor verification is released. Helps clients detect feature availability.",
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+      responses: {
+        501: {
+          description: "Feature not yet implemented.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+        401: {
+          description: "Caller is not authenticated.",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: STANDARD_ERROR_RESPONSE_REF,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const buildSwaggerDefinition = (config: ApplicationConfig): OpenApi31.Document => ({
   openapi: "3.1.0",
   info: {
@@ -1869,8 +2907,13 @@ const buildSwaggerDefinition = (config: ApplicationConfig): OpenApi31.Document =
       name: "Catalog",
       description: "Product catalogue browsing endpoints.",
     },
+    {
+      name: "Auth",
+      description: "Authentication, session management, and RBAC-protected endpoints.",
+    },
   ],
   components: standardComponents as unknown as OpenApi31.ComponentsObject,
+  paths: authPaths,
 });
 
 const buildSwaggerJSDocOptions = (config: ApplicationConfig): SwaggerJSDocOptions => ({

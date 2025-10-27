@@ -1,7 +1,14 @@
 # Authentication Security Features
 
 This document captures the security controls introduced for Phase&nbsp;3 with a focus on
-account protection, two-factor authentication readiness, and critical event visibility.
+account protection, two-factor authentication readiness, and critical event visibility. For deep
+dives see:
+
+- [`password-policy.md`](./password-policy.md) – Detailed password requirements and storage rules.
+- [`lockout-policy.md`](./lockout-policy.md) – Brute-force mitigation configuration.
+- [`security-pitfalls.md`](./security-pitfalls.md) – Common mistakes to avoid.
+- [`two-factor-plan.md`](./two-factor-plan.md) – Roadmap for 2FA completion.
+- [`../../security/auth-incident-runbook.md`](../../security/auth-incident-runbook.md) – Incident response playbook.
 
 ## Account Lockout Policy
 
