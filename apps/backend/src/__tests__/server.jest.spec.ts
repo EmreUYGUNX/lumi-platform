@@ -19,6 +19,7 @@ type ServerInternals = typeof ServerModule.serverInternals;
 let serverInternalsRef: ServerInternals | undefined;
 let infoSpy: jest.SpyInstance;
 let errorSpy: jest.SpyInstance;
+let warnSpy: jest.SpyInstance;
 let initialExitCode: number | undefined;
 
 const getStartServer = (): typeof ServerModule.startServer => {
@@ -84,17 +85,20 @@ describe("startServer", () => {
     const logger = getLogger();
     infoSpy = jest.spyOn(logger, "info").mockImplementation(() => logger);
     errorSpy = jest.spyOn(logger, "error").mockImplementation(() => logger);
+    warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => logger);
   });
 
   afterEach(() => {
     infoSpy.mockClear();
     errorSpy.mockClear();
+    warnSpy.mockClear();
     process.exitCode = initialExitCode;
   });
 
   afterAll(() => {
     infoSpy.mockRestore();
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   class FakeSocket extends EventEmitter {
@@ -200,6 +204,24 @@ describe("startServer", () => {
 
     await first;
     await second;
+  });
+
+  it("logs a warning when rate limiter cleanup fails during shutdown", async () => {
+    const controller = await getStartServer()({
+      config: createTestConfig(),
+      port: 0,
+      enableSignalHandlers: false,
+    });
+
+    controller.app.set("rateLimiterCleanup", async () => {
+      throw new Error("redis cleanup failure");
+    });
+
+    await controller.shutdown({ reason: "test-cleanup" });
+
+    expect(warnSpy).toHaveBeenCalledWith("Rate limiter cleanup failed during shutdown", {
+      error: expect.any(Error),
+    });
   });
 
   it("forces lingering sockets to be destroyed when shutdown times out", async () => {

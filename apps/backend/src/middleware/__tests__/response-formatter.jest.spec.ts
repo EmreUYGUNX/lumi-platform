@@ -98,4 +98,84 @@ describe("response formatter middleware", () => {
     expect(body.meta.requestId).toBe("incoming");
     expect(body.error.code).toBe("CUSTOM");
   });
+
+  it("normalises pagination metadata supplied as primitive values", () => {
+    const response = formatSuccess(
+      { ok: true },
+      {
+        requestId: "req-3",
+        pagination: {
+          page: "2",
+          perPage: "5",
+          total: "37",
+          totalPages: 999,
+        } as unknown as ReturnType<typeof buildPaginationMeta>,
+      },
+    );
+
+    expect(response.meta.pagination).toEqual({
+      page: 2,
+      perPage: 5,
+      total: 37,
+      totalPages: 8,
+    });
+  });
+
+  it("wraps unformatted error payloads to match the standard structure", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/error", (_req, res) => {
+      res.status(500).json({ message: "boom" });
+    });
+
+    const api = createApiClient(app);
+    const response = await api.get("/error").expect(500);
+    const body = response.body as ErrorResponse;
+
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("UNHANDLED_ERROR");
+    expect(body.error.message).toBe("An unexpected error occurred");
+  });
+
+  it("honours explicit error payloads without full response envelopes", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/explicit", (_req, res) => {
+      res.status(400).json({
+        code: "INPUT_INVALID",
+        message: "Bad input",
+        details: ["Email address invalid"],
+      });
+    });
+
+    const api = createApiClient(app);
+    const response = await api.get("/explicit").expect(400);
+    const body = response.body as ErrorResponse;
+
+    expect(body.error.code).toBe("INPUT_INVALID");
+    expect(body.error.details?.[0]?.message).toBe("Email address invalid");
+  });
+
+  it("preserves formatted success payloads that already include metadata", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/success", (_req, res) => {
+      res.json(
+        formatSuccess(
+          { ok: true },
+          {
+            requestId: "existing",
+            pagination: buildPaginationMeta({ page: 1, perPage: 10, total: 10 }),
+          },
+        ),
+      );
+    });
+
+    const api = createApiClient(app);
+    const response = await api.get("/success").expect(200);
+    const body = response.body as SuccessResponse<{ ok: boolean }>;
+
+    expect(body.meta.requestId).toBe("existing");
+    expect(body.meta.pagination?.totalPages).toBe(1);
+  });
 });

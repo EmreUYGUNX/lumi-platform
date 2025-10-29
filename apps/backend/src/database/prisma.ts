@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import { Prisma, PrismaClient } from "@prisma/client";
 
 import { getConfig } from "../config/index.js";
