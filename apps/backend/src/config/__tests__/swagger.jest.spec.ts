@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import swaggerJsdoc from "swagger-jsdoc";
+import swaggerJsdoc, { type Options as SwaggerJSDocOptions } from "swagger-jsdoc";
 
 import type { ApplicationConfig } from "@lumi/types";
 
@@ -31,7 +31,9 @@ const createConfig = (overrides: Partial<ApplicationConfig["app"]> = {}): Applic
 describe("swagger configuration", () => {
   beforeEach(() => {
     mockedSwaggerJsdoc.mockReset();
-    mockedSwaggerJsdoc.mockImplementation((options) => (options?.definition ?? {}) as object);
+    mockedSwaggerJsdoc.mockImplementation(
+      (options?: SwaggerJSDocOptions) => (options?.definition ?? {}) as object,
+    );
   });
 
   it("builds OpenAPI definition with local fallback server when necessary", () => {

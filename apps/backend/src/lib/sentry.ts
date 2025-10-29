@@ -183,6 +183,7 @@ export interface SentryUserContext {
   email?: string;
   username?: string;
   role?: string;
+  roles?: string[];
 }
 
 export const setSentryUser = (user?: SentryUserContext | null): void => {
@@ -203,8 +204,9 @@ export const setSentryUser = (user?: SentryUserContext | null): void => {
     username: user.username,
   });
 
-  if (user.role) {
-    Sentry.setTag("user_role", user.role);
+  const primaryRole = user.role ?? user.roles?.[0];
+  if (primaryRole) {
+    Sentry.setTag("user_role", primaryRole);
   }
 };
 

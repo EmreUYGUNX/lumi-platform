@@ -93,10 +93,12 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
   const start = performance.now();
   const requestId = res.requestId ?? req.requestId ?? "unknown";
 
+  const userRoles = req.user?.roles?.map((role) => role.name) ?? [];
+
   mergeRequestContext({
     requestId,
     userId: req.user?.id,
-    role: req.user?.role,
+    roles: userRoles,
   });
 
   logger.info("HTTP request received", {
@@ -105,6 +107,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
     path: req.originalUrl,
     ip: req.ip,
     userId: req.user?.id,
+    roles: userRoles,
     userAgent: req.get("user-agent"),
   });
 
@@ -119,6 +122,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
       status: res.statusCode,
       durationMs: Number(duration.toFixed(2)),
       userId: req.user?.id,
+      roles: userRoles,
       ip: req.ip,
     };
 

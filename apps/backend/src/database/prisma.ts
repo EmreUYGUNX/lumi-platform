@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 import { getConfig } from "../config/index.js";
 import { logger } from "../lib/logger.js";
@@ -20,20 +20,27 @@ const createPrismaClient = (): PrismaClient => {
         : ["warn", "error"],
   });
 
-  client.$use(async (params, next) => {
-    try {
-      return await next(params);
-    } catch (error) {
-      logger.debug("Prisma middleware captured error", {
-        model: params.model,
-        action: params.action,
-        error,
-      });
-      throw error;
-    }
-  });
-
-  return client;
+  return client.$extends(
+    Prisma.defineExtension({
+      name: "error-logging",
+      query: {
+        $allModels: {
+          async $allOperations({ model, operation, args, query }) {
+            try {
+              return await query(args);
+            } catch (error) {
+              logger.debug("Prisma middleware captured error", {
+                model,
+                action: operation,
+                error,
+              });
+              throw error;
+            }
+          },
+        },
+      },
+    }),
+  ) as PrismaClient;
 };
 
 export const prisma = (() => {

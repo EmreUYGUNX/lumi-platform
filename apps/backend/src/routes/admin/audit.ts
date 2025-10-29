@@ -9,7 +9,11 @@ import { createAdminRateLimiter } from "../../middleware/rate-limiter.js";
 const router = Router();
 
 const requireAdmin = (req: Request, _res: Response, next: NextFunction) => {
-  if (!req.user || String(req.user.role).toLowerCase() !== "admin") {
+  const hasAdminRole = req.user?.roles?.some(
+    (role) => role.name?.toLowerCase?.() === "admin" || role.id.toLowerCase() === "admin",
+  );
+
+  if (!req.user || !hasAdminRole) {
     next(new ApiError("Forbidden", { status: 403, code: "FORBIDDEN" }));
     return;
   }

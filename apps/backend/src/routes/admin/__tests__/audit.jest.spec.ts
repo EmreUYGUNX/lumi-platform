@@ -3,6 +3,7 @@ import express, { type Router } from "express";
 
 import { createApiClient } from "@lumi/testing";
 
+import { createAuthenticatedUser } from "../../../__tests__/helpers/auth.js";
 import * as auditService from "../../../audit/audit-log.service.js";
 import type * as ErrorHandlerModule from "../../../middleware/error-handler.js";
 import type * as ResponseFormatterModule from "../../../middleware/response-formatter.js";
@@ -57,7 +58,10 @@ describe("admin audit log routes", () => {
     const app = express();
     app.use(responseFormatter);
     app.use((req, _res, next) => {
-      req.user = { id: "user-1", role: "customer" };
+      req.user = createAuthenticatedUser({
+        id: "user-1",
+        roles: [{ id: "role_customer", name: "customer" }],
+      });
       next();
     });
     app.use("/api/v1/admin/audit-logs", auditAdminRouter);
@@ -97,7 +101,10 @@ describe("admin audit log routes", () => {
     const app = express();
     app.use(responseFormatter);
     app.use((req, _res, next) => {
-      req.user = { id: "admin-1", role: "admin" };
+      req.user = createAuthenticatedUser({
+        id: "admin-1",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
       next();
     });
     app.use("/api/v1/admin/audit-logs", auditAdminRouter);

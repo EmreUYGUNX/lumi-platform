@@ -3,6 +3,7 @@ import express from "express";
 
 import { createApiClient } from "@lumi/testing";
 
+import { createAuthenticatedUser } from "../../__tests__/helpers/auth.js";
 import * as auditLogModule from "../../audit/audit-log.service.js";
 import * as loggerModule from "../../lib/logger.js";
 import { requestLogger } from "../request-logger.js";
@@ -49,7 +50,10 @@ describe("request logger middleware", () => {
     app.use(express.json());
     app.use(responseFormatter);
     app.use((req, _res, next) => {
-      req.user = { id: "user-1", role: "customer" };
+      req.user = createAuthenticatedUser({
+        id: "user-1",
+        roles: [{ id: "role_customer", name: "customer" }],
+      });
       next();
     });
     app.use(requestLogger);
@@ -77,7 +81,10 @@ describe("request logger middleware", () => {
     app.use(express.json());
     app.use(responseFormatter);
     app.use((req, res, next) => {
-      req.user = { id: "admin-1", role: "admin" };
+      req.user = createAuthenticatedUser({
+        id: "admin-1",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
       res.locals.audit = { entity: "products", entityId: "prod-1", action: "products.update" };
       next();
     });

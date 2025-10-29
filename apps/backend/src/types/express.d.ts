@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from "node:http";
 
 import type { AuditLogEntry } from "../audit/audit-log.service.js";
 import type { ErrorInput, ResponseMeta } from "../middleware/response-formatter.js";
+import type { AuthenticatedUser, RequestAuthState } from "../modules/auth/token.types.js";
 
 declare global {
   namespace Express {
@@ -11,15 +12,17 @@ declare global {
        */
       requestId?: string;
       /**
+       * Legacy alias used by middleware to access the request identifier. Mirrors requestId.
+       */
+      id?: string;
+      /**
        * Authenticated user context surfaced by the authentication middleware stack.
        */
-      user?: {
-        id: string;
-        email?: string;
-        role: string;
-        permissions?: string[];
-        [key: string]: unknown;
-      };
+      user?: AuthenticatedUser;
+      /**
+       * Auth metadata captured during authentication (token state, errors, etc.).
+       */
+      auth?: RequestAuthState;
       /**
        * Raw request headers for strongly typed access.
        */

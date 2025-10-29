@@ -4,7 +4,6 @@ import express, {
   type RequestHandler,
   Router,
 } from "express";
-import "express-async-errors";
 import swaggerUi from "swagger-ui-express";
 
 import type { ApplicationConfig } from "@lumi/types";

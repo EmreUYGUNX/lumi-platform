@@ -103,7 +103,7 @@ const enrichLoggerContext = (req: Request, requestId: string) => {
   mergeRequestContext({
     requestId,
     userId: req.user?.id,
-    role: req.user?.role,
+    roles: req.user?.roles?.map((role) => role.name) ?? [],
     route: req.originalUrl,
   });
 };

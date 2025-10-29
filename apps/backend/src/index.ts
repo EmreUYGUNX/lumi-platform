@@ -1,28 +1,20 @@
-import http from "node:http";
+import process from "node:process";
 
 import { getConfig, onConfigChange } from "./config/index.js";
-import { createHttpApp } from "./http/app.js";
 import { logger } from "./lib/logger.js";
 import { registerPrismaMiddlewares } from "./lib/prisma/middleware.js";
 import { initializeObservability } from "./observability/index.js";
 import { type ServerController, startServer } from "./server.js";
 
 export const createBackendApp = () => {
-  let activeConfig = getConfig();
-  let httpServer: http.Server | undefined;
-
-  const unsubscribe = onConfigChange(({ snapshot, changedKeys, reason }) => {
-    activeConfig = snapshot;
-    if (changedKeys.length > 0) {
-      logger.info("Configuration reloaded", { reason, changedKeys });
-    }
-  });
+  let serverController: ServerController | undefined;
+  let unsubscribeConfig: (() => void) | undefined;
 
   return {
-    start() {
-      const { app } = activeConfig;
-      const expressApp = createHttpApp();
+    async start() {
+      const initialConfig = getConfig();
 
+      registerPrismaMiddlewares();
       initializeObservability();
 
       logger.info("Backend service starting", {
@@ -40,31 +32,11 @@ export const createBackendApp = () => {
         }
       });
 
-      httpServer = http.createServer(expressApp);
+      serverController = await startServer({ config: initialConfig });
 
-      httpServer.listen(app.port, () => {
-        logger.info("Backend HTTP server listening", {
-          port: app.port,
-          environment: app.environment,
-        });
-      });
-
-      httpServer.on("error", (error) => {
-        logger.error("HTTP server encountered an error", { error });
-      });
-
-      return () => {
-        unsubscribe();
-        if (httpServer) {
-          httpServer.close((error) => {
-            if (error) {
-              logger.error("Error while shutting down HTTP server", { error });
-            } else {
-              logger.info("HTTP server stopped");
-            }
-          });
-          httpServer = undefined;
-        }
+      return async () => {
+        unsubscribeConfig?.();
+        await serverController?.shutdown({ reason: "app:shutdown" });
       };
     },
   };
