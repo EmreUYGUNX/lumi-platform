@@ -14,6 +14,9 @@ overrides:
   react: 18.3.1
   react-dom: 18.3.1
   validator: 13.15.20
+  "@smithy/is-array-buffer": 4.2.0
+  "@smithy/util-buffer-from": 4.2.0
+  "@smithy/util-utf8": 4.2.0
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -3218,13 +3221,6 @@ packages:
       }
     engines: { node: ">=18.0.0" }
 
-  "@smithy/is-array-buffer@2.2.0":
-    resolution:
-      {
-        integrity: sha512-GGP3O9QFD24uGeAXYUjwSTXARoqpZykHadOmA8G5vfJPK0/DC67qa//0qvqrJzL1xc8WQWX7/yc7fwudjPHPhA==,
-      }
-    engines: { node: ">=14.0.0" }
-
   "@smithy/is-array-buffer@4.2.0":
     resolution:
       {
@@ -3372,13 +3368,6 @@ packages:
       }
     engines: { node: ">=18.0.0" }
 
-  "@smithy/util-buffer-from@2.2.0":
-    resolution:
-      {
-        integrity: sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA==,
-      }
-    engines: { node: ">=14.0.0" }
-
   "@smithy/util-buffer-from@4.2.0":
     resolution:
       {
@@ -3448,13 +3437,6 @@ packages:
         integrity: sha512-igZpCKV9+E/Mzrpq6YacdTQ0qTiLm85gD6N/IrmyDvQFA4UnU3d5g3m8tMT/6zG/vVkWSU+VxeUyGonL62DuxA==,
       }
     engines: { node: ">=18.0.0" }
-
-  "@smithy/util-utf8@2.3.0":
-    resolution:
-      {
-        integrity: sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A==,
-      }
-    engines: { node: ">=14.0.0" }
 
   "@smithy/util-utf8@4.2.0":
     resolution:
@@ -12934,7 +12916,7 @@ snapshots:
       "@aws-crypto/util": 5.2.0
       "@aws-sdk/types": 3.914.0
       "@aws-sdk/util-locate-window": 3.893.0
-      "@smithy/util-utf8": 2.3.0
+      "@smithy/util-utf8": 4.2.0
       tslib: 2.8.1
 
   "@aws-crypto/sha256-js@5.2.0":
@@ -12950,7 +12932,7 @@ snapshots:
   "@aws-crypto/util@5.2.0":
     dependencies:
       "@aws-sdk/types": 3.914.0
-      "@smithy/util-utf8": 2.3.0
+      "@smithy/util-utf8": 4.2.0
       tslib: 2.8.1
 
   "@aws-sdk/client-sesv2@3.919.0":
@@ -14971,10 +14953,6 @@ snapshots:
       "@smithy/types": 4.8.0
       tslib: 2.8.1
 
-  "@smithy/is-array-buffer@2.2.0":
-    dependencies:
-      tslib: 2.8.1
-
   "@smithy/is-array-buffer@4.2.0":
     dependencies:
       tslib: 2.8.1
@@ -15109,11 +15087,6 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  "@smithy/util-buffer-from@2.2.0":
-    dependencies:
-      "@smithy/is-array-buffer": 2.2.0
-      tslib: 2.8.1
-
   "@smithy/util-buffer-from@4.2.0":
     dependencies:
       "@smithy/is-array-buffer": 4.2.0
@@ -15174,11 +15147,6 @@ snapshots:
 
   "@smithy/util-uri-escape@4.2.0":
     dependencies:
-      tslib: 2.8.1
-
-  "@smithy/util-utf8@2.3.0":
-    dependencies:
-      "@smithy/util-buffer-from": 2.2.0
       tslib: 2.8.1
 
   "@smithy/util-utf8@4.2.0":
