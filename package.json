@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "packageManager": "pnpm@9.1.0+sha512.67f5879916a9293e5cf059c23853d571beaf4f753c707f40cb22bed5fb1578c6aad3b6c4107ccb3ba0b35be003eb621a16471ac836c87beb53f9d54bb4612724",
   "engines": {
-    "node": ">=20.11.0",
+    "node": ">=20.18.1",
     "pnpm": ">=9.0.0"
   },
   "scripts": {
@@ -135,7 +135,8 @@
       "@opentelemetry/semantic-conventions": "1.37.0",
       "@types/pg": "8.15.5",
       "react": "18.3.1",
-      "react-dom": "18.3.1"
+      "react-dom": "18.3.1",
+      "validator": "13.15.20"
     },
     "packageExtensions": {
       "react-dom@*": {

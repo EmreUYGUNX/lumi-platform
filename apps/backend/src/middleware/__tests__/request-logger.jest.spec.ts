@@ -49,6 +49,7 @@ describe("request logger middleware", () => {
     const app = express();
     app.use(express.json());
     app.use(responseFormatter);
+    // codeql[missing-rate-limiting]: Test-only middleware executed in-memory; no public exposure or rate limiting required.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
         id: "user-1",
@@ -80,6 +81,7 @@ describe("request logger middleware", () => {
     const app = express();
     app.use(express.json());
     app.use(responseFormatter);
+    // codeql[missing-rate-limiting]: Test-only middleware executed in-memory; no public exposure or rate limiting required.
     app.use((req, res, next) => {
       req.user = createAuthenticatedUser({
         id: "admin-1",

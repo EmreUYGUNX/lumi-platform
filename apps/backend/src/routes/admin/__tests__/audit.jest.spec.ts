@@ -57,6 +57,7 @@ describe("admin audit log routes", () => {
   it("rejects non-admin users with a 403 response", async () => {
     const app = express();
     app.use(responseFormatter);
+    // codeql[missing-rate-limiting]: Test stub middleware executed during unit tests without external traffic.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
         id: "user-1",
@@ -100,6 +101,7 @@ describe("admin audit log routes", () => {
 
     const app = express();
     app.use(responseFormatter);
+    // codeql[missing-rate-limiting]: Test stub middleware executed during unit tests without external traffic.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
         id: "admin-1",
