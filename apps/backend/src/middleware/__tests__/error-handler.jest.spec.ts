@@ -6,8 +6,11 @@ import { createApiClient } from "@lumi/testing";
 
 import { ApiError } from "../../errors/api-error.js";
 import * as sentryModule from "../../observability/sentry.js";
-import { errorHandler } from "../error-handler.js";
-import { responseFormatter } from "../response-formatter.js";
+import type * as ErrorHandlerModule from "../error-handler.js";
+import type * as ResponseFormatterModule from "../response-formatter.js";
+
+type ErrorHandlerFn = typeof ErrorHandlerModule.errorHandler;
+type ResponseFormatterFn = typeof ResponseFormatterModule.responseFormatter;
 
 process.env.APP_NAME ??= "BackendTest";
 process.env.API_BASE_URL ??= "http://localhost:4000";
@@ -26,6 +29,14 @@ jest.mock("../../observability/sentry.js", () => ({
 }));
 
 const mockedSentry = jest.mocked(sentryModule);
+
+let errorHandler: ErrorHandlerFn;
+let responseFormatter: ResponseFormatterFn;
+
+beforeAll(async () => {
+  ({ errorHandler } = await import("../error-handler.js"));
+  ({ responseFormatter } = await import("../response-formatter.js"));
+});
 
 describe("error handler middleware", () => {
   beforeEach(() => {

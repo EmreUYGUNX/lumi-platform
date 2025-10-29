@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import express from "express";
+import express, { type Router } from "express";
 
 import { createApiClient } from "@lumi/testing";
 
 import * as auditService from "../../../audit/audit-log.service.js";
-import { errorHandler } from "../../../middleware/error-handler.js";
-import { responseFormatter } from "../../../middleware/response-formatter.js";
-import { auditAdminRouter } from "../audit.js";
+import type * as ErrorHandlerModule from "../../../middleware/error-handler.js";
+import type * as ResponseFormatterModule from "../../../middleware/response-formatter.js";
+
+type ErrorHandlerFn = typeof ErrorHandlerModule.errorHandler;
+type ResponseFormatterFn = typeof ResponseFormatterModule.responseFormatter;
 
 process.env.APP_NAME ??= "BackendTest";
 process.env.API_BASE_URL ??= "http://localhost:4000";
@@ -35,6 +37,16 @@ jest.mock("../../../audit/audit-log.service.js", () => ({
 }));
 
 const mockedAuditService = jest.mocked(auditService);
+
+let auditAdminRouter: Router;
+let errorHandler: ErrorHandlerFn;
+let responseFormatter: ResponseFormatterFn;
+
+beforeAll(async () => {
+  ({ auditAdminRouter } = await import("../audit.js"));
+  ({ errorHandler } = await import("../../../middleware/error-handler.js"));
+  ({ responseFormatter } = await import("../../../middleware/response-formatter.js"));
+});
 
 describe("admin audit log routes", () => {
   beforeEach(() => {
