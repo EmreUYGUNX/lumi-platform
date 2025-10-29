@@ -1,3 +1,7 @@
+/* eslint-disable max-classes-per-file */
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import path from "node:path";
+
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import TransportStream from "winston-transport";
@@ -15,7 +19,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   SENTRY_DSN: "",
   LOG_DIRECTORY: "logs",
   LOG_MAX_SIZE: "10m",
@@ -31,6 +35,39 @@ const BASE_ENV = {
   CONFIG_HOT_RELOAD: "false",
   CI: "true",
 } as const;
+
+const rotationInstances: { close: jest.Mock; dirname?: string }[] = [];
+
+jest.mock("winston-daily-rotate-file", () => {
+  class DailyRotateFile extends TransportStream {
+    public readonly dirname: string | undefined;
+
+    private readonly closeMock = jest.fn();
+
+    constructor(options: Record<string, unknown>) {
+      super(options);
+      this.dirname = options.dirname as string | undefined;
+      rotationInstances.push({
+        close: this.closeMock,
+        dirname: this.dirname,
+      });
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    override log(_info: unknown, next: () => void): void {
+      next();
+    }
+
+    override close(): void {
+      this.closeMock();
+    }
+  }
+
+  return {
+    __esModule: true,
+    default: DailyRotateFile,
+  };
+});
 
 class MemoryTransport extends TransportStream {
   public readonly logs: Record<string, unknown>[] = [];
@@ -50,6 +87,7 @@ const loadConfigModule = async () => import("../../config/index.js");
 
 beforeEach(() => {
   jest.resetModules();
+  rotationInstances.length = 0;
 });
 
 afterEach(() => {
@@ -198,6 +236,49 @@ describe("logger", () => {
     });
   });
 
+  it("creates rotating file transports when disk logging is enabled", async () => {
+    jest.resetModules();
+
+    const tempDirectory = path.join(process.cwd(), "logs-test-suite");
+    if (existsSync(tempDirectory)) {
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+
+    try {
+      await withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          NODE_ENV: "production",
+          LOG_ENABLE_CONSOLE: "true",
+          LOG_DIRECTORY: "logs-test-suite",
+          CI: "false",
+        },
+        async () => {
+          const { logger } = await loadLoggerModule();
+          const { getConfig } = await loadConfigModule();
+          const config = getConfig();
+
+          expect(config.app.environment).toBe("production");
+          expect(config.runtime.ci).toBe(false);
+          expect(existsSync(tempDirectory)).toBe(true);
+
+          const rotationTransports = logger.transports.filter(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(rotationTransports).toHaveLength(2);
+          expect(rotationInstances).toHaveLength(2);
+
+          logger.close();
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+        },
+      );
+    } finally {
+      jest.resetModules();
+    }
+  });
+
   it("closes existing transports when re-registering with same name", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const { registerLogTransport, unregisterLogTransport, listRegisteredTransports } =
@@ -257,6 +338,188 @@ describe("logger", () => {
         }),
       );
       errorSpy.mockRestore();
+    });
+  });
+
+  it("stringifies primitive error payloads", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { logError, logger } = await loadLoggerModule();
+      const errorSpy = jest.spyOn(logger, "error");
+      logError(404, "primitive-error");
+      expect(errorSpy).toHaveBeenCalledWith(
+        "primitive-error",
+        expect.objectContaining({
+          error: { message: "404" },
+        }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  it("shuts down console transport when disabled at runtime", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        LOG_ENABLE_CONSOLE: "true",
+      },
+      async () => {
+        const { logger } = await loadLoggerModule();
+        const consoleTransport = logger.transports.find(
+          (transport) => transport.constructor?.name === "Console",
+        );
+        expect(consoleTransport).toBeDefined();
+        if (!consoleTransport) {
+          throw new Error("Console transport not initialised");
+        }
+        const closeSpy = jest.fn();
+        // eslint-disable-next-line no-param-reassign
+        (consoleTransport as { close?: () => void }).close = closeSpy;
+
+        process.env.LOG_ENABLE_CONSOLE = "false";
+        const { reloadConfiguration } = await loadConfigModule();
+        reloadConfiguration("console-disable");
+
+        expect(closeSpy).toHaveBeenCalled();
+        const hasConsole = logger.transports.some(
+          (transport) => transport.constructor?.name === "Console",
+        );
+        expect(hasConsole).toBe(false);
+      },
+    );
+  });
+
+  it("closes rotation transports when disk logging is disabled", async () => {
+    jest.resetModules();
+    const tempDirectory = path.join(process.cwd(), "logs-rotate-close");
+    if (existsSync(tempDirectory)) {
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+    mkdirSync(tempDirectory, { recursive: true });
+
+    try {
+      await withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          NODE_ENV: "production",
+          CI: "false",
+          LOG_ENABLE_CONSOLE: "false",
+          LOG_DIRECTORY: "logs-rotate-close",
+        },
+        async () => {
+          const { logger } = await loadLoggerModule();
+          const rotationTransports = logger.transports.filter(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(rotationTransports).toHaveLength(2);
+          expect(rotationInstances).toHaveLength(2);
+          rotationInstances.forEach(({ close }) => {
+            expect(close).not.toHaveBeenCalled();
+          });
+
+          process.env.CI = "true";
+          const { reloadConfiguration } = await loadConfigModule();
+          reloadConfiguration("disable-disk");
+
+          rotationInstances.forEach(({ close }) => {
+            expect(close).toHaveBeenCalled();
+          });
+          const hasRotation = logger.transports.some(
+            (transport) => transport.constructor?.name === "DailyRotateFile",
+          );
+          expect(hasRotation).toBe(false);
+
+          logger.close();
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+        },
+      );
+    } finally {
+      jest.resetModules();
+    }
+  });
+
+  it("renders colourised console output in pretty mode", async () => {
+    jest.resetModules();
+    jest.doMock("winston-daily-rotate-file", () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+      const MockedTransportStream = require("winston-transport");
+      class MockRotationTransport extends MockedTransportStream {
+        public readonly dirname: string | undefined;
+
+        constructor(options: Record<string, unknown>) {
+          super(options);
+          this.dirname = options.dirname as string | undefined;
+        }
+
+        // eslint-disable-next-line class-methods-use-this
+        log(_info: unknown, next: () => void): void {
+          next();
+        }
+      }
+
+      return {
+        __esModule: true,
+        default: MockRotationTransport,
+      };
+    });
+
+    try {
+      const prettyDirectory = path.join(process.cwd(), "logs-pretty-mode");
+      mkdirSync(prettyDirectory, { recursive: true });
+
+      await withTemporaryEnvironment(
+        {
+          ...BASE_ENV,
+          NODE_ENV: "development",
+          LOG_ENABLE_CONSOLE: "true",
+          CI: "false",
+          LOG_DIRECTORY: "logs-pretty-mode",
+        },
+        async () => {
+          const { logger, withRequestContext } = await loadLoggerModule();
+          const consoleTransport = logger.transports.find(
+            (transport) => transport.constructor?.name === "Console",
+          );
+          expect(consoleTransport).toBeDefined();
+          if (!consoleTransport) {
+            throw new Error("Console transport not initialised");
+          }
+          const messageKey = Symbol.for("message");
+          const emitted: string[] = [];
+          const logSpy = jest.spyOn(consoleTransport, "log").mockImplementation((info, next) => {
+            emitted.push(info[messageKey] as string);
+            next();
+          });
+
+          withRequestContext({ requestId: "pretty-req" }, () => {
+            logger.info("pretty-output", { correlationId: "corr-1" });
+          });
+
+          expect(emitted).toHaveLength(1);
+          expect(emitted[0]).toContain("[request:pretty-req]");
+          expect(emitted[0]).toContain('"correlationId":"corr-1"');
+          logSpy.mockRestore();
+        },
+      );
+    } finally {
+      jest.resetModules();
+    }
+  });
+
+  it("ignores unregister requests for unknown transports", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { unregisterLogTransport, listRegisteredTransports } = await loadLoggerModule();
+      expect(() => unregisterLogTransport("missing" as string)).not.toThrow();
+      expect(listRegisteredTransports()).not.toContain("missing");
+    });
+  });
+
+  it("returns undefined when structured payload serialisation fails", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { extractStructuredLog } = await loadLoggerModule();
+      const payload = { count: BigInt(42) } as unknown as Record<string, unknown>;
+      expect(extractStructuredLog(payload)).toBeUndefined();
     });
   });
 });

@@ -10,11 +10,13 @@ describe("buildCorsOptions", () => {
     expect(options.origin).toEqual(config.cors.allowedOrigins);
     expect(options.maxAge).toBe(config.cors.maxAgeSeconds);
     expect(options.credentials).toBe(true);
+    expect(options.unsafeWildcardDetected).toBe(false);
   });
 
-  it("returns wildcard origin when configured", () => {
+  it("flags wildcard origin configuration and returns an empty allow list", () => {
     const config = createSecurityConfig();
     const options = buildCorsOptions({ ...config.cors, allowedOrigins: ["*"] });
-    expect(options.origin).toBe("*");
+    expect(options.origin).toEqual([]);
+    expect(options.unsafeWildcardDetected).toBe(true);
   });
 });

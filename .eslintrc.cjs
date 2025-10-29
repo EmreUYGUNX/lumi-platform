@@ -17,6 +17,7 @@ module.exports = {
       "./packages/*/tsconfig.json",
       "./packages/*/tsconfig.eslint.json",
       "./tools/tsconfig.json",
+      "./prisma/tsconfig.json",
     ],
     tsconfigRootDir: __dirname,
   },
@@ -29,10 +30,12 @@ module.exports = {
           "./packages/*/tsconfig.json",
           "./packages/*/tsconfig.eslint.json",
           "./tools/tsconfig.json",
+          "./prisma/tsconfig.json",
         ],
       },
       node: {
         extensions: [".js", ".jsx", ".ts", ".tsx"],
+        version: ">=20.11.0",
       },
     },
     react: {
@@ -156,11 +159,6 @@ module.exports = {
       parserOptions: {
         project: [path.join(__dirname, "apps/backend/tsconfig.json")],
       },
-      settings: {
-        node: {
-          version: ">=20.11.0",
-        },
-      },
       plugins: ["n"],
       extends: ["plugin:n/recommended"],
       rules: {
@@ -196,6 +194,14 @@ module.exports = {
       rules: {
         "security/detect-object-injection": "off",
         "sonarjs/no-duplicate-string": "off",
+      },
+    },
+    {
+      files: ["prisma/seed.ts"],
+      rules: {
+        "no-await-in-loop": "off",
+        "no-restricted-syntax": "off",
+        "sonarjs/cognitive-complexity": "off",
       },
     },
   ],

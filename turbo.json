@@ -114,7 +114,7 @@
       "cache": false,
       "persistent": true,
       "dependsOn": ["^dev", "build"],
-      "env": ["NODE_ENV", "DEBUG", "LOG_LEVEL", "API_BASE_URL", "APP_PORT"]
+      "env": ["NODE_ENV", "DEBUG", "LOG_LEVEL", "API_BASE_URL", "APP_PORT", "PORT"]
     },
     "format": {
       "cache": false,

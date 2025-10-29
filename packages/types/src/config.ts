@@ -44,6 +44,22 @@ export interface SecurityHeadersConfig {
 
 export type RateLimitStrategy = "memory" | "redis";
 
+export interface RateLimitRouteConfig {
+  points: number;
+  durationSeconds: number;
+  blockDurationSeconds: number;
+}
+
+export interface AuthRateLimitRouteMap {
+  global: RateLimitRouteConfig;
+  login: RateLimitRouteConfig;
+  register: RateLimitRouteConfig;
+  forgotPassword: RateLimitRouteConfig;
+  resendVerification: RateLimitRouteConfig;
+  refresh: RateLimitRouteConfig;
+  changePassword: RateLimitRouteConfig;
+}
+
 export interface RateLimitConfig {
   enabled: boolean;
   keyPrefix: string;
@@ -52,9 +68,26 @@ export interface RateLimitConfig {
   blockDurationSeconds: number;
   strategy: RateLimitStrategy;
   inmemoryBlockOnConsumed?: number;
+  ipWhitelist: string[];
   redis?: {
     url: string;
   };
+  routes: {
+    auth: AuthRateLimitRouteMap;
+  };
+}
+
+export interface ProgressiveDelayConfig {
+  baseDelayMs: number;
+  stepDelayMs: number;
+  maxDelayMs: number;
+}
+
+export interface AuthBruteForceConfig {
+  enabled: boolean;
+  windowSeconds: number;
+  progressiveDelays: ProgressiveDelayConfig;
+  captchaThreshold: number;
 }
 
 export interface ValidationConfig {
@@ -70,10 +103,22 @@ export interface LogRotationConfig {
   zippedArchive: boolean;
 }
 
+export interface RequestLoggingConfig {
+  sampleRate: number;
+  maxBodyLength: number;
+  redactFields: string[];
+}
+
 export interface LogTransportConfig {
   directory: string;
   rotation: LogRotationConfig;
   consoleEnabled: boolean;
+  request: RequestLoggingConfig;
+}
+
+export interface MetricsBasicAuthConfig {
+  username: string;
+  password: string;
 }
 
 export interface MetricsConfig {
@@ -82,6 +127,15 @@ export interface MetricsConfig {
   prefix?: string;
   collectDefaultMetrics: boolean;
   defaultMetricsInterval: number;
+  basicAuth?: MetricsBasicAuthConfig;
+}
+
+export interface DatabasePoolConfig {
+  minConnections: number;
+  maxConnections: number;
+  idleTimeoutMs: number;
+  maxLifetimeMs: number;
+  connectionTimeoutMs: number;
 }
 
 export interface AlertingConfig {
@@ -94,6 +148,95 @@ export interface HealthConfig {
   uptimeGracePeriodSeconds: number;
 }
 
+export interface AuthTokenConfig {
+  secret: string;
+  ttlSeconds: number;
+}
+
+export interface AuthCookiesConfig {
+  domain?: string;
+  secret: string;
+}
+
+export interface AuthSessionConfig {
+  fingerprintSecret: string;
+  lockoutDurationSeconds: number;
+  maxLoginAttempts: number;
+}
+
+export interface EmailSmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  username?: string;
+  password?: string;
+  tls: {
+    rejectUnauthorized: boolean;
+  };
+}
+
+export type EmailQueueDriver = "inline" | "memory" | "bullmq";
+
+export interface EmailQueueConfig {
+  driver: EmailQueueDriver;
+  concurrency: number;
+}
+
+export interface EmailRateLimitConfig {
+  windowSeconds: number;
+  maxPerRecipient: number;
+}
+
+export interface EmailTemplateBrandingConfig {
+  productName: string;
+  supportEmail: string;
+  supportUrl?: string;
+}
+
+export interface EmailTemplateConfig {
+  baseUrl: string;
+  branding: EmailTemplateBrandingConfig;
+  defaultLocale: string;
+}
+
+export interface EmailConfig {
+  enabled: boolean;
+  defaultSender: {
+    email: string;
+    name?: string;
+    replyTo?: string;
+  };
+  signingSecret: string;
+  transport: {
+    driver: "smtp";
+    smtp: EmailSmtpConfig;
+  };
+  rateLimit: EmailRateLimitConfig;
+  queue: EmailQueueConfig;
+  logging: {
+    deliveries: boolean;
+  };
+  template: EmailTemplateConfig;
+}
+
+export interface AuthConfig {
+  jwt: {
+    access: AuthTokenConfig;
+    refresh: AuthTokenConfig;
+  };
+  cookies: AuthCookiesConfig;
+  tokens: {
+    emailVerification: {
+      ttlSeconds: number;
+    };
+    passwordReset: {
+      ttlSeconds: number;
+    };
+  };
+  session: AuthSessionConfig;
+  bruteForce: AuthBruteForceConfig;
+}
+
 export interface ResolvedEnvironment {
   nodeEnv: RuntimeEnvironment;
   appName: string;
@@ -101,10 +244,57 @@ export interface ResolvedEnvironment {
   apiBaseUrl: string;
   frontendUrl: string;
   databaseUrl: string;
+  databasePool: {
+    minConnections: number;
+    maxConnections: number;
+  };
+  slowQueryThresholdMs: number;
+  queryTimeoutMs: number;
   redisUrl: string;
   storageBucket: string;
   logLevel: LogLevel;
   jwtSecret: string;
+  jwtAccessSecret: string;
+  jwtRefreshSecret: string;
+  jwtAccessTtlSeconds: number;
+  jwtRefreshTtlSeconds: number;
+  cookieDomain?: string;
+  cookieSecret: string;
+  email: {
+    enabled: boolean;
+    defaultSender: {
+      email: string;
+      name?: string;
+      replyTo?: string;
+    };
+    signingSecret: string;
+    transport: {
+      driver: "smtp";
+      smtp: EmailSmtpConfig;
+    };
+    rateLimit: EmailRateLimitConfig;
+    queue: EmailQueueConfig;
+    logging: {
+      deliveries: boolean;
+    };
+    template: {
+      baseUrl: string;
+      supportEmail: string;
+      supportUrl?: string;
+      defaultLocale: string;
+    };
+  };
+  emailVerificationTtlSeconds: number;
+  passwordResetTtlSeconds: number;
+  sessionFingerprintSecret: string;
+  lockoutDurationSeconds: number;
+  maxLoginAttempts: number;
+  authBruteForce: {
+    enabled: boolean;
+    windowSeconds: number;
+    progressiveDelays: ProgressiveDelayConfig;
+    captchaThreshold: number;
+  };
   cors: CorsConfig;
   securityHeaders: SecurityHeadersConfig;
   rateLimit: RateLimitConfig;
@@ -114,11 +304,16 @@ export interface ResolvedEnvironment {
   logMaxSize: string;
   logMaxFiles: string;
   logConsoleEnabled: boolean;
+  logRequestSampleRate: number;
+  logRequestMaxBodyLength: number;
+  logRequestRedactFields: string[];
   metricsEnabled: boolean;
   metricsEndpoint: string;
   metricsPrefix?: string;
   metricsCollectDefault: boolean;
   metricsDefaultInterval: number;
+  metricsBasicAuthUsername?: string;
+  metricsBasicAuthPassword?: string;
   alertingEnabled: boolean;
   alertingWebhookUrl?: string;
   alertingSeverity: AlertSeverityLevel;
@@ -140,6 +335,9 @@ export interface ApplicationConfig {
   };
   database: {
     url: string;
+    pool: DatabasePoolConfig;
+    slowQueryThresholdMs: number;
+    queryTimeoutMs: number;
   };
   cache: {
     redisUrl: string;
@@ -154,6 +352,7 @@ export interface ApplicationConfig {
     rateLimit: RateLimitConfig;
     validation: ValidationConfig;
   };
+  auth: AuthConfig;
   observability: {
     sentryDsn?: string;
     logs: LogTransportConfig;
@@ -161,6 +360,7 @@ export interface ApplicationConfig {
     alerting: AlertingConfig;
     health: HealthConfig;
   };
+  email: EmailConfig;
   featureFlags: FeatureFlagMap;
   runtime: {
     ci: boolean;

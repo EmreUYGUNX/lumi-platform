@@ -11,9 +11,37 @@ const config = createProjectJestConfig({
   setupFiles: []
 });
 
+config.setupFilesAfterEnv = [
+  ...(config.setupFilesAfterEnv || []),
+  path.join(__dirname, "src/__tests__/setup.ts")
+];
+
 config.collectCoverageFrom = [
   ...(config.collectCoverageFrom || []),
   "!<rootDir>/apps/backend/src/index.ts"
 ];
+
+config.coveragePathIgnorePatterns = [
+  ...(config.coveragePathIgnorePatterns || []),
+  "<rootDir>/vendor/",
+  "<rootDir>/apps/backend/src/lib/prisma/middleware.ts"
+];
+
+config.transformIgnorePatterns = [
+  ...(config.transformIgnorePatterns || []),
+  "node_modules/(?!embedded-postgres/|@embedded-postgres/)"
+];
+
+config.modulePathIgnorePatterns = [
+  ...(config.modulePathIgnorePatterns || []),
+  "<rootDir>/apps/frontend/.next",
+  "<rootDir>/.next"
+];
+
+config.moduleNameMapper = {
+  "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
+  ...(config.moduleNameMapper || {}),
+  "^@/(.*)$": "<rootDir>/apps/backend/src/$1"
+};
 
 module.exports = config;

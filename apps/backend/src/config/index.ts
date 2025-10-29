@@ -2,10 +2,15 @@ import { EventEmitter } from "node:events";
 
 import type { ApplicationConfig, ConfigurationChange, ResolvedEnvironment } from "@lumi/types";
 
+import { buildAuthConfig } from "./auth.config.js";
 import { getEnvironment, loadEnvironment, onEnvironmentChange } from "./env.js";
 import { createFeatureFlagRegistry } from "./feature-flags.js";
 
 const configEmitter = new EventEmitter();
+
+const DEFAULT_POOL_IDLE_TIMEOUT_MS = 30 * 1e3;
+const DEFAULT_POOL_MAX_LIFETIME_MS = 300 * 1e3;
+const DEFAULT_POOL_CONNECTION_TIMEOUT_MS = 5 * 1e3;
 
 const flatten = (input: unknown, prefix = ""): Record<string, unknown> => {
   if (typeof input !== "object" || input === null) {
@@ -57,6 +62,29 @@ const computeDiffKeys = (
   return changed;
 };
 
+const buildEmailConfig = (env: ResolvedEnvironment): ApplicationConfig["email"] => ({
+  enabled: env.email.enabled,
+  defaultSender: {
+    email: env.email.defaultSender.email,
+    name: env.email.defaultSender.name ?? env.appName,
+    replyTo: env.email.defaultSender.replyTo,
+  },
+  signingSecret: env.email.signingSecret,
+  transport: env.email.transport,
+  rateLimit: env.email.rateLimit,
+  queue: env.email.queue,
+  logging: env.email.logging,
+  template: {
+    baseUrl: env.email.template.baseUrl,
+    defaultLocale: env.email.template.defaultLocale,
+    branding: {
+      productName: env.appName,
+      supportEmail: env.email.template.supportEmail,
+      supportUrl: env.email.template.supportUrl ?? env.email.template.baseUrl,
+    },
+  },
+});
+
 const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationConfig => ({
   app: {
     name: env.appName,
@@ -68,6 +96,15 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
   },
   database: {
     url: env.databaseUrl,
+    pool: {
+      minConnections: env.databasePool.minConnections,
+      maxConnections: env.databasePool.maxConnections,
+      idleTimeoutMs: DEFAULT_POOL_IDLE_TIMEOUT_MS,
+      maxLifetimeMs: DEFAULT_POOL_MAX_LIFETIME_MS,
+      connectionTimeoutMs: Math.min(env.queryTimeoutMs, DEFAULT_POOL_CONNECTION_TIMEOUT_MS),
+    },
+    slowQueryThresholdMs: env.slowQueryThresholdMs,
+    queryTimeoutMs: env.queryTimeoutMs,
   },
   cache: {
     redisUrl: env.redisUrl,
@@ -82,6 +119,8 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
     rateLimit: env.rateLimit,
     validation: env.validation,
   },
+  auth: buildAuthConfig(env),
+  email: buildEmailConfig(env),
   observability: {
     sentryDsn: env.sentryDsn,
     logs: {
@@ -92,6 +131,11 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
         zippedArchive: true,
       },
       consoleEnabled: env.logConsoleEnabled,
+      request: {
+        sampleRate: env.logRequestSampleRate,
+        maxBodyLength: env.logRequestMaxBodyLength,
+        redactFields: env.logRequestRedactFields,
+      },
     },
     metrics: {
       enabled: env.metricsEnabled,
@@ -99,6 +143,13 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
       prefix: env.metricsPrefix,
       collectDefaultMetrics: env.metricsCollectDefault,
       defaultMetricsInterval: env.metricsDefaultInterval,
+      basicAuth:
+        env.metricsBasicAuthUsername && env.metricsBasicAuthPassword
+          ? {
+              username: env.metricsBasicAuthUsername,
+              password: env.metricsBasicAuthPassword,
+            }
+          : undefined,
     },
     alerting: {
       enabled: env.alertingEnabled,
@@ -164,6 +215,11 @@ export const getConfig = (): ApplicationConfig => cachedConfig;
 export const getFeatureFlags = () => featureFlagRegistry.snapshot();
 
 export const isFeatureEnabled = (flag: string): boolean => featureFlagRegistry.isEnabled(flag);
+
+export const getAuthConfig = () => getConfig().auth;
+export const getJwtConfig = () => getAuthConfig().jwt;
+export const getSessionSecurityConfig = () => getAuthConfig().session;
+export const getEmailConfig = () => getConfig().email;
 
 export const reloadConfiguration = (
   reason = "manual",

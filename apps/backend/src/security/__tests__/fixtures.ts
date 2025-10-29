@@ -40,6 +40,46 @@ export const createSecurityConfig = (): ApplicationConfig["security"] => ({
     blockDurationSeconds: 60,
     strategy: "memory",
     inmemoryBlockOnConsumed: 0,
+    ipWhitelist: [],
+    routes: {
+      auth: {
+        global: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        login: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        register: {
+          points: 5,
+          durationSeconds: 900,
+          blockDurationSeconds: 900,
+        },
+        forgotPassword: {
+          points: 3,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
+        resendVerification: {
+          points: 3,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
+        refresh: {
+          points: 10,
+          durationSeconds: 60,
+          blockDurationSeconds: 120,
+        },
+        changePassword: {
+          points: 5,
+          durationSeconds: 3600,
+          blockDurationSeconds: 3600,
+        },
+      },
+    },
   },
   validation: {
     strict: false,

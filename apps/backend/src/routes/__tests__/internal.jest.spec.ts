@@ -1,0 +1,191 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
+import * as fs from "node:fs";
+import path from "node:path";
+
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
+import request from "supertest";
+
+import { resetEnvironmentCache } from "../../config/env.js";
+import { withTemporaryEnvironment } from "../../config/testing.js";
+
+const TEST_LOG_DIR = path.join(process.cwd(), "apps/backend/tmp-logs");
+
+const BASE_ENV = {
+  NODE_ENV: "test",
+  APP_NAME: "InternalRoutesTest",
+  APP_PORT: "4900",
+  API_BASE_URL: "http://localhost:4900",
+  FRONTEND_URL: "http://localhost:3900",
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
+  REDIS_URL: "redis://localhost:6379/0",
+  STORAGE_BUCKET: "internal-routes",
+  LOG_LEVEL: "info",
+  LOG_DIRECTORY: TEST_LOG_DIR,
+  JWT_SECRET: "12345678901234567890123456789012",
+  METRICS_ENABLED: "true",
+  METRICS_ENDPOINT: "/metrics",
+  METRICS_PREFIX: "lumi_",
+  METRICS_COLLECT_DEFAULT: "false",
+  METRICS_DEFAULT_INTERVAL: "5000",
+  METRICS_BASIC_AUTH_USERNAME: "metrics",
+  METRICS_BASIC_AUTH_PASSWORD: "metrics-pass",
+  ALERTING_ENABLED: "false",
+  HEALTH_UPTIME_GRACE_PERIOD: "0",
+  FEATURE_FLAGS: "{}",
+  CONFIG_HOT_RELOAD: "false",
+  CI: "true",
+} as const;
+
+beforeEach(() => {
+  jest.resetModules();
+});
+
+beforeAll(() => {
+  fs.mkdirSync(TEST_LOG_DIR, { recursive: true });
+});
+
+afterEach(() => {
+  resetEnvironmentCache();
+  jest.resetModules();
+});
+
+afterAll(() => {
+  if (fs.existsSync(TEST_LOG_DIR)) {
+    fs.rmSync(TEST_LOG_DIR, { recursive: true, force: true });
+  }
+});
+
+const toAuthHeader = (username: string, password: string) => {
+  const credentials = `${username}:${password}`;
+  return `Basic ${Buffer.from(credentials).toString("base64")}`;
+};
+
+describe("internal router", () => {
+  it("exposes metrics behind basic authentication", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app)
+        .get("/internal/metrics")
+        .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+        .expect(200);
+
+      expect(response.headers["content-type"]).toContain("text/plain");
+      expect(response.text).toContain("lumi_http_requests_total");
+    });
+  });
+
+  it("allows metrics export when authentication is disabled", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_BASIC_AUTH_USERNAME: "",
+        METRICS_BASIC_AUTH_PASSWORD: "",
+      },
+      async () => {
+        const { createApp } = await import("../../app.js");
+        const app = createApp();
+
+        const response = await request(app).get("/internal/metrics").expect(200);
+
+        expect(response.headers["content-type"]).toContain("text/plain");
+      },
+    );
+  });
+
+  it("rejects metrics requests without valid credentials", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app).get("/internal/metrics").expect(401);
+
+      expect(response.headers["www-authenticate"]).toContain("Basic realm");
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe("UNAUTHORIZED");
+    });
+  });
+
+  it("returns 503 when metrics are disabled", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_ENABLED: "false",
+      },
+      async () => {
+        const { createApp } = await import("../../app.js");
+        const app = createApp();
+
+        const response = await request(app)
+          .get("/internal/metrics")
+          .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+          .expect(503);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe("METRICS_DISABLED");
+      },
+    );
+  });
+
+  it("returns 204 when no metrics are recorded", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const observability = await import("../../observability/index.js");
+      const snapshotSpy = jest.spyOn(observability, "getMetricsSnapshot").mockResolvedValue("");
+
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app)
+        .get("/internal/metrics")
+        .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+        .expect(204);
+
+      expect(response.text).toBe("");
+      snapshotSpy.mockRestore();
+    });
+  });
+
+  it("surfaces metrics snapshot errors", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const observability = await import("../../observability/index.js");
+      const snapshotSpy = jest
+        .spyOn(observability, "getMetricsSnapshot")
+        .mockRejectedValue("metrics-down");
+
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app)
+        .get("/internal/metrics")
+        .set("Authorization", toAuthHeader("metrics", "metrics-pass"))
+        .expect(500);
+
+      expect(response.body.error.code).toBe("METRICS_SNAPSHOT_ERROR");
+      expect(response.body.error.details.error.message).toBe("metrics-down");
+      snapshotSpy.mockRestore();
+    });
+  });
+
+  it("returns a health snapshot", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const { createApp } = await import("../../app.js");
+      const app = createApp();
+
+      const response = await request(app).get("/internal/health").expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty("status");
+      expect(response.body.meta).toHaveProperty("environment", "test");
+    });
+  });
+});

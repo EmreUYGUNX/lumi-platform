@@ -1,0 +1,2410 @@
+openapi: 3.1.0
+info:
+  title: Lumi Backend API
+  version: 1.0.0
+  description: Express API baseline for the Lumi commerce platform. The documentation reflects the Phase 1 middleware and
+    health endpoints.
+  contact:
+    name: Lumi Platform Engineering
+    email: engineering@lumi.example
+  license:
+    name: Proprietary - Lumi Internal Use Only
+    identifier: LicenseRef-Lumi-Internal
+servers:
+  - url: http://localhost:4100/api
+    description: Primary API entrypoint
+tags:
+  - name: Health
+    description: Service health and readiness checks.
+  - name: Observability
+    description: Internal observability surfaces including metrics and diagnostics.
+  - name: Admin
+    description: Administrative endpoints reserved for authorised operators. Currently guarded with strict 403 responses
+      until RBAC is implemented.
+  - name: Catalog
+    description: Product catalogue browsing endpoints.
+  - name: Auth
+    description: Authentication, session management, and RBAC-protected endpoints.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Reserved for authenticated endpoints. Full RBAC enforcement will arrive in Phase 3.
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Used for internal-only endpoints such as metrics collection.
+    serviceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: Service-to-service authentication placeholder. Exact contract will be finalised in Phase 2.
+  schemas:
+    StandardSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+          description: Indicates the request completed successfully.
+        data:
+          description: Response payload specific to the request.
+        meta:
+          type: object
+          additionalProperties: true
+          description: Optional metadata contextualising the response.
+    ErrorDetails:
+      type: object
+      additionalProperties: true
+      description: Additional information to help diagnose the failure.
+    StandardError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          examples:
+            - FORBIDDEN
+            - UNAUTHORIZED
+        message:
+          type: string
+          description: Human readable summary of the error.
+          examples:
+            - Administrator privileges required.
+        details:
+          $ref: "#/components/schemas/ErrorDetails"
+    StandardErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum:
+            - false
+          description: Indicates the request failed.
+        error:
+          $ref: "#/components/schemas/StandardError"
+        meta:
+          type: object
+          additionalProperties: true
+          description: Optional metadata contextualising the error.
+    AuthUserProfile:
+      type: object
+      description: Canonical representation of an authenticated user.
+      required:
+        - id
+        - email
+        - emailVerified
+        - status
+        - roles
+        - permissions
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable user identifier.
+        email:
+          type: string
+          format: email
+          description: Normalised email address.
+        firstName:
+          type: string
+          nullable: true
+          description: Optional given name.
+        lastName:
+          type: string
+          nullable: true
+          description: Optional family name.
+        phone:
+          type: string
+          nullable: true
+          description: Optional E.164 formatted phone number.
+        emailVerified:
+          type: boolean
+          description: Indicates whether the email address has been confirmed.
+        status:
+          type: string
+          description: Account lifecycle state.
+          enum:
+            - ACTIVE
+            - SUSPENDED
+            - DELETED
+        roles:
+          type: array
+          description: Role slugs assigned to the user.
+          items:
+            type: string
+        permissions:
+          type: array
+          description: Permission keys granted to the user.
+          items:
+            type: string
+    AuthTokenEnvelope:
+      type: object
+      description: Signed JWT payload metadata.
+      required:
+        - token
+        - expiresAt
+      properties:
+        token:
+          type: string
+          description: Signed JWT token value.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Token expiry in UTC.
+    AuthTokenPair:
+      type: object
+      description: Access and refresh token bundle.
+      required:
+        - accessToken
+        - refreshToken
+      properties:
+        accessToken:
+          $ref: "#/components/schemas/AuthTokenEnvelope"
+        refreshToken:
+          $ref: "#/components/schemas/AuthTokenEnvelope"
+    AuthRegisterResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - user
+                - emailVerification
+              properties:
+                user:
+                  $ref: "#/components/schemas/AuthUserProfile"
+                emailVerification:
+                  type: object
+                  required:
+                    - expiresAt
+                  properties:
+                    expiresAt:
+                      type: string
+                      format: date-time
+                      description: Expiry timestamp for the verification token.
+    AuthLoginResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - sessionId
+                - accessToken
+                - refreshToken
+                - accessTokenExpiresAt
+                - refreshTokenExpiresAt
+                - user
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  description: Active session identifier.
+                accessToken:
+                  type: string
+                  description: Signed access token for authorising API calls.
+                refreshToken:
+                  type: string
+                  description: Signed refresh token issued alongside the cookie.
+                accessTokenExpiresAt:
+                  type: string
+                  format: date-time
+                  description: Expiry for the access token.
+                refreshTokenExpiresAt:
+                  type: string
+                  format: date-time
+                  description: Expiry for the refresh token.
+                user:
+                  $ref: "#/components/schemas/AuthUserProfile"
+    AuthRefreshResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - sessionId
+                - accessToken
+                - refreshToken
+                - accessTokenExpiresAt
+                - refreshTokenExpiresAt
+                - user
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                accessToken:
+                  type: string
+                refreshToken:
+                  type: string
+                accessTokenExpiresAt:
+                  type: string
+                  format: date-time
+                refreshTokenExpiresAt:
+                  type: string
+                  format: date-time
+                user:
+                  $ref: "#/components/schemas/AuthUserProfile"
+    AuthLogoutResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - sessionId
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  description: Identifier of the revoked session.
+    AuthLogoutAllResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - revokedSessions
+              properties:
+                revokedSessions:
+                  type: integer
+                  minimum: 0
+                  description: Number of sessions revoked during the operation.
+    AuthUserResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - user
+              properties:
+                user:
+                  $ref: "#/components/schemas/AuthUserProfile"
+    AuthMessageResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  description: Informational message for the caller.
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+          description: Unique email address for the account.
+        password:
+          type: string
+          minLength: 12
+          description: Must satisfy the platform password policy (minimum 12 characters, upper and lower case, number, special
+            character).
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        phone:
+          type: string
+          nullable: true
+          description: Optional phone number in international format.
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+    VerifyEmailRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 10
+          description: Signed verification token received via email.
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+          minLength: 10
+          description: Password reset token received via email.
+        password:
+          type: string
+          minLength: 12
+          description: New password satisfying the platform policy.
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Current password for verification.
+        newPassword:
+          type: string
+          minLength: 12
+          description: Replacement password that must satisfy the platform policy and differ from the current password.
+    HealthComponent:
+      type: object
+      required:
+        - status
+        - summary
+        - observedAt
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Component health status derived from the latest probe.
+        summary:
+          type: string
+          description: High level description of the component state.
+        details:
+          type: object
+          additionalProperties: true
+          description: Detailed diagnostic data supplied by the component probe.
+        severity:
+          type: string
+          enum:
+            - info
+            - warn
+            - error
+            - fatal
+          description: Recommended alerting severity for the reported state.
+        observedAt:
+          type: string
+          format: date-time
+          description: UTC timestamp when the component was evaluated.
+    HealthSnapshot:
+      type: object
+      required:
+        - status
+        - uptimeSeconds
+        - timestamp
+        - components
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Overall system health derived from the individual component states.
+        uptimeSeconds:
+          type: number
+          format: double
+          description: Node.js process uptime at the time of the snapshot.
+        responseTimeMs:
+          type: number
+          format: double
+          description: Time taken to evaluate all health checks, in milliseconds.
+        timestamp:
+          type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was generated.
+        components:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/HealthComponent"
+          description: Collection of component health summaries keyed by identifier.
+        metrics:
+          type: object
+          properties:
+            memory:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+              description: Per-segment memory usage in bytes.
+            cpu:
+              type: object
+              properties:
+                userMs:
+                  type: number
+                  format: double
+                systemMs:
+                  type: number
+                  format: double
+            load:
+              type: object
+              properties:
+                averages:
+                  type: array
+                  items:
+                    type: number
+                    format: double
+                  minItems: 3
+                  maxItems: 3
+                  description: 1, 5, and 15 minute load averages.
+    HealthResponseMeta:
+      type: object
+      properties:
+        environment:
+          type: string
+        service:
+          type: string
+        check:
+          type: string
+          description: Identifier for the health check variant.
+        generatedAt:
+          type: string
+          format: date-time
+          description: Timestamp representing when the metadata snapshot was captured.
+    HealthComprehensiveResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthSnapshot"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - comprehensive
+    HealthReadinessData:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+    HealthReadinessResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthReadinessData"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - readiness
+    HealthLivenessData:
+      type: object
+      required:
+        - status
+        - uptimeSeconds
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+        uptimeSeconds:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+    HealthLivenessResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthLivenessData"
+            meta:
+              allOf:
+                - $ref: "#/components/schemas/HealthResponseMeta"
+                - type: object
+                  properties:
+                    check:
+                      type: string
+                      enum:
+                        - liveness
+    Money:
+      type: object
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: string
+          pattern: ^-?\d+(?:\.\d{1,2})?$
+          description: Decimal amount represented as a string with up to two fractional digits.
+          examples:
+            - "199.99"
+            - "0.00"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: ^[A-Z]{3}$
+          description: ISO-4217 currency code.
+          examples:
+            - TRY
+            - USD
+    AuditTimestamps:
+      type: object
+      required:
+        - createdAt
+        - updatedAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp in ISO-8601 format.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp in ISO-8601 format.
+    SoftDeleteMetadata:
+      type: object
+      properties:
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp indicating when the record was soft deleted.
+    UserRoleSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - name
+          properties:
+            id:
+              type: string
+              format: cuid
+            name:
+              type: string
+              maxLength: 120
+            description:
+              type: string
+              nullable: true
+    UserPermissionSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - key
+          properties:
+            id:
+              type: string
+              format: cuid
+            key:
+              type: string
+              maxLength: 120
+            description:
+              type: string
+              nullable: true
+    UserSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - email
+            - status
+            - emailVerified
+            - roles
+            - permissions
+          properties:
+            id:
+              type: string
+              format: cuid
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+              nullable: true
+            lastName:
+              type: string
+              nullable: true
+            fullName:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - SUSPENDED
+                - DELETED
+            emailVerified:
+              type: boolean
+            roles:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserRoleSummary"
+            permissions:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserPermissionSummary"
+    MediaAsset:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - assetId
+            - url
+            - type
+            - provider
+            - mimeType
+            - sizeBytes
+          properties:
+            id:
+              type: string
+              format: cuid
+            assetId:
+              type: string
+              maxLength: 120
+            url:
+              type: string
+              format: uri
+            type:
+              type: string
+              enum:
+                - IMAGE
+                - VIDEO
+                - DOCUMENT
+            provider:
+              type: string
+              enum:
+                - CLOUDINARY
+                - S3
+            mimeType:
+              type: string
+            sizeBytes:
+              type: integer
+              minimum: 0
+            width:
+              type: integer
+              nullable: true
+            height:
+              type: integer
+              nullable: true
+            alt:
+              type: string
+              nullable: true
+            caption:
+              type: string
+              nullable: true
+    CategorySummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - name
+            - slug
+            - path
+            - level
+          properties:
+            id:
+              type: string
+              format: cuid
+            name:
+              type: string
+            slug:
+              type: string
+              pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+            description:
+              type: string
+              nullable: true
+            parentId:
+              type: string
+              format: cuid
+              nullable: true
+            level:
+              type: integer
+              minimum: 0
+            path:
+              type: string
+            imageUrl:
+              type: string
+              format: uri
+              nullable: true
+            iconUrl:
+              type: string
+              format: uri
+              nullable: true
+            displayOrder:
+              type: integer
+              nullable: true
+    ProductVariant:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - title
+            - price
+            - stock
+            - isPrimary
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            sku:
+              type: string
+              nullable: true
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            stock:
+              type: integer
+              minimum: 0
+            attributes:
+              type: object
+              nullable: true
+              additionalProperties: true
+            weightGrams:
+              type: integer
+              nullable: true
+            isPrimary:
+              type: boolean
+    ProductMedia:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - productId
+            - mediaId
+            - isPrimary
+            - media
+          properties:
+            productId:
+              type: string
+              format: cuid
+            mediaId:
+              type: string
+              format: cuid
+            sortOrder:
+              type: integer
+              nullable: true
+            isPrimary:
+              type: boolean
+            media:
+              $ref: "#/components/schemas/MediaAsset"
+    ProductSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - $ref: "#/components/schemas/SoftDeleteMetadata"
+        - type: object
+          required:
+            - id
+            - title
+            - slug
+            - status
+            - price
+            - currency
+            - inventoryPolicy
+            - variants
+            - categories
+            - media
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            slug:
+              type: string
+              pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+            sku:
+              type: string
+              nullable: true
+            summary:
+              type: string
+              nullable: true
+            description:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - DRAFT
+                - ACTIVE
+                - ARCHIVED
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            inventoryPolicy:
+              type: string
+              enum:
+                - TRACK
+                - CONTINUE
+                - DENY
+            searchKeywords:
+              type: array
+              items:
+                type: string
+            attributes:
+              type: object
+              additionalProperties: true
+              nullable: true
+            variants:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductVariant"
+            categories:
+              type: array
+              items:
+                $ref: "#/components/schemas/CategorySummary"
+            media:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductMedia"
+    ProductCollectionResponse:
+      allOf:
+        - $ref: "#/components/schemas/StandardSuccessResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductSummary"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+    CartItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - cartId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            cartId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            productVariant:
+              $ref: "#/components/schemas/ProductVariant"
+              nullable: true
+    CartTotals:
+      type: object
+      required:
+        - subtotal
+        - tax
+        - discount
+        - total
+      properties:
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        tax:
+          $ref: "#/components/schemas/Money"
+        discount:
+          $ref: "#/components/schemas/Money"
+        total:
+          $ref: "#/components/schemas/Money"
+    CartSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - status
+            - items
+            - totals
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            sessionId:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - CHECKED_OUT
+                - ABANDONED
+            expiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CartItem"
+            totals:
+              $ref: "#/components/schemas/CartTotals"
+    OrderItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - orderId
+            - productId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            productId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            titleSnapshot:
+              type: string
+            variantSnapshot:
+              type: object
+              additionalProperties: true
+              nullable: true
+    OrderSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - reference
+            - status
+            - totalAmount
+            - subtotalAmount
+            - taxAmount
+            - discountAmount
+            - currency
+            - items
+          properties:
+            id:
+              type: string
+              format: cuid
+            reference:
+              type: string
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            cartId:
+              type: string
+              format: cuid
+              nullable: true
+            status:
+              type: string
+              enum:
+                - PENDING
+                - PAID
+                - FULFILLED
+                - SHIPPED
+                - DELIVERED
+                - CANCELLED
+            totalAmount:
+              $ref: "#/components/schemas/Money"
+            subtotalAmount:
+              $ref: "#/components/schemas/Money"
+            taxAmount:
+              $ref: "#/components/schemas/Money"
+            discountAmount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            placedAt:
+              type: string
+              format: date-time
+              nullable: true
+            fulfilledAt:
+              type: string
+              format: date-time
+              nullable: true
+            shippedAt:
+              type: string
+              format: date-time
+              nullable: true
+            deliveredAt:
+              type: string
+              format: date-time
+              nullable: true
+            cancelledAt:
+              type: string
+              format: date-time
+              nullable: true
+            notes:
+              type: string
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+              nullable: true
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+            shippingAddressId:
+              type: string
+              format: cuid
+              nullable: true
+            billingAddressId:
+              type: string
+              format: cuid
+              nullable: true
+    PaymentSummary:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - orderId
+            - provider
+            - status
+            - transactionId
+            - amount
+            - currency
+          properties:
+            id:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            provider:
+              type: string
+              enum:
+                - IYZICO
+                - STRIPE
+                - PAYPAL
+                - MANUAL
+            status:
+              type: string
+              enum:
+                - INITIATED
+                - AUTHORIZED
+                - SETTLED
+                - FAILED
+                - REFUNDED
+            transactionId:
+              type: string
+            conversationId:
+              type: string
+              nullable: true
+            amount:
+              $ref: "#/components/schemas/Money"
+            paidPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            installment:
+              type: integer
+              nullable: true
+            paymentChannel:
+              type: string
+              nullable: true
+            paymentGroup:
+              type: string
+              nullable: true
+            cardToken:
+              type: string
+              nullable: true
+            cardAssociation:
+              type: string
+              nullable: true
+            cardFamily:
+              type: string
+              nullable: true
+            cardType:
+              type: string
+              nullable: true
+            cardBankName:
+              type: string
+              nullable: true
+            cardHolderName:
+              type: string
+              nullable: true
+            binNumber:
+              type: string
+              nullable: true
+            lastFourDigits:
+              type: string
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            deviceId:
+              type: string
+              nullable: true
+            fraudScore:
+              type: number
+              nullable: true
+            riskFlags:
+              type: object
+              additionalProperties: true
+              nullable: true
+            authorizedAt:
+              type: string
+              format: date-time
+              nullable: true
+            settledAt:
+              type: string
+              format: date-time
+              nullable: true
+            failedAt:
+              type: string
+              format: date-time
+              nullable: true
+            failureReason:
+              type: string
+              nullable: true
+            failureCode:
+              type: string
+              nullable: true
+            rawPayload:
+              type: object
+              additionalProperties: true
+              nullable: true
+    PaymentRefundRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - paymentId
+            - amount
+            - currency
+            - status
+          properties:
+            id:
+              type: string
+              format: cuid
+            paymentId:
+              type: string
+              format: cuid
+            amount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            reason:
+              type: string
+              nullable: true
+            status:
+              type: string
+            refundId:
+              type: string
+              nullable: true
+            processedAt:
+              type: string
+              format: date-time
+              nullable: true
+            failureReason:
+              type: string
+              nullable: true
+            failureCode:
+              type: string
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+              nullable: true
+    InventoryRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - productVariantId
+            - quantityAvailable
+            - quantityReserved
+            - quantityOnHand
+          properties:
+            id:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantityAvailable:
+              type: integer
+              minimum: 0
+            quantityReserved:
+              type: integer
+              minimum: 0
+            quantityOnHand:
+              type: integer
+              minimum: 0
+            lowStockThreshold:
+              type: integer
+              nullable: true
+    AddressRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - label
+            - fullName
+            - line1
+            - city
+            - postalCode
+            - country
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            label:
+              type: string
+            fullName:
+              type: string
+            phone:
+              type: string
+              nullable: true
+            line1:
+              type: string
+            line2:
+              type: string
+              nullable: true
+            city:
+              type: string
+            state:
+              type: string
+              nullable: true
+            postalCode:
+              type: string
+            country:
+              type: string
+            isDefault:
+              type: boolean
+    SavedCardRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - cardToken
+            - lastFourDigits
+            - expiryMonth
+            - expiryYear
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            cardToken:
+              type: string
+            cardAlias:
+              type: string
+              nullable: true
+            binNumber:
+              type: string
+              nullable: true
+            lastFourDigits:
+              type: string
+            cardType:
+              type: string
+              nullable: true
+            cardAssociation:
+              type: string
+              nullable: true
+            cardFamily:
+              type: string
+              nullable: true
+            cardBankName:
+              type: string
+              nullable: true
+            cardHolderName:
+              type: string
+              nullable: true
+            expiryMonth:
+              type: integer
+              minimum: 1
+              maximum: 12
+            expiryYear:
+              type: integer
+            isDefault:
+              type: boolean
+    ReviewRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - productId
+            - userId
+            - rating
+            - title
+            - status
+          properties:
+            id:
+              type: string
+              format: cuid
+            productId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+              nullable: true
+            rating:
+              type: integer
+              minimum: 1
+              maximum: 5
+            title:
+              type: string
+            content:
+              type: string
+              nullable: true
+            isVerifiedPurchase:
+              type: boolean
+            status:
+              type: string
+              enum:
+                - PENDING
+                - APPROVED
+                - REJECTED
+            helpfulCount:
+              type: integer
+              minimum: 0
+            notHelpfulCount:
+              type: integer
+              minimum: 0
+    ReviewMediaRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - reviewId
+            - mediaId
+          properties:
+            reviewId:
+              type: string
+              format: cuid
+            mediaId:
+              type: string
+              format: cuid
+            sortOrder:
+              type: integer
+              nullable: true
+    CouponResource:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - code
+            - type
+            - value
+            - isActive
+          properties:
+            id:
+              type: string
+              format: cuid
+            code:
+              type: string
+            description:
+              type: string
+              nullable: true
+            type:
+              type: string
+              enum:
+                - PERCENTAGE
+                - FIXED_AMOUNT
+                - FREE_SHIPPING
+            value:
+              $ref: "#/components/schemas/Money"
+            minOrderAmount:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            maxDiscountAmount:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            usageLimit:
+              type: integer
+              nullable: true
+            usageCount:
+              type: integer
+              minimum: 0
+            startsAt:
+              type: string
+              format: date-time
+              nullable: true
+            expiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            isActive:
+              type: boolean
+    CouponUsageRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - couponId
+            - userId
+            - orderId
+            - discountAmount
+            - usedAt
+          properties:
+            id:
+              type: string
+              format: cuid
+            couponId:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            discountAmount:
+              $ref: "#/components/schemas/Money"
+            usedAt:
+              type: string
+              format: date-time
+    UserSessionToken:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - userId
+            - refreshTokenHash
+            - expiresAt
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+            refreshTokenHash:
+              type: string
+            fingerprint:
+              type: string
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
+            expiresAt:
+              type: string
+              format: date-time
+            revokedAt:
+              type: string
+              format: date-time
+              nullable: true
+    SecurityEventRecord:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - type
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            type:
+              type: string
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
+            payload:
+              type: object
+              additionalProperties: true
+              nullable: true
+    AuditLogEntry:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - actorType
+            - action
+            - entity
+            - entityId
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            actorType:
+              type: string
+            action:
+              type: string
+            entity:
+              type: string
+            entityId:
+              type: string
+            before:
+              type: object
+              additionalProperties: true
+              nullable: true
+            after:
+              type: object
+              additionalProperties: true
+              nullable: true
+            ipAddress:
+              type: string
+              nullable: true
+            userAgent:
+              type: string
+              nullable: true
+    PaginationMeta:
+      type: object
+      required:
+        - page
+        - pageSize
+        - totalItems
+        - totalPages
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        page:
+          type: integer
+          minimum: 0
+        pageSize:
+          type: integer
+          minimum: 1
+        totalItems:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+paths:
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user account
+      description: Creates a customer account and dispatches an email verification token. Passwords must satisfy the platform
+        policy and are hashed before storage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration succeeded and a verification email was issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRegisterResponse"
+        "400":
+          description: Validation failed for the supplied payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "409":
+          description: An account with the provided email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Authenticate with email and password
+      description: Validates credentials, records security telemetry, issues a new session, and returns access/refresh tokens.
+        The refresh token is also delivered as an HTTP-only, same-site cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded and tokens were issued.
+          headers:
+            Set-Cookie:
+              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLoginResponse"
+        "400":
+          description: Validation failed for the credentials payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "401":
+          description: Invalid credentials, lockout in effect, or account inactive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Rotate refresh token and obtain a new access token
+      description: Expects a valid signed refresh token via HTTP-only cookies. Performs replay detection, rotates the session,
+        and returns a fresh token pair.
+      responses:
+        "200":
+          description: Token rotation succeeded.
+          headers:
+            Set-Cookie:
+              description: Signed `refreshToken` cookie scoped to `/api` with SameSite=strict.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRefreshResponse"
+        "401":
+          description: Missing refresh token, token reuse detected, or session no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Revoke the current session
+      description: Invalidates the active session and clears the refresh token cookie.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Session revoked successfully.
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie cleared by setting an expired value.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLogoutResponse"
+        "401":
+          description: Caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/logout-all:
+    post:
+      tags:
+        - Auth
+      summary: Revoke all sessions for the authenticated user
+      description: Invalidates every active session associated with the caller and clears the refresh cookie.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active sessions revoked.
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie cleared by setting an expired value.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLogoutAllResponse"
+        "401":
+          description: Caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Retrieve the authenticated user profile
+      description: Returns the caller's profile, including roles and permissions resolved through RBAC.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "401":
+          description: Caller is not authenticated or session is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/verify-email:
+    post:
+      tags:
+        - Auth
+      summary: Confirm email using a verification token
+      description: Validates the verification token delivered by email, marks the user as verified, and revokes sessions if
+        token misuse is detected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "400":
+          description: Token structure invalid or already consumed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "401":
+          description: Token signature mismatch or verification failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/resend-verification:
+    post:
+      tags:
+        - Auth
+      summary: Resend email verification for the authenticated user
+      description: Issues a new verification token provided the account is not already verified.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Verification email reissued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "401":
+          description: Caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "404":
+          description: User record could not be found (should not occur for authenticated clients).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "409":
+          description: Email is already verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "429":
+          description: Rate limit exceeded for resend requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: Initiate password reset
+      description: Sends a password reset email if the account exists. The response is intentionally generic to avoid user
+        enumeration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Reset workflow triggered if the account exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessageResponse"
+        "400":
+          description: Email field missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "429":
+          description: Rate limit exceeded for password reset requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: Complete password reset
+      description: Validates the reset token, updates the password, revokes active sessions, and logs a security event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "400":
+          description: Payload validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "401":
+          description: Token mismatch or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/change-password:
+    put:
+      tags:
+        - Auth
+      summary: Change password for the authenticated user
+      description: Validates the current password, enforces the password policy, updates stored credentials, and revokes other
+        sessions.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUserResponse"
+        "400":
+          description: Validation failed (policy breach or passwords identical).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "401":
+          description: Authentication failed or current password incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "429":
+          description: Rate limit exceeded for change password attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/2fa/setup:
+    post:
+      tags:
+        - Auth
+      summary: Placeholder endpoint for two-factor enrolment
+      description: Currently returns a NOT_IMPLEMENTED response while the two-factor flow is under construction. Available to
+        authenticated callers for roadmap awareness.
+      security:
+        - bearerAuth: []
+      responses:
+        "401":
+          description: Caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "501":
+          description: Feature not yet implemented.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/auth/2fa/verify:
+    post:
+      tags:
+        - Auth
+      summary: Placeholder endpoint for two-factor verification
+      description: Returns NOT_IMPLEMENTED until two-factor verification is released. Helps clients detect feature availability.
+      security:
+        - bearerAuth: []
+      responses:
+        "401":
+          description: Caller is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "501":
+          description: Feature not yet implemented.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/users:
+    get:
+      summary: List platform users (placeholder)
+      description: >
+        Administrative endpoints are guarded by RBAC. Until full implementations land, a placeholder payload is returned
+        for authorised administrators.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "200":
+          description: Successful placeholder payload for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges are required or the requester lacks a valid role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+    post:
+      summary: Create a platform user (placeholder)
+      description: >
+        Placeholder endpoint for administrative user creation. Returns an informational message for authorised
+        administrators.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "202":
+          description: Request acknowledged for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges are required or the requester lacks a valid role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/audit-log:
+    get:
+      summary: Retrieve audit log entries (placeholder)
+      description: >
+        Enterprise audit trails will be exposed here after RBAC implementation. Authorised administrators receive a
+        placeholder payload.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "200":
+          description: Placeholder payload for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges are required or ownership checks failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/reports/sales:
+    get:
+      summary: Generate sales report (placeholder)
+      description: >
+        Reserved endpoint for future sales reporting capabilities. Authorised administrators with reporting permissions
+        receive a placeholder payload.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "200":
+          description: Placeholder payload for authorised administrators with reporting access.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges or reporting permissions are missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/catalog/products:
+    get:
+      summary: Search catalog products
+      description: Retrieve a paginated list of products using shared DTO contracts.
+      tags:
+        - Catalog
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Free text query matching title, slug, or keywords.
+        - in: query
+          name: statuses
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - DRAFT
+                - ACTIVE
+                - ARCHIVED
+          description: Optional product statuses to include.
+        - in: query
+          name: categoryIds
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by category identifiers.
+        - in: query
+          name: collectionIds
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by collection identifiers.
+        - in: query
+          name: priceMin
+          schema:
+            type: string
+          description: Minimum price boundary.
+        - in: query
+          name: priceMax
+          schema:
+            type: string
+          description: Maximum price boundary.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+          description: Pagination page number.
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+          description: Number of items per page.
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum:
+              - newest
+              - oldest
+              - price_asc
+              - price_desc
+              - title_asc
+              - title_desc
+          description: Optional sort strategy.
+      responses:
+        "200":
+          description: Product search results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductCollectionResponse"
+        "400":
+          description: Invalid search parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/catalog/products/{slug}:
+    get:
+      summary: Retrieve product details by slug
+      description: Fetches a single product using the shared DTO mapping pipeline.
+      tags:
+        - Catalog
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          description: Product slug identifier.
+      responses:
+        "200":
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ProductSummary"
+        "404":
+          description: Product not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health:
+    get:
+      summary: Retrieve comprehensive service health
+      description: >
+        Aggregates component health checks, latency measurements, and process diagnostics to provide a production-grade
+        snapshot of the service state.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service health snapshot available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthComprehensiveResponse"
+        "500":
+          description: Failed to evaluate health checks or collect metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health/ready:
+    get:
+      summary: Readiness probe
+      description: Evaluates dependency health to determine whether the service can accept traffic.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is ready to accept traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReadinessResponse"
+        "503":
+          description: One or more dependencies are unhealthy; traffic should not yet be routed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/health/live:
+    get:
+      summary: Liveness probe
+      description: Lightweight probe used by orchestrators to confirm the process is responsive.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service process is healthy and responsive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLivenessResponse"
+  /internal/metrics:
+    get:
+      summary: Export Prometheus metrics snapshot
+      description: >
+        Streams Prometheus-compatible metrics. The endpoint requires Basic authentication when enabled in configuration
+        and is intended for platform observability tooling.
+      tags:
+        - Observability
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: OpenMetrics stream containing the latest metrics.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "204":
+          description: Metrics collection enabled but no datapoints have been recorded yet.
+        "401":
+          description: Authentication is required to access metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "500":
+          description: Failed to collect the metrics snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "503":
+          description: Metrics collection is disabled in the active configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"

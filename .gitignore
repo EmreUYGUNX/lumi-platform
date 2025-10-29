@@ -36,6 +36,7 @@ pnpm-debug.log*
 !.env.test
 !.env.production.template
 !env/.env.docker
+!prisma/.env
 
 # Editor directories and files
 .vscode/*
@@ -60,3 +61,5 @@ storybook-static/
 *.tmp
 *.swp
 *.Zone.Identifier
+apps/backend/logs-*/
+.trivy/

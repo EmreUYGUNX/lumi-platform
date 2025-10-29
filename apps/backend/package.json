@@ -7,16 +7,28 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch src/index.ts",
+    "dev": "NODE_ENV=development pnpm exec nodemon --config nodemon.json",
+    "dev:debug": "NODE_ENV=development NODE_OPTIONS='--inspect=0.0.0.0:9229' pnpm exec nodemon --config nodemon.json",
     "start": "NODE_ENV=production node --enable-source-maps dist/index.js",
-    "build": "pnpm --filter @lumi/types build && pnpm --filter @lumi/shared build && tsc --build tsconfig.build.json",
+    "build": "pnpm --filter @lumi/types build && pnpm --filter @lumi/shared build && pnpm run prisma:generate:if-needed && tsc --build tsconfig.build.json",
+    "prisma:generate": "dotenv -e ../../env/.env.template -- pnpm exec prisma generate",
+    "prisma:validate": "dotenv -e ../../env/.env.template -- pnpm exec prisma validate",
+    "prisma:format": "dotenv -e ../../env/.env.template -- pnpm exec prisma format",
+    "prisma:migrate:dev": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate dev",
+    "prisma:migrate:deploy": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate deploy",
+    "prisma:migrate:status": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate status",
+    "prisma:migrate:reset": "dotenv -e ../../env/.env.template -- pnpm exec prisma migrate reset --force --skip-seed",
+    "prisma:seed": "pnpm exec prisma db seed",
+    "prisma:studio": "dotenv -e ../../env/.env.template -- pnpm exec prisma studio",
+    "prisma:generate:if-needed": "node ../../tools/scripts/prisma-generate-if-needed.mjs",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",
     "test:jest": "jest --config jest.config.cjs --runInBand",
     "test:quick": "pnpm run test:jest -- --runTestsByPath src/middleware/__tests__/error-handler.jest.spec.ts src/middleware/__tests__/rate-limiter.jest.spec.ts src/middleware/__tests__/request-logger.jest.spec.ts src/middleware/__tests__/response-formatter.jest.spec.ts src/routes/admin/__tests__/audit.jest.spec.ts",
     "test:vitest": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test:performance": "tsx src/__tests__/performance/health.performance.ts",
+    "typecheck": "pnpm run prisma:generate:if-needed && tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
@@ -35,6 +47,7 @@
     "winston": "^3.13.0",
     "winston-daily-rotate-file": "^5.0.0",
     "winston-transport": "^4.9.0",
+    "xss-clean": "^0.1.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -45,5 +58,9 @@
     "@types/supertest": "^2.0.16",
     "supertest": "^6.3.4",
     "vitest": "^1.5.0"
+  },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma",
+    "seed": "tsx ../../prisma/seed.ts"
   }
 }

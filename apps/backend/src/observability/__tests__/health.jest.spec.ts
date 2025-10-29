@@ -14,7 +14,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   METRICS_ENABLED: "true",
   METRICS_ENDPOINT: "/metrics",
   ALERTING_ENABLED: "false",
@@ -71,7 +71,7 @@ describe("health checks", () => {
     await withTemporaryEnvironment(
       {
         ...BASE_ENV,
-        HEALTH_UPTIME_GRACE_PERIOD: "120",
+        HEALTH_UPTIME_GRACE_PERIOD: "100000",
       },
       async () => {
         const health = await import("../health.js");

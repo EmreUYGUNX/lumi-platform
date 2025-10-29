@@ -1,6 +1,10 @@
 # json5 prototype pollution vulnerability flagged via @types package (dev-only).
 # Actual json5 dependency is pinned to >=1.0.2 in pnpm.lock.
 CVE-2022-46175
+# body-parser runtime resolved to 1.20.3 (override in pnpm.overrides); older transitive metadata triggers false positive.
+CVE-2024-45590
+# mime runtime resolved to 1.6.0 via overrides; advisory references legacy 1.3.x family not shipped in images.
+CVE-2017-16138
 # cross-spawn only present in dev toolchain layers; backend runtime does not execute it.
 CVE-2024-21538
 # esbuild Go binaries bundled for tooling only; not used in backend runtime.
@@ -8,3 +12,6 @@ CVE-2024-24790
 CVE-2023-45288
 CVE-2024-34156
 CVE-2025-47907
+# @redis/json shares the same version scheme as the deprecated `json` CLI.
+# Trivy maps it to CVE-2020-7712, but the redis module is unaffected.
+CVE-2020-7712

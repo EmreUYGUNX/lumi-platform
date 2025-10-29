@@ -32,7 +32,7 @@ Lumi operates as a Turborepo-managed monorepo that hosts backend, frontend, mobi
 
 ## Prerequisites
 
-- Node.js >= 20.11.0 (LTS recommended).
+- Node.js >= 20.18.1 (LTS recommended).
 - pnpm >= 9.0.0 (bundled with repo to enforce workspace logic).
 - Docker Desktop or Docker Engine >= 24 for local container orchestration.
 - Git with LFS support.

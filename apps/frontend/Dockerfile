@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 
-ARG NODE_VERSION=20.12.2
-ARG PNPM_VERSION=9.0.6
+ARG NODE_VERSION=20.18.1
+ARG PNPM_VERSION=8.15.8
 
 FROM node:${NODE_VERSION}-alpine AS base
 
@@ -24,8 +24,8 @@ COPY apps/frontend/package.json apps/frontend/
 COPY packages/shared/package.json packages/shared/
 COPY packages/types/package.json packages/types/
 COPY packages/ui/package.json packages/ui/
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm fetch --filter @lumi/frontend...
+COPY patches ./patches/
+RUN pnpm fetch --filter @lumi/frontend...
 
 FROM base AS development
 
@@ -33,11 +33,11 @@ ENV NODE_ENV=development
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  pnpm install --filter @lumi/frontend... --frozen-lockfile
-RUN chown -R lumi:nodejs /workspace
-USER lumi
+RUN pnpm install --filter @lumi/frontend... --frozen-lockfile
 EXPOSE 3000
+ENV PNPM_YES=true \
+  PNPM_NON_INTERACTIVE=true
+CMD ["sh", "-c", "pnpm install --filter @lumi/frontend... --frozen-lockfile --force && pnpm --filter @lumi/frontend exec next dev --hostname 0.0.0.0 --port ${PORT:-3000}"]
 CMD ["pnpm", "--filter", "@lumi/frontend", "dev"]
 
 FROM base AS build
@@ -47,10 +47,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
-RUN --mount=type=cache,id=pnpm-store,target=/workspace/.pnpm-store \
-  NODE_ENV=development pnpm install --filter @lumi/frontend... --frozen-lockfile
-RUN --mount=type=cache,id=lumi-next-cache,target=/workspace/apps/frontend/.next/cache \
-  NODE_ENV=production pnpm --filter @lumi/frontend... build
+RUN NODE_ENV=development pnpm install --filter @lumi/frontend... --frozen-lockfile
+RUN NODE_ENV=production pnpm --filter @lumi/frontend... build
 RUN pnpm prune --prod
 
 FROM base AS production

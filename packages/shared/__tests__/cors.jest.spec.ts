@@ -23,13 +23,15 @@ describe("CORS helpers", () => {
     expect(normalised.exposedHeaders).toEqual(["x-request-id"]);
   });
 
-  it("permits wildcard origins when configured", () => {
+  it("rejects wildcard origins when configured", () => {
     const config: CorsConfig = {
       ...baseConfig,
       allowedOrigins: ["*"],
     };
 
-    expect(isOriginAllowed("https://example.com", config)).toBe(true);
+    const normalised = normalizeCorsConfig(config);
+    expect(normalised.allowedOrigins).toEqual([]);
+    expect(isOriginAllowed("https://example.com", config)).toBe(false);
   });
 
   it("rejects unknown origins when restrictions apply", () => {

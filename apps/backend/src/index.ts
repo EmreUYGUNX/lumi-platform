@@ -3,7 +3,9 @@ import http from "node:http";
 import { getConfig, onConfigChange } from "./config/index.js";
 import { createHttpApp } from "./http/app.js";
 import { logger } from "./lib/logger.js";
+import { registerPrismaMiddlewares } from "./lib/prisma/middleware.js";
 import { initializeObservability } from "./observability/index.js";
+import { type ServerController, startServer } from "./server.js";
 
 export const createBackendApp = () => {
   let activeConfig = getConfig();
@@ -22,9 +24,20 @@ export const createBackendApp = () => {
       const expressApp = createHttpApp();
 
       initializeObservability();
+
       logger.info("Backend service starting", {
-        environment: app.environment,
-        port: app.port,
+        environment: initialConfig.app.environment,
+        port: initialConfig.app.port,
+      });
+
+      unsubscribeConfig = onConfigChange(({ snapshot, changedKeys, reason }) => {
+        if (changedKeys.length > 0) {
+          logger.info("Configuration reloaded", { reason, changedKeys });
+        }
+
+        if (serverController) {
+          serverController.app.locals.config = snapshot;
+        }
       });
 
       httpServer = http.createServer(expressApp);
@@ -57,7 +70,26 @@ export const createBackendApp = () => {
   };
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const shutdown = createBackendApp().start();
-  process.on("exit", () => shutdown());
+const isExecutedDirectly = import.meta.url === `file://${process.argv[1]}`;
+
+const registerShutdownCleanup = (cleanup: () => Promise<void>) => {
+  process.once("exit", () => {
+    cleanup().catch((error) => {
+      logger.error("Error during shutdown cleanup", { error });
+    });
+  });
+};
+
+const bootstrapBackend = async () => {
+  const cleanup = await createBackendApp().start();
+  registerShutdownCleanup(cleanup);
+};
+
+if (isExecutedDirectly) {
+  try {
+    await bootstrapBackend();
+  } catch (error) {
+    logger.error("Failed to start backend application", { error });
+    process.exitCode = 1;
+  }
 }

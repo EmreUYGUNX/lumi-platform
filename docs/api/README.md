@@ -7,6 +7,7 @@ This directory hosts the API specifications, endpoint references, and integratio
 - `rest/` – REST endpoint specifications grouped by domain (OpenAPI YAML + markdown guides).
 - `schemas/` – Shared request/response schemas sourced from `@lumi/types`.
 - `changelog/` – Versioned change logs documenting API additions, deprecations, and removals.
+- `auth-endpoints.md` – Narrative companion to the OpenAPI spec covering authentication flows, error semantics, and rate limits.
 
 ## Authoring Standards
 
@@ -18,7 +19,8 @@ This directory hosts the API specifications, endpoint references, and integratio
 ## Tooling
 
 - Use `pnpm exec openapi-generator-cli` (to be added in Phase 1) for client SDK generation.
-- Validate specs using Spectral or similar linting before committing.
+- Generate the canonical spec with `pnpm docs:openapi:generate` and keep it committed.
+- Validate specs using Spectral (`pnpm docs:openapi:lint`) before committing.
 
 ## Next Steps
 

@@ -14,7 +14,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "debug",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   METRICS_ENABLED: "true",
   METRICS_ENDPOINT: "/metrics",
   METRICS_PREFIX: "lumi_",
@@ -43,9 +43,9 @@ describe("metrics", () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const metrics = await import("../metrics.js");
       const counter = metrics.createCounter({
-        name: "http_requests_total",
+        name: "custom_requests_total",
         help: "Counts HTTP requests.",
-        labelNames: ["method", "status"],
+        labelNames: ["method", "route", "status"],
       });
       const histogram = metrics.createHistogram({
         name: "operation_duration_seconds",
@@ -54,12 +54,12 @@ describe("metrics", () => {
         buckets: [0.001, 0.01, 0.1],
       });
 
-      counter.labels("GET", "200").inc();
+      counter.labels("GET", "/unit", "200").inc();
       metrics.trackDuration(histogram, { operation: "unit" }, () => {});
 
       const snapshot = await metrics.getMetricsSnapshot();
-      expect(snapshot).toContain("lumi_http_requests_total");
-      expect(metrics.listRegisteredMetrics()).toContain("lumi_http_requests_total");
+      expect(snapshot).toContain("lumi_custom_requests_total");
+      expect(metrics.listRegisteredMetrics()).toContain("lumi_custom_requests_total");
       expect(snapshot).toContain("lumi_operation_duration_seconds");
     });
   });
@@ -142,13 +142,206 @@ describe("metrics", () => {
   it("records uptime gauge immediately when requested", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
       const metrics = await import("../metrics.js");
-      const gauge = metrics.metricsRegistry.getSingleMetric("lumi_uptime_seconds") as unknown as {
-        set: (value: number) => void;
-      };
-      const setSpy = jest.spyOn(gauge, "set");
+      const gauge = metrics.metricsRegistry.getSingleMetric("lumi_uptime_seconds");
+      expect(gauge).toBeDefined();
+      const setSpy = jest.spyOn(gauge as unknown as { set: (value: number) => void }, "set");
       metrics.recordUptimeNow();
       expect(setSpy).toHaveBeenCalled();
       setSpy.mockRestore();
     });
+  });
+
+  it("does not double prefix metric names that already contain the prefix", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const gauge = metrics.createGauge({
+        name: "lumi_existing_metric",
+        help: "Prefixed gauge",
+      });
+      // @ts-expect-error Gauge exposes its name at runtime.
+      expect(gauge.name).toBe("lumi_existing_metric");
+    });
+  });
+
+  it("logs failures when HTTP metric instruments throw", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const { logger } = await import("../../lib/logger.js");
+
+      interface HistogramMetric {
+        startTimer: () => (labels: { status: string }) => void;
+      }
+      interface CounterMetric {
+        labels: (method: string, route: string, status: string) => never;
+      }
+
+      const durationMetric = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_request_duration_seconds",
+      ) as unknown as HistogramMetric;
+      const requestCounter = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_requests_total",
+      ) as unknown as CounterMetric;
+
+      const timerSpy = jest.spyOn(durationMetric, "startTimer").mockReturnValue(() => {
+        throw new Error("histogram failure");
+      });
+      const counterSpy = jest.spyOn(requestCounter, "labels").mockImplementation(() => {
+        throw new Error("counter failure");
+      });
+      const logSpy = jest.spyOn(logger, "debug").mockReturnValue(logger);
+
+      const timer = metrics.beginHttpRequestObservation("GET", "/failing");
+      timer("200");
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("histogram"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("counter"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+
+      logSpy.mockRestore();
+      timerSpy.mockRestore();
+      counterSpy.mockRestore();
+    });
+  });
+
+  it("normalises and records observed HTTP metrics", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const { logger } = await import("../../lib/logger.js");
+
+      interface HistogramLabels {
+        labels: (method: string, route: string, status: string) => { observe: () => void };
+      }
+      interface CounterLabels {
+        labels: (method: string, route: string, status: string) => { inc: () => void };
+      }
+
+      const durationMetric = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_request_duration_seconds",
+      ) as unknown as HistogramLabels;
+      const requestCounter = metrics.metricsRegistry.getSingleMetric(
+        "lumi_http_requests_total",
+      ) as unknown as CounterLabels;
+
+      const counterLabels = jest.spyOn(requestCounter, "labels").mockImplementation(() => {
+        return {
+          inc: () => {
+            throw new Error("counter observe");
+          },
+        };
+      });
+      const histogramLabels = jest.spyOn(durationMetric, "labels").mockImplementation(() => {
+        return {
+          observe: () => {
+            throw new Error("histogram observe");
+          },
+        };
+      });
+      const logSpy = jest.spyOn(logger, "debug").mockReturnValue(logger);
+
+      metrics.observeHttpRequest({ method: "post", route: "orders", status: "201" }, 0.123);
+
+      expect(counterLabels).toHaveBeenCalled();
+      expect(histogramLabels).toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("counter"),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("histogram"),
+        expect.objectContaining({
+          error: expect.objectContaining({ duration: expect.any(Number) }),
+        }),
+      );
+
+      logSpy.mockRestore();
+      counterLabels.mockRestore();
+      histogramLabels.mockRestore();
+    });
+  });
+
+  it("invokes collectDefaultMetrics when enabled in configuration", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_COLLECT_DEFAULT: "true",
+      },
+      async () => {
+        jest.resetModules();
+        const metrics = await import("../metrics.js");
+        expect(metrics.isMetricsCollectionEnabled()).toBe(true);
+        expect(metrics.metricsInternals.isDefaultCollectorActive()).toBe(true);
+
+        const snapshot = await metrics.getMetricsSnapshot();
+        expect(snapshot).toContain("process_cpu_user_seconds_total");
+
+        metrics.metricsInternals.resetForTest();
+      },
+    );
+  });
+
+  it("skips synchronous timers when metrics are disabled", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_ENABLED: "false",
+      },
+      async () => {
+        const metrics = await import("../metrics.js");
+        const end = jest.fn();
+        const histogram = {
+          startTimer: jest.fn(() => end),
+        } as unknown as Parameters<typeof metrics.trackDuration>[0];
+
+        metrics.trackDuration(histogram, undefined, () => {});
+
+        expect(histogram.startTimer).not.toHaveBeenCalled();
+        expect(end).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  it("records HTTP metrics through observation helpers", async () => {
+    await withTemporaryEnvironment(BASE_ENV, async () => {
+      const metrics = await import("../metrics.js");
+      const stopTimer = metrics.beginHttpRequestObservation("get", "api/v1/users/:id");
+      stopTimer("200");
+
+      metrics.observeHttpRequest(
+        {
+          method: "post",
+          route: "/api/v1/users",
+          status: "201",
+        },
+        0.245,
+      );
+
+      const snapshot = await metrics.getMetricsSnapshot();
+      expect(snapshot).toContain("lumi_http_requests_total");
+      expect(snapshot).toContain('method="GET"');
+      expect(snapshot).toContain('method="POST"');
+      expect(snapshot).toContain("lumi_http_request_duration_seconds");
+
+      metrics.metricsInternals.resetForTest();
+    });
+  });
+
+  it("applies the configured uptime sampling interval", async () => {
+    await withTemporaryEnvironment(
+      {
+        ...BASE_ENV,
+        METRICS_DEFAULT_INTERVAL: "2000",
+      },
+      async () => {
+        jest.resetModules();
+        const metrics = await import("../metrics.js");
+        expect(metrics.metricsInternals.getUptimeIntervalMs()).toBe(2000);
+        metrics.metricsInternals.resetForTest();
+      },
+    );
   });
 });

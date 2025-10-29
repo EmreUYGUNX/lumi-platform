@@ -14,7 +14,7 @@ const BASE_ENV = {
   REDIS_URL: "redis://localhost:6379",
   STORAGE_BUCKET: "bucket-test",
   LOG_LEVEL: "info",
-  JWT_SECRET: "1234567890123456",
+  JWT_SECRET: "12345678901234567890123456789012",
   METRICS_ENABLED: "true",
   METRICS_ENDPOINT: "/metrics",
   ALERTING_ENABLED: "false",
@@ -22,6 +22,22 @@ const BASE_ENV = {
   CONFIG_HOT_RELOAD: "false",
   CI: "true",
 } as const;
+
+const noopRequestStopTimer = () => {};
+
+function beginHttpTimerStub() {
+  return noopRequestStopTimer;
+}
+
+const createHistogramTimer = () => {
+  const endTimer = jest.fn();
+
+  return {
+    startTimer: jest.fn(function startTimer() {
+      return endTimer;
+    }),
+  };
+};
 
 describe("observability bootstrap", () => {
   afterEach(() => {
@@ -57,6 +73,8 @@ describe("observability bootstrap", () => {
       trackDurationAsync: jest.fn(),
       getMetricsSnapshot: jest.fn(),
       recordUptimeNow: recordUptime,
+      beginHttpRequestObservation: jest.fn(beginHttpTimerStub),
+      observeHttpRequest: jest.fn(),
     }));
 
     jest.doMock("../health.js", () => ({
@@ -76,6 +94,8 @@ describe("observability bootstrap", () => {
     jest.doMock("../sentry.js", () => ({
       getSentryInstance: jest.fn(() => ({ flush: jest.fn() })),
       isSentryEnabled: jest.fn(() => false),
+      initializeSentry: jest.fn(() => Promise.resolve()),
+      setSentryUser: jest.fn(),
     }));
 
     await withTemporaryEnvironment(BASE_ENV, async () => {
@@ -86,12 +106,9 @@ describe("observability bootstrap", () => {
       module.createCounter({ name: "counter", help: "help" });
       module.createGauge({ name: "gauge", help: "help" });
       module.createHistogram({ name: "hist", help: "help" });
-      module.trackDuration({ startTimer: jest.fn(() => jest.fn()) } as never, undefined, () => {});
-      await module.trackDurationAsync(
-        { startTimer: jest.fn(() => jest.fn()) } as never,
-        undefined,
-        async () => "done",
-      );
+      const histogramTimer = createHistogramTimer();
+      module.trackDuration(histogramTimer as never, undefined, () => {});
+      await module.trackDurationAsync(histogramTimer as never, undefined, async () => "done");
       module.registerHealthCheck("test", () => ({
         status: "healthy",
         summary: "ok",

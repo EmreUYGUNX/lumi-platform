@@ -5,17 +5,33 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./dto": {
+      "import": "./dist/dto/index.js",
+      "types": "./dist/dto/index.d.ts"
+    },
+    "./dto/*": {
+      "import": "./dist/dto/*.js",
+      "types": "./dist/dto/*.d.ts"
+    }
+  },
   "scripts": {
-    "build": "pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
+    "prisma:generate:if-needed": "node ../../tools/scripts/prisma-generate-if-needed.mjs",
+    "build": "pnpm run prisma:generate:if-needed && pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",
     "test:jest": "jest --config jest.config.cjs --runInBand",
     "test:vitest": "vitest run --passWithNoTests",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "pnpm run prisma:generate:if-needed && tsc --project tsconfig.json --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check"
   },
   "dependencies": {
+    "@prisma/client": "^5.20.0",
     "@lumi/types": "workspace:*",
     "zod": "^3.23.8"
   },
