@@ -1,0 +1,5 @@
+[allowlist]
+  description = "Ignore simulated secrets in documentation"
+  paths = [
+    '''PHASE-\d+-.*\.md'''
+  ]

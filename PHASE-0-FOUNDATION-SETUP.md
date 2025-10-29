@@ -581,8 +581,8 @@ expect(prettierConfig.singleQuote).toBeDefined();
 ```typescript
 // ❌ NEVER DO THIS
 const config = {
-  apiKey: "hardcoded-api-key",
-  dbPassword: "hardcoded-password",
+  apiKey: "<your-api-key>",
+  dbPassword: "<your-db-password>",
 };
 ```
 
