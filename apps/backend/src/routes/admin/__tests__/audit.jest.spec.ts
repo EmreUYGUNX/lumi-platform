@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import express, { type Router } from "express";
+import rateLimit from "express-rate-limit";
 
 import { createApiClient } from "@lumi/testing";
 
@@ -19,17 +20,17 @@ process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.STORAGE_BUCKET ??= "bucket";
 process.env.JWT_SECRET ??= "test-secret-key-value";
 
-const passthroughRateLimiter = (
-  _req: express.Request,
-  _res: express.Response,
-  next: express.NextFunction,
-) => {
-  next();
-};
+const createTestRateLimiter = () =>
+  rateLimit({
+    windowMs: 1000,
+    limit: 1000,
+    standardHeaders: false,
+    legacyHeaders: false,
+  });
 
 jest.mock("../../../middleware/rate-limiter.js", () => ({
   __esModule: true,
-  createAdminRateLimiter: jest.fn(() => passthroughRateLimiter),
+  createAdminRateLimiter: jest.fn(() => createTestRateLimiter()),
 }));
 
 jest.mock("../../../audit/audit-log.service.js", () => ({
@@ -57,6 +58,7 @@ describe("admin audit log routes", () => {
   it("rejects non-admin users with a 403 response", async () => {
     const app = express();
     app.use(responseFormatter);
+    app.use(createTestRateLimiter());
     // codeql[js/missing-rate-limiting]: Test stub middleware executed during unit tests without external traffic.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
@@ -101,6 +103,7 @@ describe("admin audit log routes", () => {
 
     const app = express();
     app.use(responseFormatter);
+    app.use(createTestRateLimiter());
     // codeql[js/missing-rate-limiting]: Test stub middleware executed during unit tests without external traffic.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({

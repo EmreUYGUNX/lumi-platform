@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import express from "express";
+import rateLimit from "express-rate-limit";
 
 import { createApiClient } from "@lumi/testing";
 
@@ -38,6 +39,14 @@ const logger = loggerModule.logger as unknown as {
   error: jest.Mock;
 };
 
+const createTestRateLimiter = () =>
+  rateLimit({
+    windowMs: 1000,
+    limit: 1000,
+    standardHeaders: false,
+    legacyHeaders: false,
+  });
+
 const recordAuditLog = auditLogModule.recordAuditLog as unknown as jest.Mock;
 
 describe("request logger middleware", () => {
@@ -49,6 +58,7 @@ describe("request logger middleware", () => {
     const app = express();
     app.use(express.json());
     app.use(responseFormatter);
+    app.use(createTestRateLimiter());
     // codeql[js/missing-rate-limiting]: Test-only middleware executed in-memory; no public exposure or rate limiting required.
     app.use((req, _res, next) => {
       req.user = createAuthenticatedUser({
@@ -81,6 +91,7 @@ describe("request logger middleware", () => {
     const app = express();
     app.use(express.json());
     app.use(responseFormatter);
+    app.use(createTestRateLimiter());
     // codeql[js/missing-rate-limiting]: Test-only middleware executed in-memory; no public exposure or rate limiting required.
     app.use((req, res, next) => {
       req.user = createAuthenticatedUser({
