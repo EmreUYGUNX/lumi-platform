@@ -8,6 +8,7 @@
     "verbatimModuleSyntax": false,
     "types": ["node", "jest", "@testing-library/jest-dom"],
     "outDir": "./dist-jest",
+    "noEmitOnError": false,
     "allowJs": true,
     "composite": false,
     "incremental": false,
