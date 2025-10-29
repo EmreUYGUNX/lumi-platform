@@ -192,7 +192,7 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
           chmod +x gitleaks
-          ./gitleaks detect --no-banner --redact --no-git --config-path .gitleaks.toml --report-format sarif --report-path gitleaks.sarif
+          ./gitleaks detect --no-banner --redact --no-git -c .gitleaks.toml --report-format sarif --report-path gitleaks.sarif
           rm gitleaks
       - name: Evaluate SARIF output
         id: gitleaks_report
