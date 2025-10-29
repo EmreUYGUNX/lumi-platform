@@ -10,7 +10,11 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig } from "./config/index.js";
 import { createOpenApiDocument, getSwaggerUiOptions } from "./config/swagger.js";
-import { registerErrorHandlers } from "./middleware/errorHandler.js";
+import {
+  attachErrorHandlerAutoRefresh,
+  registerErrorHandlers,
+  resolveRouter,
+} from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
 import { createApiRouter } from "./routes/index.js";
 import { createInternalRouter } from "./routes/internal.js";
@@ -75,20 +79,19 @@ export const createApp = ({
   registerErrorHandlers(app, config);
 
   const refreshErrorHandlers = () => {
-    const router = Reflect.get(app, "_router") as
-      | {
-          stack: {
-            handle?: RequestHandler | ErrorRequestHandler;
-            route?: unknown;
-          }[];
-        }
-      | undefined;
+    let router = resolveRouter(app);
+    if (!router?.stack) {
+      const lazy = (app as unknown as { lazyrouter?: () => void }).lazyrouter;
+      lazy?.call(app);
+      router = resolveRouter(app);
+    }
     const storedLayers = app.get("errorHandlerLayers") as
       | {
           handle?: RequestHandler | ErrorRequestHandler;
           route?: unknown;
         }[]
       | undefined;
+
     if (!router?.stack || !storedLayers || storedLayers.length === 0) {
       return;
     }
@@ -99,6 +102,7 @@ export const createApp = ({
 
   refreshErrorHandlers();
   app.set("refreshErrorHandlers", refreshErrorHandlers);
+  attachErrorHandlerAutoRefresh(app, refreshErrorHandlers);
 
   return app;
 };

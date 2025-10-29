@@ -6,25 +6,6 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { logger } from "../lib/logger.js";
 
-const normaliseRequestQuery: RequestHandler = (req, _res, next) => {
-  const originalQuery = req.query;
-  if (originalQuery && typeof originalQuery === "object") {
-    try {
-      Object.defineProperty(req, "query", {
-        value: { ...(originalQuery as Record<string, unknown>) },
-        writable: true,
-        configurable: true,
-        enumerable: true,
-      });
-    } catch (error) {
-      logger.debug("Unable to override request query descriptor for sanitization", {
-        error,
-      });
-    }
-  }
-  next();
-};
-
 export const createSanitizationMiddleware = (
   validationConfig: ApplicationConfig["security"]["validation"],
 ): RequestHandler[] => {
@@ -32,7 +13,7 @@ export const createSanitizationMiddleware = (
     return [];
   }
 
-  const mongoSanitizer = mongoSanitize({
+  const mongoSanitizerCore = mongoSanitize({
     allowDots: true,
     replaceWith: "_",
     onSanitize({ key }) {
@@ -42,9 +23,29 @@ export const createSanitizationMiddleware = (
     },
   });
 
+  const mongoSanitizer: RequestHandler = (req, res, next) => {
+    const originalQuery = req.query;
+    if (originalQuery && typeof originalQuery === "object" && !Array.isArray(originalQuery)) {
+      try {
+        Object.defineProperty(req, "query", {
+          value: { ...(originalQuery as Record<string, unknown>) },
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      } catch (error) {
+        logger.debug("Unable to override request query descriptor for sanitization", {
+          error,
+        });
+      }
+    }
+
+    return mongoSanitizerCore(req, res, next);
+  };
+
   const xssSanitizer = xssClean({
     allowList: {},
   }) as RequestHandler;
 
-  return [normaliseRequestQuery, mongoSanitizer, xssSanitizer];
+  return [mongoSanitizer, xssSanitizer];
 };
