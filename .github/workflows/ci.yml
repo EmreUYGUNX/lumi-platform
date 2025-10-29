@@ -185,9 +185,15 @@ jobs:
         run: pnpm security:secrets
       - name: Secret scanning
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.24.3
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          chmod +x gitleaks
+          ./gitleaks detect --no-banner --redact --report-format sarif --report-path gitleaks.sarif
+          rm gitleaks
       - name: Evaluate SARIF output
         id: gitleaks_report
         run: |

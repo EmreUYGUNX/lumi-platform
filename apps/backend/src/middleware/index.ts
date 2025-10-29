@@ -29,7 +29,7 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
 
   const corsBundle = createCorsMiddleware(config.security.cors);
   app.use(corsBundle.middleware);
-  app.options("*", corsBundle.preflight);
+  app.options(/.*/, corsBundle.preflight);
 
   const rateLimiterBundle = createRateLimiterBundle(config.security.rateLimit);
   app.use(rateLimiterBundle.global);
