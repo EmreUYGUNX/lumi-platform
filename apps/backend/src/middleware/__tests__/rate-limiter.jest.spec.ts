@@ -192,4 +192,69 @@ describe("rate limiter middleware", () => {
     const third = await agent.get("/resource").expect(200);
     expect(third.body.success).toBe(true);
   });
+
+  it("falls back to socket address and request metadata when ip or response helpers are unavailable", async () => {
+    const { createRateLimiter } = await import("../rate-limiter.js");
+    const app = express();
+    app.use(responseFormatter);
+    app.use((req, res, next) => {
+      Object.defineProperty(req, "ip", {
+        configurable: true,
+        value: undefined,
+        writable: true,
+      });
+      Object.defineProperty(req.socket, "remoteAddress", {
+        configurable: true,
+        value: "203.0.113.99",
+        writable: true,
+      });
+      req.requestId = "req-fallback";
+      res.requestId = undefined as unknown as string;
+      // remove helper to test fallback path
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete (res as unknown as Record<string, unknown>).error;
+      next();
+    });
+    app.use(createRateLimiter({ identifier: "socket-test", max: 1, windowSeconds: 60 }));
+    app.get("/resource", respondOk);
+
+    const agent = createApiClient(app);
+    await agent.get("/resource").expect(200);
+    const limited = await agent.get("/resource").expect(429);
+
+    expect(limited.body.meta.requestId).toBe("req-fallback");
+    expect(limited.body.error.code).toBe("RATE_LIMITED");
+  });
+
+  it("handles requests lacking addressing metadata", async () => {
+    const { createRateLimiter } = await import("../rate-limiter.js");
+    const app = express();
+    app.use(responseFormatter);
+    app.use((req, res, next) => {
+      Object.defineProperty(req, "ip", {
+        configurable: true,
+        value: undefined,
+        writable: true,
+      });
+      Object.defineProperty(req.socket, "remoteAddress", {
+        configurable: true,
+        value: undefined,
+        writable: true,
+      });
+      req.requestId = "req-empty";
+      res.requestId = undefined as unknown as string;
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete (res as unknown as Record<string, unknown>).error;
+      next();
+    });
+    app.use(createRateLimiter({ identifier: "empty-socket", max: 1, windowSeconds: 60 }));
+    app.get("/resource", respondOk);
+
+    const agent = createApiClient(app);
+    await agent.get("/resource").expect(200);
+    const limited = await agent.get("/resource").expect(429);
+
+    expect(limited.body.meta.requestId).toBe("req-empty");
+    expect(limited.body.error.code).toBe("RATE_LIMITED");
+  });
 });

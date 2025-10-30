@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { Prisma } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
 
@@ -111,5 +112,59 @@ describe("error handler middleware", () => {
     const response = await api.get("/error").expect(500);
     expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
     expect(captureSpy).toHaveBeenCalled();
+  });
+
+  it("normalises plain object errors when they include status information", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/plain", () => {
+      throw Object.assign(new Error("Resource already exists"), {
+        status: 409,
+        code: "custom_conflict",
+        message: "Resource already exists",
+        details: [{ field: "email", message: "Already taken" }],
+      });
+    });
+    app.use(errorHandler);
+
+    const api = createApiClient(app);
+    const response = await api.get("/plain").expect(409);
+
+    expect(response.body.error.code).toBe("CUSTOM_CONFLICT");
+    expect(response.body.error.details[0].field).toBe("email");
+  });
+
+  it("maps Prisma validation errors to database validation responses", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/prisma-validation", () => {
+      const validationError = new Error(
+        "Unknown argument `foo` on prisma.user.create()",
+      ) as unknown as Prisma.PrismaClientValidationError;
+      validationError.name = "PrismaClientValidationError";
+      throw validationError;
+    });
+    app.use(errorHandler);
+
+    const api = createApiClient(app);
+    const response = await api.get("/prisma-validation").expect(400);
+
+    expect(response.body.error.code).toBe("DATABASE_VALIDATION_ERROR");
+    expect(response.body.error.details[0].message).toContain("Unknown argument");
+  });
+
+  it("falls back to json responses when response helpers are unavailable", async () => {
+    const app = express();
+    app.get("/fallback", () => {
+      throw new Error("Unhandled failure");
+    });
+    app.use(errorHandler);
+
+    const api = createApiClient(app);
+    const response = await api.get("/fallback").expect(500);
+
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.code).toBe("INTERNAL_SERVER_ERROR");
+    expect(response.body.meta.requestId).toBeDefined();
   });
 });
