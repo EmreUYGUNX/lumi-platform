@@ -125,4 +125,69 @@ describe("request logger middleware", () => {
       }),
     );
   });
+
+  it("logs error-level output and masks nested sensitive payloads for server failures", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(responseFormatter);
+    app.use(createTestRateLimiter());
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "user-2",
+        roles: [{ id: "role_support", name: "support" }],
+      });
+      next();
+    });
+    app.use(requestLogger);
+    app.post("/api/v1/support/action", (_req, res) => {
+      res.status(500).json({ error: { code: "FAIL", token: "secret-token" } });
+    });
+
+    const api = createApiClient(app);
+    await api
+      .post("/api/v1/support/action")
+      .send({ meta: { token: "nested-secret", password: "super" } })
+      .expect(500);
+
+    const logFn = logger.log as jest.Mock;
+    const errorCall = logFn.mock.calls.find((call) => call[0] === "error");
+    expect(errorCall).toBeDefined();
+    const metadata = errorCall?.[2] as { body?: unknown } | undefined;
+    const body = metadata?.body as Record<string, unknown>;
+    expect(body?.meta).toMatchObject({ token: "[REDACTED]", password: "[REDACTED]" });
+  });
+
+  it("derives audit metadata when admin mutation omits explicit context", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(responseFormatter);
+    app.use(createTestRateLimiter());
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "admin-2",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
+      next();
+    });
+    app.use(requestLogger);
+    app.patch("/api/v1/admin/users/user-42", (_req, res) => {
+      res.status(200).json({ success: true });
+    });
+
+    const api = createApiClient(app);
+    await api.patch("/api/v1/admin/users/user-42").send({ status: "active" }).expect(200);
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(recordAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "admin-2",
+        entity: "users",
+        entityId: "user-42",
+        action: "users.patch",
+      }),
+    );
+  });
 });

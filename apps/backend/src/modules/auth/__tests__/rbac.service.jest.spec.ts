@@ -444,3 +444,162 @@ describe("RbacService", () => {
     expect(cache.delete).toHaveBeenCalledWith("user_admin");
   });
 });
+
+describe("permission cache integration", () => {
+  afterEach(() => {
+    jest.resetModules();
+  });
+
+  it("falls back to in-memory caching when Redis configuration is missing", async () => {
+    const mockPrisma = {
+      user: {
+        findUnique: jest.fn(async () => ({
+          id: "user_cache",
+          email: "cache@example.com",
+          status: "ACTIVE",
+        })),
+      },
+      role: {
+        findMany: jest.fn(async () => []),
+      },
+      permission: {
+        findMany: jest.fn(async () => []),
+      },
+    } as unknown as PrismaClient;
+
+    const loggerWarn = jest.fn();
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/config/index.js", () => ({
+        __esModule: true,
+        getConfig: jest.fn(() => ({
+          cache: { redisUrl: undefined },
+        })),
+      }));
+
+      jest.doMock("@/lib/prisma.js", () => ({
+        __esModule: true,
+        getPrismaClient: jest.fn(() => mockPrisma),
+      }));
+
+      jest.doMock("@/lib/logger.js", () => ({
+        __esModule: true,
+        createChildLogger: jest.fn(() => ({
+          warn: loggerWarn,
+          error: jest.fn(),
+          info: jest.fn(),
+          debug: jest.fn(),
+        })),
+        logger: {
+          error: jest.fn(),
+          warn: jest.fn(),
+          info: jest.fn(),
+          log: jest.fn(),
+        },
+        mergeRequestContext: jest.fn(),
+        withRequestContext: jest.fn((_context, callback: () => unknown) => callback()),
+        registerLogTransport: jest.fn(),
+        unregisterLogTransport: jest.fn(),
+        listRegisteredTransports: jest.fn(() => []),
+        logError: jest.fn(),
+      }));
+
+      const { createRbacService } = await import("../rbac.service.js");
+      const fallbackService = createRbacService();
+
+      await expect(fallbackService.getUserPermissions("user_cache")).resolves.toEqual([]);
+      await expect(fallbackService.getUserPermissions("user_cache")).resolves.toEqual([]);
+
+      expect(mockPrisma.permission.findMany).toHaveBeenCalledTimes(1);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        "Redis URL not configured. Using in-memory RBAC permission cache.",
+      );
+    });
+  });
+
+  it("surfaces cache operation failures after exhausting retries", async () => {
+    const failingOperation: jest.MockedFunction<() => Promise<never>> = jest.fn();
+    failingOperation
+      .mockRejectedValueOnce(new Error("redis down"))
+      .mockRejectedValueOnce(new Error("redis still down"))
+      .mockRejectedValueOnce(new Error("redis permanently down"));
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("redis", () => ({
+        __esModule: true,
+        createClient: jest.fn(() => ({
+          isOpen: false,
+          connect: jest.fn(async () => {
+            /* noop */
+          }),
+          quit: jest.fn(async () => {
+            /* noop */
+          }),
+          get: failingOperation,
+          set: failingOperation,
+          del: failingOperation,
+          on: jest.fn(),
+        })),
+      }));
+
+      const mockPrisma = {
+        user: {
+          findUnique: jest.fn(async () => ({
+            id: "user_error",
+            email: "error@example.com",
+            status: "ACTIVE",
+          })),
+        },
+        role: {
+          findMany: jest.fn(async () => []),
+        },
+        permission: {
+          findMany: jest.fn(async () => []),
+        },
+      } as unknown as PrismaClient;
+
+      jest.doMock("@/config/index.js", () => ({
+        __esModule: true,
+        getConfig: jest.fn(() => ({
+          cache: { redisUrl: "redis://localhost:6379/1" },
+        })),
+      }));
+
+      jest.doMock("@/lib/prisma.js", () => ({
+        __esModule: true,
+        getPrismaClient: jest.fn(() => mockPrisma),
+      }));
+
+      jest.doMock("@/lib/logger.js", () => ({
+        __esModule: true,
+        createChildLogger: jest.fn(() => ({
+          warn: jest.fn(),
+          error: jest.fn(),
+          info: jest.fn(),
+          debug: jest.fn(),
+        })),
+        logger: {
+          error: jest.fn(),
+          warn: jest.fn(),
+          info: jest.fn(),
+          log: jest.fn(),
+        },
+        mergeRequestContext: jest.fn(),
+        withRequestContext: jest.fn((_context, callback: () => unknown) => callback()),
+        registerLogTransport: jest.fn(),
+        unregisterLogTransport: jest.fn(),
+        listRegisteredTransports: jest.fn(() => []),
+        logError: jest.fn(),
+      }));
+
+      const { createRbacService } = await import("../rbac.service.js");
+      const redisBackedService = createRbacService();
+
+      await expect(redisBackedService.invalidateUserPermissions("user_error")).rejects.toThrow(
+        "redis permanently down",
+      );
+
+      expect(failingOperation).toHaveBeenCalledTimes(3);
+    });
+  });
+});

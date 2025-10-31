@@ -257,4 +257,58 @@ describe("rate limiter middleware", () => {
     expect(limited.body.meta.requestId).toBe("req-empty");
     expect(limited.body.error.code).toBe("RATE_LIMITED");
   });
+
+  it("does not bypass limits when internal bypass is disabled", async () => {
+    const { createRateLimiter } = await import("../rate-limiter.js");
+    const app = express();
+    app.use(responseFormatter);
+    app.use(
+      createRateLimiter({
+        identifier: "no-bypass",
+        allowInternalBypass: false,
+        max: 2,
+        windowSeconds: 60,
+      }),
+    );
+    app.get("/resource", respondOk);
+
+    const agent = createApiClient(app);
+    await agent.get("/resource").set("X-Internal-Service", "internal").expect(200);
+    await agent.get("/resource").set("X-Internal-Service", "internal").expect(200);
+    const limited = await agent.get("/resource").set("X-Internal-Service", "internal").expect(429);
+
+    expect(limited.body.error.code).toBe("RATE_LIMITED");
+  });
+
+  it("falls back to an in-memory store when Redis client creation fails", async () => {
+    const config = getMockConfig();
+    config.security.rateLimit.strategy = "redis";
+    config.cache.redisUrl = "redis://localhost:6380/0";
+    setMockConfig(config);
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("redis", () => ({
+        __esModule: true,
+        createClient: jest.fn(() => {
+          throw new Error("redis unavailable");
+        }),
+      }));
+
+      const { createRateLimiter } = await import("../rate-limiter.js");
+
+      const app = express();
+      app.use(responseFormatter);
+      app.use(createRateLimiter({ identifier: "redis-fallback", max: 1, windowSeconds: 60 }));
+      app.get("/resource", respondOk);
+
+      const agent = createApiClient(app);
+      await agent.get("/resource").expect(200);
+      const limited = await agent.get("/resource").expect(429);
+
+      expect(limited.body.error.code).toBe("RATE_LIMITED");
+    });
+
+    jest.resetModules();
+    resetRateLimitConfig();
+  });
 });
