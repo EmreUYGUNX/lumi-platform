@@ -224,8 +224,9 @@ jobs:
       - *checkout
       - name: Reclaim Docker disk space
         run: |
-          docker system prune -af || true
+          docker image prune -f || true
           docker builder prune -af || true
+          docker volume prune -f || true
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build backend production image
