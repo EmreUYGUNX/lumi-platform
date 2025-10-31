@@ -263,6 +263,11 @@ jobs:
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
+      - name: Reset Trivy temp workspace
+        run: |
+          rm -rf .trivy-tmp
+          mkdir -p .trivy-tmp
+          chmod 0777 .trivy-tmp
       - name: Build frontend production image
         run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Frontend image vulnerability scan
