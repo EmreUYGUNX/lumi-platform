@@ -229,14 +229,12 @@ jobs:
           docker volume prune -f || true
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build backend production image
-        run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
-      - name: Build frontend production image
-        run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Prepare Trivy workspace directories
         run: |
           mkdir -p .trivy-cache
           mkdir -p .trivy-tmp
+      - name: Build backend production image
+        run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: File system vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -261,6 +259,11 @@ jobs:
           cache-dir: .trivy-cache
         env:
           TMPDIR: /github/workspace/.trivy-tmp
+        if: ${{ success() }}
+      - name: Remove backend image
+        run: docker rmi lumi-backend-ci:latest || true
+      - name: Build frontend production image
+        run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Frontend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -272,6 +275,8 @@ jobs:
           cache-dir: .trivy-cache
         env:
           TMPDIR: /github/workspace/.trivy-tmp
+      - name: Remove frontend image
+        run: docker rmi lumi-frontend-ci:latest || true
 
   performance:
     name: Performance Budgets
