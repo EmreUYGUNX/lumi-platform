@@ -228,6 +228,10 @@ jobs:
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: Build frontend production image
         run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
+      - name: Prepare Trivy workspace directories
+        run: |
+          mkdir -p .trivy-cache
+          mkdir -p .trivy-tmp
       - name: File system vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -238,6 +242,9 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           trivyignores: .trivyignore
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: /github/workspace/.trivy-tmp
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -246,6 +253,9 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: /github/workspace/.trivy-tmp
       - name: Frontend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -254,6 +264,9 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: /github/workspace/.trivy-tmp
 
   performance:
     name: Performance Budgets
