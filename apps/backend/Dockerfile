@@ -65,6 +65,8 @@ COPY . .
 RUN NODE_ENV=development pnpm install --filter @lumi/backend... --frozen-lockfile
 RUN NODE_ENV=production pnpm --filter @lumi/backend... build
 RUN pnpm prune --prod
+RUN find node_modules -type d -name '@esbuild' -prune -exec rm -rf {} + \
+  && find node_modules -type d -name 'esbuild' -prune -exec rm -rf {} +
 
 FROM node:${NODE_VERSION}-alpine AS production
 
