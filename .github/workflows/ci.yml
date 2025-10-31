@@ -231,9 +231,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Prepare Trivy workspace directories
         run: |
-          sudo rm -rf /tmp/trivy-cache /tmp/trivy-tmp
-          sudo mkdir -p /tmp/trivy-cache /tmp/trivy-tmp
-          sudo chmod 0777 /tmp/trivy-cache /tmp/trivy-tmp
+          sudo rm -rf .trivy-cache .trivy-tmp
+          mkdir -p .trivy-cache .trivy-tmp
+          chmod 0777 .trivy-cache .trivy-tmp
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: File system vulnerability scan
@@ -246,9 +246,9 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           trivyignores: .trivyignore
-          cache-dir: /tmp/trivy-cache
+          cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp/trivy-tmp
+          TMPDIR: /github/workspace/.trivy-tmp
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -257,9 +257,9 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: /tmp/trivy-cache
+          cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp/trivy-tmp
+          TMPDIR: /github/workspace/.trivy-tmp
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
@@ -273,9 +273,9 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: /tmp/trivy-cache
+          cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp/trivy-tmp
+          TMPDIR: /github/workspace/.trivy-tmp
       - name: Remove frontend image
         run: docker rmi lumi-frontend-ci:latest || true
 
