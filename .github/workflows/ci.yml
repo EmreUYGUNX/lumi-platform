@@ -231,8 +231,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Prepare Trivy workspace directories
         run: |
+          sudo rm -rf .trivy-cache .trivy-tmp
           mkdir -p .trivy-cache
+          chmod 0777 .trivy-cache
           mkdir -p .trivy-tmp
+          chmod 0777 .trivy-tmp
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: File system vulnerability scan
