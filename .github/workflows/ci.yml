@@ -246,9 +246,9 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           trivyignores: .trivyignore
-          cache-dir: .trivy-cache
+          cache-dir: /tmp/trivy-cache
         env:
-          TMPDIR: /github/workspace/.trivy-tmp
+          TMPDIR: /tmp/trivy-tmp
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
