@@ -3,11 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "emitDeclarationOnly": false,
-    "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "paths": {
-      "@lumi/types": ["../types/dist/index.d.ts"],
-      "@lumi/types/*": ["../types/dist/*.d.ts"]
-    }
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**", "**/*.stories.*"]
 }
