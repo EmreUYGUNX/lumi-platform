@@ -231,6 +231,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
+      - name: Create Trivy temp directory
+        run: mkdir -p ${{ github.workspace }}/trivy-tmp
       - name: File system vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
