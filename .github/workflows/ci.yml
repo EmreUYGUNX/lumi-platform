@@ -259,8 +259,8 @@ jobs:
           exit-code: 1
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /github/workspace/trivy-tmp
-          TRIVY_TEMP_DIR: /github/workspace/trivy-tmp
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
@@ -284,8 +284,8 @@ jobs:
           exit-code: 1
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /github/workspace/trivy-tmp
-          TRIVY_TEMP_DIR: /github/workspace/trivy-tmp
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
       - name: Remove frontend image
         run: docker rmi lumi-frontend-ci:latest || true
 
