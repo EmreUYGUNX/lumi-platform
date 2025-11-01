@@ -247,8 +247,8 @@ jobs:
           trivyignores: .trivyignore
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp
-          TRIVY_TEMP_DIR: /tmp
+          TMPDIR: ${{ runner.temp }}
+          TRIVY_TEMP_DIR: ${{ runner.temp }}
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@0.20.0
         with:
@@ -259,8 +259,8 @@ jobs:
           exit-code: 1
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp
-          TRIVY_TEMP_DIR: /tmp
+          TMPDIR: ${{ runner.temp }}
+          TRIVY_TEMP_DIR: ${{ runner.temp }}
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
@@ -276,8 +276,8 @@ jobs:
           exit-code: 1
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /tmp
-          TRIVY_TEMP_DIR: /tmp
+          TMPDIR: ${{ runner.temp }}
+          TRIVY_TEMP_DIR: ${{ runner.temp }}
       - name: Remove frontend image
         run: docker rmi lumi-frontend-ci:latest || true
 
