@@ -6,9 +6,10 @@ import { createApp } from "../app.js";
 import type { CreateAppOptions } from "../app.js";
 import { NotFoundError } from "../lib/errors.js";
 import type {
-  ProductSearchResult,
-  ProductServiceContract,
-} from "../modules/product/product.service.js";
+  CatalogService,
+  CategoryDetailResult,
+  ProductDetailResult,
+} from "../modules/catalog/catalog.service.js";
 import type { DeepPartial } from "./config.js";
 import { createTestConfig, mergeTestOverrides } from "./config.js";
 
@@ -47,34 +48,74 @@ const resolveOverrides = (
 ): DeepPartial<ApplicationConfig> =>
   mergeTestOverrides<ApplicationConfig>(DEFAULT_OVERRIDES, overrides ?? {});
 
-const createProductServiceStub = (): ProductServiceContract => ({
-  async search(): Promise<ProductSearchResult> {
+const emptyPaginationMeta = {
+  page: 1,
+  pageSize: 0,
+  totalItems: 0,
+  totalPages: 0,
+  hasNextPage: false,
+  hasPreviousPage: false,
+};
+
+const CATALOG_STUB_ERROR = "Catalog service stub not implemented in test harness.";
+
+const createCatalogServiceStub = () => ({
+  async listPublicProducts() {
     return {
       items: [],
-      meta: {
-        page: 1,
-        pageSize: 0,
-        totalItems: 0,
-        totalPages: 0,
-        hasNextPage: false,
-        hasPreviousPage: false,
-      },
+      meta: emptyPaginationMeta,
     };
   },
-  async getBySlug() {
-    throw new NotFoundError("Product service stub not implemented in test harness.");
+  async getProductDetail(): Promise<ProductDetailResult> {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async listProductVariants() {
+    return [];
+  },
+  async createProduct() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async updateProduct() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async archiveProduct() {
+    await Promise.resolve();
+  },
+  async addVariant() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async updateVariant() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async deleteVariant() {
+    await Promise.resolve();
+  },
+  async listCategories() {
+    return [];
+  },
+  async getCategoryDetail(): Promise<CategoryDetailResult> {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async createCategory() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async updateCategory() {
+    throw new NotFoundError(CATALOG_STUB_ERROR);
+  },
+  async deleteCategory() {
+    await Promise.resolve();
   },
 });
 
 export const createTestApp = (options: CreateTestAppOptions = {}): TestAppContext => {
   const overrides = resolveOverrides(options.configOverrides);
   const config = createTestConfig(overrides);
-  const catalogServicesOverrides = options.apiOptions?.catalogServices;
+  const catalogOptionsOverrides = options.apiOptions?.catalogOptions;
   const apiOptions = {
     ...options.apiOptions,
-    catalogServices: {
-      productService: createProductServiceStub(),
-      ...catalogServicesOverrides,
+    catalogOptions: {
+      service: (catalogOptionsOverrides?.service ??
+        createCatalogServiceStub()) as unknown as CatalogService,
     },
   } satisfies CreateAppOptions["apiOptions"];
   const app = createApp({ config, apiOptions });

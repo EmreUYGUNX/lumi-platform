@@ -449,7 +449,6 @@ describe("DTO schemas", () => {
   it("validates product creation payloads", () => {
     const payload: ProductCreateRequestDTO = {
       title: "Lumen Floor Lamp",
-      slug: "lumen-floor-lamp",
       price: { amount: "599.00", currency: "TRY" },
       variants: [
         productVariantInputSchema.parse({
@@ -479,8 +478,18 @@ describe("DTO schemas", () => {
       productFilterSchema.parse({
         search: "lamp",
         statuses: [ProductStatus.ACTIVE],
+        attributes: { colour: "Black", size: ["M", "L"] },
+        sort: "rating",
       }),
     ).not.toThrow();
+  });
+
+  it("rejects invalid attribute filters", () => {
+    expect(() =>
+      productFilterSchema.parse({
+        attributes: "not-json",
+      }),
+    ).toThrow("Attribute filters must be valid JSON.");
   });
 
   it("builds paginated response schema on demand", () => {

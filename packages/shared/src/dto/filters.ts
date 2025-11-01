@@ -59,6 +59,17 @@ export const dateRangeFilterSchema = z
     },
   );
 
+const productAttributeValueSchema = z.union([
+  localeStringSchema.max(120),
+  z.array(localeStringSchema.max(120)).min(1),
+]);
+
+export const productAttributeFilterSchema = z
+  .record(productAttributeValueSchema)
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Attribute filter cannot be empty.",
+  });
+
 export const productFilterSchema = z
   .object({
     search: localeStringSchema.max(120).optional(),
@@ -66,11 +77,21 @@ export const productFilterSchema = z
     categoryIds: z.array(cuidSchema).max(10).optional(),
     collectionIds: z.array(cuidSchema).max(10).optional(),
     primaryCategoryId: cuidSchema.optional(),
+    attributes: productAttributeFilterSchema.optional(),
     priceRange: priceRangeFilterSchema.optional(),
     includeDeleted: z.boolean().optional(),
     inventoryAvailability: z.enum(["in_stock", "low_stock", "out_of_stock"]).optional(),
     sort: z
-      .enum(["newest", "oldest", "price_asc", "price_desc", "title_asc", "title_desc"])
+      .enum([
+        "relevance",
+        "newest",
+        "oldest",
+        "price_asc",
+        "price_desc",
+        "title_asc",
+        "title_desc",
+        "rating",
+      ])
       .optional(),
     cursor: z.string().optional(),
     take: z.coerce.number().int().positive().max(100).optional(),
@@ -101,6 +122,7 @@ export const orderFilterSchema = z
 
 export type PriceRangeFilter = z.infer<typeof priceRangeFilterSchema>;
 export type DateRangeFilter = z.infer<typeof dateRangeFilterSchema>;
+export type ProductAttributeFilter = z.infer<typeof productAttributeFilterSchema>;
 export type ProductFilter = z.infer<typeof productFilterSchema>;
 export type ReviewFilter = z.infer<typeof reviewFilterSchema>;
 export type OrderFilter = z.infer<typeof orderFilterSchema>;

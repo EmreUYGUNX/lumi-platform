@@ -3,12 +3,12 @@ import { Router } from "express";
 
 import { createAuthRouter } from "@/modules/auth/auth.routes.js";
 import type { AuthRouterOptions } from "@/modules/auth/auth.routes.js";
+import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
+import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
 import { createAdminRouter } from "./admin.js";
-import { createCatalogRouter } from "./catalog.js";
-import type { CatalogRouterOptions } from "./catalog.js";
 import { createHealthRouter } from "./health.js";
 import { buildRequestPath } from "./registry.js";
 
@@ -20,7 +20,7 @@ interface ApiRouterOptions {
    * accurate 405 responses and documentation remains in sync.
    */
   registerRoute?: RouteRegistrar;
-  catalogServices?: CatalogRouterOptions["services"];
+  catalogOptions?: Pick<CatalogRouterOptions, "service">;
   authOptions?: AuthRouterOptions;
 }
 
@@ -123,10 +123,10 @@ export const createV1Router = (
   );
 
   router.use(
-    "/catalog",
+    "/",
     createCatalogRouter(config, {
       registerRoute: registerV1Route,
-      services: options.catalogServices,
+      ...options.catalogOptions,
     }),
   );
 
@@ -145,10 +145,13 @@ export const createApiRouter = (
   options: ApiRouterOptions = {},
 ): Router => {
   const router = Router();
-  const { registerRoute } = options;
+  const { registerRoute, ...forwardedOptions } = options;
 
   const v1RegisterRoute = createVersionRegistrar("v1", registerRoute);
-  const v1Router = createV1Router(config, { registerRoute: v1RegisterRoute });
+  const v1Router = createV1Router(config, {
+    registerRoute: v1RegisterRoute,
+    ...forwardedOptions,
+  });
   router.use("/v1", v1Router);
 
   // Backwards compatibility: keep legacy `/api/*` routes mapped to v1 but mark them deprecated.
@@ -157,7 +160,10 @@ export const createApiRouter = (
     documentationUrl: `${config.app.apiBaseUrl.replace(/\/+$/, "")}/docs/api`,
   };
 
-  const legacyRouter = createV1Router(config, { registerRoute });
+  const legacyRouter = createV1Router(config, {
+    registerRoute,
+    ...forwardedOptions,
+  });
   router.use("/", createDeprecationMiddleware("v0", legacyMetadata), legacyRouter);
 
   return router;

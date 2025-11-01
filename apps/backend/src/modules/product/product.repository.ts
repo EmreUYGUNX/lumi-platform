@@ -1,5 +1,5 @@
 /* eslint-disable import/order */
-import { Prisma, ProductStatus } from "@prisma/client";
+import { OrderStatus, Prisma, ProductStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import {
@@ -26,6 +26,7 @@ export interface ProductSearchFilters {
   minPrice?: Prisma.Decimal | number;
   maxPrice?: Prisma.Decimal | number;
   includeDeleted?: boolean;
+  attributes?: Record<string, string | string[]>;
 }
 
 const PRODUCT_DEFAULT_INCLUDE: Prisma.ProductInclude = {
@@ -101,6 +102,133 @@ const toDecimal = (value?: Prisma.Decimal | number): Prisma.Decimal | undefined 
   return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
 };
 
+const buildSearchConditions = (term?: string): Prisma.ProductWhereInput["OR"] | undefined => {
+  if (!term) {
+    return undefined;
+  }
+
+  const normalized = term.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+
+  const lowerCase = normalized.toLowerCase();
+  return [
+    { title: { contains: normalized, mode: "insensitive" } },
+    { slug: { contains: normalized, mode: "insensitive" } },
+    { searchKeywords: { has: lowerCase } },
+  ];
+};
+
+const buildStatusCondition = (
+  statuses?: ProductStatus[],
+): Prisma.ProductWhereInput["status"] | undefined => {
+  const count = statuses?.length ?? 0;
+  if (count === 0) {
+    return undefined;
+  }
+
+  return count === 1 ? statuses![0] : { in: statuses };
+};
+
+const buildCategoryCondition = (
+  filters: ProductSearchFilters,
+): Prisma.ProductWhereInput["categories"] | undefined => {
+  if (filters.primaryCategoryId) {
+    return {
+      some: {
+        categoryId: filters.primaryCategoryId,
+        isPrimary: true,
+      },
+    };
+  }
+
+  const categoryIds = filters.categoryIds ?? [];
+  if (categoryIds.length > 0) {
+    return {
+      some: { categoryId: { in: categoryIds } },
+    };
+  }
+
+  return undefined;
+};
+
+const buildCollectionCondition = (
+  collectionIds?: string[],
+): Prisma.ProductWhereInput["collections"] | undefined => {
+  const ids = collectionIds ?? [];
+  if (ids.length === 0) {
+    return undefined;
+  }
+
+  return {
+    some: { collectionId: { in: ids } },
+  };
+};
+
+const buildPriceFilter = (filters: ProductSearchFilters): Prisma.DecimalFilter | undefined => {
+  const gte = toDecimal(filters.minPrice);
+  const lte = toDecimal(filters.maxPrice);
+
+  if (gte === undefined && lte === undefined) {
+    return undefined;
+  }
+
+  return { gte, lte };
+};
+
+const buildAttributeConditions = (
+  attributes?: Record<string, string | string[]>,
+): Prisma.ProductWhereInput[] => {
+  if (!attributes) {
+    return [];
+  }
+
+  const entries = Object.entries(attributes);
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const conditions: Prisma.ProductWhereInput[] = [];
+
+  entries.forEach(([attribute, rawValue]) => {
+    if (Array.isArray(rawValue)) {
+      const values = rawValue
+        .filter((value) => typeof value === "string")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+
+      if (values.length === 0) {
+        return;
+      }
+
+      conditions.push({
+        OR: values.map((value) => ({
+          attributes: {
+            path: [attribute],
+            equals: value,
+          },
+        })),
+      });
+      return;
+    }
+
+    if (typeof rawValue === "string") {
+      const trimmed = rawValue.trim();
+      if (trimmed.length > 0) {
+        conditions.push({
+          attributes: {
+            path: [attribute],
+            equals: trimmed,
+          },
+        });
+      }
+    }
+  });
+
+  return conditions;
+};
+
 const buildProductSearchWhere = (filters: ProductSearchFilters): Prisma.ProductWhereInput => {
   const where: Prisma.ProductWhereInput = {};
 
@@ -109,51 +237,51 @@ const buildProductSearchWhere = (filters: ProductSearchFilters): Prisma.ProductW
     where.deletedAt = null;
   }
 
-  if (filters.term) {
-    const normalized = filters.term.trim();
-    where.OR = [
-      { title: { contains: normalized, mode: "insensitive" } },
-      { slug: { contains: normalized, mode: "insensitive" } },
-      { searchKeywords: { has: normalized.toLowerCase() } },
-    ];
+  const searchConditions = buildSearchConditions(filters.term);
+  if (searchConditions) {
+    where.OR = searchConditions;
   }
 
-  if (filters.statuses?.length) {
-    where.status = filters.statuses.length === 1 ? filters.statuses[0] : { in: filters.statuses };
+  const statusCondition = buildStatusCondition(filters.statuses);
+  if (statusCondition) {
+    where.status = statusCondition;
   }
 
-  if (filters.primaryCategoryId) {
-    where.categories = {
-      some: {
-        categoryId: filters.primaryCategoryId,
-        isPrimary: true,
-      },
-    };
-  } else if (filters.categoryIds?.length) {
-    where.categories = {
-      some: { categoryId: { in: filters.categoryIds } },
-    };
+  const categoryCondition = buildCategoryCondition(filters);
+  if (categoryCondition) {
+    where.categories = categoryCondition;
   }
 
-  if (filters.collectionIds?.length) {
-    where.collections = {
-      some: { collectionId: { in: filters.collectionIds } },
-    };
+  const collectionCondition = buildCollectionCondition(filters.collectionIds);
+  if (collectionCondition) {
+    where.collections = collectionCondition;
   }
 
-  const priceFilter = {
-    gte: toDecimal(filters.minPrice),
-    lte: toDecimal(filters.maxPrice),
-  } as Prisma.DecimalFilter;
-
-  if (priceFilter.gte !== undefined || priceFilter.lte !== undefined) {
+  const priceFilter = buildPriceFilter(filters);
+  if (priceFilter) {
     where.price = priceFilter;
+  }
+
+  const attributeConditions = buildAttributeConditions(filters.attributes);
+  if (attributeConditions.length > 0) {
+    const existingAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+    where.AND = [...existingAnd, ...attributeConditions];
   }
 
   return where;
 };
 
 type ProductListingSummary = Prisma.ProductGetPayload<{ select: typeof PRODUCT_LISTING_SELECT }>;
+
+type ProductVariantWithRelations = Prisma.ProductVariantGetPayload<{
+  include: {
+    variantMedia: {
+      include: {
+        media: true;
+      };
+    };
+  };
+}>;
 
 export class ProductRepository extends BaseRepository<
   Prisma.ProductDelegate,
@@ -307,5 +435,49 @@ export class ProductRepository extends BaseRepository<
     });
 
     return result as unknown as CursorPaginatedResult<ProductListingSummary>;
+  }
+
+  async listVariants(
+    productId: string,
+    options: {
+      includeOutOfStock?: boolean;
+    } = {},
+  ): Promise<ProductVariantWithRelations[]> {
+    const where: Prisma.ProductVariantWhereInput = { productId };
+    if (options.includeOutOfStock === false) {
+      where.stock = { gt: 0 };
+    }
+
+    const variants = await this.prisma.productVariant.findMany({
+      where,
+      include: {
+        variantMedia: {
+          include: {
+            media: true,
+          },
+        },
+      },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    });
+
+    return variants as ProductVariantWithRelations[];
+  }
+
+  async countActiveOrderReferences(productId: string): Promise<number> {
+    const activeStatuses = [
+      OrderStatus.PENDING,
+      OrderStatus.PAID,
+      OrderStatus.FULFILLED,
+      OrderStatus.SHIPPED,
+    ];
+
+    return this.prisma.orderItem.count({
+      where: {
+        productId,
+        order: {
+          status: { in: activeStatuses },
+        },
+      },
+    });
   }
 }

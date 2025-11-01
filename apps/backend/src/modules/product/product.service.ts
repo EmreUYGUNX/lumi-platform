@@ -6,11 +6,13 @@ import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/li
 import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
 import {
   type PaginationRequest,
+  type ProductAttributeFilter,
   type ProductFilter,
   type ProductSummaryDTO,
   type ProductWithRelations,
   mapProductToSummary,
   paginationRequestSchema,
+  productAttributeFilterSchema,
   productFilterSchema,
 } from "@lumi/shared/dto";
 
@@ -219,6 +221,62 @@ const resolveSortFilter = (raw: Record<string, unknown>): Record<string, unknown
   return sort ? { sort } : {};
 };
 
+const parseAttributeFilterInput = (input: unknown): ProductAttributeFilter | undefined => {
+  if (input === undefined || input === null || input === "") {
+    return undefined;
+  }
+
+  let candidate: unknown = input;
+
+  if (typeof input === "string") {
+    try {
+      candidate = JSON.parse(input);
+    } catch (error) {
+      throw new ValidationError("Attribute filters must be valid JSON.", {
+        issues: [
+          {
+            path: "attributes",
+            message: "Unable to parse attribute filters.",
+            code: "INVALID_JSON",
+          },
+        ],
+        cause: error instanceof Error ? error : undefined,
+      });
+    }
+  }
+
+  if (candidate && typeof candidate === "object") {
+    const result = productAttributeFilterSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError("Invalid attribute filters.", {
+        issues: buildValidationIssues(result.error.issues),
+      });
+    }
+
+    return result.data;
+  }
+
+  throw new ValidationError("Attribute filters must be an object.", {
+    issues: [
+      {
+        path: "attributes",
+        message: "Expected an object with attribute keys.",
+        code: "TYPE_ERROR",
+      },
+    ],
+  });
+};
+
+const resolveAttributeFilter = (raw: Record<string, unknown>): Record<string, unknown> => {
+  const candidate = raw.attributes ?? raw.attributeFilters ?? raw.attribute;
+  if (candidate === undefined) {
+    return {};
+  }
+
+  const attributes = parseAttributeFilterInput(candidate);
+  return attributes ? { attributes } : {};
+};
+
 const resolveCursorFilter = (raw: Record<string, unknown>): Record<string, unknown> => {
   const cursor = toNullableString(raw.cursor);
   return cursor ? { cursor } : {};
@@ -237,6 +295,7 @@ const buildFilterInput = (raw: Record<string, unknown>): Record<string, unknown>
   ...resolveStatusFilter(raw),
   ...resolveCategoryFilter(raw),
   ...resolveCollectionFilter(raw),
+  ...resolveAttributeFilter(raw),
   ...resolvePriceRangeFilter(raw),
   ...resolveIncludeDeletedFilter(raw),
   ...resolveInventoryAvailabilityFilter(raw),
@@ -355,6 +414,10 @@ const toRepositoryFilters = (filter: ProductFilter): ProductSearchFilters => {
     filters.includeDeleted = filter.includeDeleted;
   }
 
+  if (filter.attributes) {
+    filters.attributes = filter.attributes;
+  }
+
   return filters;
 };
 
@@ -362,6 +425,9 @@ const mapSortToOrderBy = (
   sort: ProductFilter["sort"],
 ): Prisma.ProductOrderByWithRelationInput[] | undefined => {
   switch (sort) {
+    case "relevance": {
+      return undefined;
+    }
     case "newest": {
       return [{ createdAt: "desc" }];
     }
@@ -379,6 +445,16 @@ const mapSortToOrderBy = (
     }
     case "title_desc": {
       return [{ title: "desc" }];
+    }
+    case "rating": {
+      return [
+        {
+          reviews: {
+            _count: "desc",
+          },
+        },
+        { createdAt: "desc" },
+      ];
     }
     default: {
       return undefined;
