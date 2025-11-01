@@ -394,6 +394,37 @@ export class ProductRepository extends BaseRepository<
     return summary;
   }
 
+  async listForRatingSort(
+    filters: ProductSearchFilters,
+  ): Promise<{ id: string; createdAt: Date }[]> {
+    const where = buildProductSearchWhere(filters);
+    const records = await this.findMany({
+      where,
+      select: {
+        id: true,
+        createdAt: true,
+      },
+    });
+
+    return records.map((record) => ({
+      id: record.id,
+      createdAt: record.createdAt,
+    }));
+  }
+
+  async findWithRelations(ids: string[]): Promise<ProductWithRelations[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const records = await this.findMany({
+      where: { id: { in: ids } },
+      include: PRODUCT_DEFAULT_INCLUDE,
+    });
+
+    return records as ProductWithRelations[];
+  }
+
   async attachMedia(productId: string, mediaId: string, sortOrder?: number): Promise<void> {
     await this.withTransaction(async (_repo, tx) => {
       await tx.productMedia.upsert({

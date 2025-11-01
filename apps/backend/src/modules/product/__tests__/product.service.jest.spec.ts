@@ -24,13 +24,26 @@ type RepositorySearch = (
   pagination?: unknown,
 ) => Promise<PaginatedResult<ProductWithRelations>>;
 
-const createRepository = (overrides: Partial<Record<string, unknown>> = {}) => ({
-  findBySlug: jest.fn<RepositoryFindBySlug>(),
-  search: jest.fn<RepositorySearch>(),
-  findMany: jest.fn().mockResolvedValue([]),
-  getReviewAggregates: jest.fn().mockResolvedValue(new Map()),
-  ...overrides,
-});
+const createRepository = (overrides: Partial<Record<string, unknown>> = {}) => {
+  const listForRatingSort = jest
+    .fn<(filters: ProductSearchFilters) => Promise<{ id: string; createdAt: Date }[]>>()
+    .mockResolvedValue([]);
+  const findWithRelations = jest
+    .fn<(ids: string[]) => Promise<ProductWithRelations[]>>()
+    .mockResolvedValue([]);
+  const getAggregates = jest
+    .fn<(ids: string[]) => Promise<Map<string, { average: number; count: number }>>>()
+    .mockResolvedValue(new Map());
+
+  return {
+    findBySlug: jest.fn<RepositoryFindBySlug>(),
+    search: jest.fn<RepositorySearch>(),
+    listForRatingSort,
+    findWithRelations,
+    getReviewAggregates: getAggregates,
+    ...overrides,
+  };
+};
 
 const createProductEntity = (): ProductWithRelations => {
   const timestamp = new Date("2024-01-01T00:00:00.000Z");
@@ -301,30 +314,34 @@ describe("ProductService", () => {
       { id: secondProduct.id, createdAt: secondProduct.createdAt },
     ];
 
-    const findManyMock = jest.fn().mockImplementation((args: Prisma.ProductFindManyArgs) => {
-      if (args.select) {
-        return Promise.resolve(candidates);
-      }
+    const listForRatingSortMock = jest
+      .fn<(filters: ProductSearchFilters) => Promise<{ id: string; createdAt: Date }[]>>()
+      .mockResolvedValue(candidates);
 
-      return Promise.resolve([firstProduct, secondProduct]);
-    });
+    const findWithRelationsMock = jest
+      .fn<(ids: string[]) => Promise<ProductWithRelations[]>>()
+      .mockResolvedValue([firstProduct, secondProduct] as ProductWithRelations[]);
 
-    const getReviewAggregatesMock = jest.fn().mockResolvedValue(
-      new Map<string, { average: number; count: number }>([
-        [firstProduct.id, { average: 4.5, count: 12 }],
-        [secondProduct.id, { average: 4.8, count: 3 }],
-      ]),
-    );
+    const getReviewAggregatesMock = jest
+      .fn<(ids: string[]) => Promise<Map<string, { average: number; count: number }>>>()
+      .mockResolvedValue(
+        new Map<string, { average: number; count: number }>([
+          [firstProduct.id, { average: 4.5, count: 12 }],
+          [secondProduct.id, { average: 4.8, count: 3 }],
+        ]),
+      );
 
     const repository = createRepository({
-      findMany: findManyMock,
+      listForRatingSort: listForRatingSortMock,
+      findWithRelations: findWithRelationsMock,
       getReviewAggregates: getReviewAggregatesMock,
     });
     const service = new ProductService(repository as never);
 
     const result = await service.search({ sort: "rating" });
 
-    expect(findManyMock).toHaveBeenCalled();
+    expect(listForRatingSortMock).toHaveBeenCalled();
+    expect(findWithRelationsMock).toHaveBeenCalledWith([secondProduct.id, firstProduct.id]);
     expect(getReviewAggregatesMock).toHaveBeenCalledWith(
       expect.arrayContaining([firstProduct.id, secondProduct.id]),
     );

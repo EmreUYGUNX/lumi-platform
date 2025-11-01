@@ -18,7 +18,6 @@ import {
 
 /* eslint-disable unicorn/no-null */
 import type { ProductSearchFilters } from "./product.repository.js";
-import { buildProductSearchWhere } from "./product.repository.js";
 
 interface ProductRepositoryLike {
   findBySlug(
@@ -40,7 +39,8 @@ interface ProductRepositoryLike {
       "where"
     >,
   ): Promise<PaginatedResult<ProductWithRelations>>;
-  findMany<T extends Prisma.ProductFindManyArgs>(args: T): Promise<Prisma.ProductGetPayload<T>[]>;
+  listForRatingSort(filters: ProductSearchFilters): Promise<{ id: string; createdAt: Date }[]>;
+  findWithRelations(ids: string[]): Promise<ProductWithRelations[]>;
   getReviewAggregates(
     productIds: string[],
   ): Promise<Map<string, { average: number; count: number }>>;
@@ -512,14 +512,7 @@ export class ProductService implements ProductServiceContract {
     filters: ProductSearchFilters,
     pagination: PaginationRequest,
   ): Promise<ProductSearchResult> {
-    const where = buildProductSearchWhere(filters);
-    const candidates = await this.repository.findMany({
-      where,
-      select: {
-        id: true,
-        createdAt: true,
-      },
-    });
+    const candidates = await this.repository.listForRatingSort(filters);
 
     const page = Math.max(1, pagination.page ?? 1);
     const pageSize = Math.max(1, pagination.pageSize ?? 24);
@@ -577,18 +570,12 @@ export class ProductService implements ProductServiceContract {
       };
     }
 
-    const records = await this.repository.findMany({
-      where: {
-        id: { in: pageIds },
-      },
-      include: DEFAULT_PRODUCT_INCLUDE,
-    });
-
+    const records = await this.repository.findWithRelations(pageIds);
     const recordMap = new Map(records.map((record) => [record.id, record] as const));
 
     const items = pageIds
       .map((id) => recordMap.get(id))
-      .filter((record): record is ProductWithRelations => record !== undefined && record !== null)
+      .filter((record): record is ProductWithRelations => record !== undefined)
       .map((record) => mapProductToSummary(record));
 
     const totalItems = candidates.length;
