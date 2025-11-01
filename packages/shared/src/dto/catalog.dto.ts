@@ -118,7 +118,7 @@ export const productVariantInputSchema = z
 export const productCreateRequestSchema = z
   .object({
     title: localeStringSchema.max(240),
-    slug: slugSchema,
+    slug: slugSchema.optional(),
     summary: nullableLocaleStringSchema.optional(),
     description: nullableLocaleStringSchema.optional(),
     status: productStatusSchema.optional(),
@@ -144,6 +144,31 @@ export const productCreateRequestSchema = z
   })
   .strict();
 
+export const productUpdateRequestSchema = productCreateRequestSchema
+  .partial()
+  .extend({
+    slug: slugSchema.optional(),
+    categoryIds: z.array(cuidSchema).min(1).optional(),
+    variants: z.array(productVariantInputSchema).optional(),
+  })
+  .strict();
+
+export const productVariantUpdateSchema = productVariantInputSchema.partial().strict();
+
+export const categoryCreateRequestSchema = z
+  .object({
+    name: localeStringSchema.max(180),
+    slug: slugSchema.optional(),
+    description: nullableLocaleStringSchema.optional(),
+    parentId: cuidSchema.optional(),
+    imageUrl: urlSchema.nullable().optional(),
+    iconUrl: urlSchema.nullable().optional(),
+    displayOrder: z.number().int().nullable().optional(),
+  })
+  .strict();
+
+export const categoryUpdateRequestSchema = categoryCreateRequestSchema.partial().strict();
+
 export type MediaAssetDTO = z.infer<typeof mediaAssetSchema>;
 export type CategorySummaryDTO = z.infer<typeof categorySummarySchema>;
 export type ProductVariantDTO = z.infer<typeof productVariantSchema>;
@@ -151,6 +176,10 @@ export type ProductMediaDTO = z.infer<typeof productMediaSchema>;
 export type ProductSummaryDTO = z.infer<typeof productSummarySchema>;
 export type ProductVariantInputDTO = z.infer<typeof productVariantInputSchema>;
 export type ProductCreateRequestDTO = z.infer<typeof productCreateRequestSchema>;
+export type ProductUpdateRequestDTO = z.infer<typeof productUpdateRequestSchema>;
+export type ProductVariantUpdateDTO = z.infer<typeof productVariantUpdateSchema>;
+export type CategoryCreateRequestDTO = z.infer<typeof categoryCreateRequestSchema>;
+export type CategoryUpdateRequestDTO = z.infer<typeof categoryUpdateRequestSchema>;
 
 export const isMediaAssetDTO = (value: unknown): value is MediaAssetDTO =>
   mediaAssetSchema.safeParse(value).success;

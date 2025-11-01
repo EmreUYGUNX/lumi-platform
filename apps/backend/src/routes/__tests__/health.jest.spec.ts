@@ -7,7 +7,7 @@ import request from "supertest";
 
 import { resetEnvironmentCache } from "../../config/env.js";
 import { withTemporaryEnvironment } from "../../config/testing.js";
-import type { ProductServiceContract } from "../../modules/product/product.service.js";
+import type { CatalogService } from "../../modules/catalog/catalog.service.js";
 import { registerHealthCheck, unregisterHealthCheck } from "../../observability/index.js";
 
 const BASE_ENV = {
@@ -74,8 +74,8 @@ afterEach(() => {
 
 const PRISMA_HEALTH_CHECK_ID = "database:prisma";
 
-const createProductServiceStub = (): ProductServiceContract => ({
-  async search() {
+const createCatalogServiceStub = () => ({
+  async listPublicProducts() {
     return {
       items: [],
       meta: {
@@ -88,8 +88,44 @@ const createProductServiceStub = (): ProductServiceContract => ({
       },
     };
   },
-  async getBySlug() {
+  async getProductDetail() {
     throw new Error("Not implemented in health route tests.");
+  },
+  async listProductVariants() {
+    return [];
+  },
+  async createProduct() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async updateProduct() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async archiveProduct() {
+    await Promise.resolve();
+  },
+  async addVariant() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async updateVariant() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async deleteVariant() {
+    await Promise.resolve();
+  },
+  async listCategories() {
+    return [];
+  },
+  async getCategoryDetail() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async createCategory() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async updateCategory() {
+    throw new Error("Not implemented in health route tests.");
+  },
+  async deleteCategory() {
+    await Promise.resolve();
   },
 });
 
@@ -109,8 +145,8 @@ describe("health routes", () => {
           const { createApp } = await import("../../app.js");
           const app = createApp({
             apiOptions: {
-              catalogServices: {
-                productService: createProductServiceStub(),
+              catalogOptions: {
+                service: createCatalogServiceStub() as unknown as CatalogService,
               },
             },
           });
@@ -148,8 +184,8 @@ describe("health routes", () => {
       const { createApp } = await import("../../app.js");
       const app = createApp({
         apiOptions: {
-          catalogServices: {
-            productService: createProductServiceStub(),
+          catalogOptions: {
+            service: createCatalogServiceStub() as unknown as CatalogService,
           },
         },
       });
@@ -179,8 +215,8 @@ describe("health routes", () => {
       const { createApp } = await import("../../app.js");
       const app = createApp({
         apiOptions: {
-          catalogServices: {
-            productService: createProductServiceStub(),
+          catalogOptions: {
+            service: createCatalogServiceStub() as unknown as CatalogService,
           },
         },
       });

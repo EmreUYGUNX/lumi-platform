@@ -6,11 +6,13 @@ import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/li
 import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
 import {
   type PaginationRequest,
+  type ProductAttributeFilter,
   type ProductFilter,
   type ProductSummaryDTO,
   type ProductWithRelations,
   mapProductToSummary,
   paginationRequestSchema,
+  productAttributeFilterSchema,
   productFilterSchema,
 } from "@lumi/shared/dto";
 
@@ -37,6 +39,11 @@ interface ProductRepositoryLike {
       "where"
     >,
   ): Promise<PaginatedResult<ProductWithRelations>>;
+  listForRatingSort(filters: ProductSearchFilters): Promise<{ id: string; createdAt: Date }[]>;
+  findWithRelations(ids: string[]): Promise<ProductWithRelations[]>;
+  getReviewAggregates(
+    productIds: string[],
+  ): Promise<Map<string, { average: number; count: number }>>;
 }
 
 const DEFAULT_PRODUCT_INCLUDE: Prisma.ProductInclude = {
@@ -219,6 +226,62 @@ const resolveSortFilter = (raw: Record<string, unknown>): Record<string, unknown
   return sort ? { sort } : {};
 };
 
+const parseAttributeFilterInput = (input: unknown): ProductAttributeFilter | undefined => {
+  if (input === undefined || input === null || input === "") {
+    return undefined;
+  }
+
+  let candidate: unknown = input;
+
+  if (typeof input === "string") {
+    try {
+      candidate = JSON.parse(input);
+    } catch (error) {
+      throw new ValidationError("Attribute filters must be valid JSON.", {
+        issues: [
+          {
+            path: "attributes",
+            message: "Unable to parse attribute filters.",
+            code: "INVALID_JSON",
+          },
+        ],
+        cause: error instanceof Error ? error : undefined,
+      });
+    }
+  }
+
+  if (candidate && typeof candidate === "object") {
+    const result = productAttributeFilterSchema.safeParse(candidate);
+    if (!result.success) {
+      throw new ValidationError("Invalid attribute filters.", {
+        issues: buildValidationIssues(result.error.issues),
+      });
+    }
+
+    return result.data;
+  }
+
+  throw new ValidationError("Attribute filters must be an object.", {
+    issues: [
+      {
+        path: "attributes",
+        message: "Expected an object with attribute keys.",
+        code: "TYPE_ERROR",
+      },
+    ],
+  });
+};
+
+const resolveAttributeFilter = (raw: Record<string, unknown>): Record<string, unknown> => {
+  const candidate = raw.attributes ?? raw.attributeFilters ?? raw.attribute;
+  if (candidate === undefined) {
+    return {};
+  }
+
+  const attributes = parseAttributeFilterInput(candidate);
+  return attributes ? { attributes } : {};
+};
+
 const resolveCursorFilter = (raw: Record<string, unknown>): Record<string, unknown> => {
   const cursor = toNullableString(raw.cursor);
   return cursor ? { cursor } : {};
@@ -237,6 +300,7 @@ const buildFilterInput = (raw: Record<string, unknown>): Record<string, unknown>
   ...resolveStatusFilter(raw),
   ...resolveCategoryFilter(raw),
   ...resolveCollectionFilter(raw),
+  ...resolveAttributeFilter(raw),
   ...resolvePriceRangeFilter(raw),
   ...resolveIncludeDeletedFilter(raw),
   ...resolveInventoryAvailabilityFilter(raw),
@@ -355,6 +419,10 @@ const toRepositoryFilters = (filter: ProductFilter): ProductSearchFilters => {
     filters.includeDeleted = filter.includeDeleted;
   }
 
+  if (filter.attributes) {
+    filters.attributes = filter.attributes;
+  }
+
   return filters;
 };
 
@@ -362,6 +430,9 @@ const mapSortToOrderBy = (
   sort: ProductFilter["sort"],
 ): Prisma.ProductOrderByWithRelationInput[] | undefined => {
   switch (sort) {
+    case "relevance": {
+      return undefined;
+    }
     case "newest": {
       return [{ createdAt: "desc" }];
     }
@@ -379,6 +450,9 @@ const mapSortToOrderBy = (
     }
     case "title_desc": {
       return [{ title: "desc" }];
+    }
+    case "rating": {
+      return undefined;
     }
     default: {
       return undefined;
@@ -404,6 +478,9 @@ export class ProductService implements ProductServiceContract {
     const { filter, pagination } = extractSearchParameters(input);
 
     const filters = toRepositoryFilters(filter);
+    if (filter.sort === "rating") {
+      return this.searchByRating(filters, pagination);
+    }
     const orderBy = mapSortToOrderBy(filter.sort);
 
     const result = await this.repository.search(filters, {
@@ -429,6 +506,92 @@ export class ProductService implements ProductServiceContract {
     throw new NotFoundError("Product not found.", {
       details: { slug },
     });
+  }
+
+  private async searchByRating(
+    filters: ProductSearchFilters,
+    pagination: PaginationRequest,
+  ): Promise<ProductSearchResult> {
+    const candidates = await this.repository.listForRatingSort(filters);
+
+    const page = Math.max(1, pagination.page ?? 1);
+    const pageSize = Math.max(1, pagination.pageSize ?? 24);
+
+    if (candidates.length === 0) {
+      return {
+        items: [],
+        meta: {
+          totalItems: 0,
+          totalPages: 0,
+          page,
+          pageSize,
+          hasNextPage: false,
+          hasPreviousPage: page > 1,
+        },
+      };
+    }
+
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    const aggregates = await this.repository.getReviewAggregates(candidateIds);
+
+    const sorted = [...candidates].sort((left, right) => {
+      const leftStats = aggregates.get(left.id) ?? { average: 0, count: 0 };
+      const rightStats = aggregates.get(right.id) ?? { average: 0, count: 0 };
+
+      if (rightStats.average !== leftStats.average) {
+        return rightStats.average - leftStats.average;
+      }
+
+      if (rightStats.count !== leftStats.count) {
+        return rightStats.count - leftStats.count;
+      }
+
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    });
+
+    const start = (page - 1) * pageSize;
+    const paged = sorted.slice(start, start + pageSize);
+    const pageIds = paged.map((entry) => entry.id);
+
+    if (pageIds.length === 0) {
+      const totalItems = candidates.length;
+      const totalPages = Math.ceil(totalItems / pageSize);
+
+      return {
+        items: [],
+        meta: {
+          totalItems,
+          totalPages,
+          page,
+          pageSize,
+          hasNextPage: false,
+          hasPreviousPage: page > 1,
+        },
+      };
+    }
+
+    const records = await this.repository.findWithRelations(pageIds);
+    const recordMap = new Map(records.map((record) => [record.id, record] as const));
+
+    const items = pageIds
+      .map((id) => recordMap.get(id))
+      .filter((record): record is ProductWithRelations => record !== undefined)
+      .map((record) => mapProductToSummary(record));
+
+    const totalItems = candidates.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+
+    return {
+      items,
+      meta: {
+        totalItems,
+        totalPages,
+        page,
+        pageSize,
+        hasNextPage: start + pageSize < totalItems,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
 
