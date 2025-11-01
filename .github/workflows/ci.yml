@@ -226,7 +226,7 @@ jobs:
         run: |
           echo "Disk space before cleanup:"
           df -h
-          docker system prune -af || true
+          docker builder prune -af || true
           echo "Disk space after cleanup:"
           df -h
       - name: Set up Docker Buildx
@@ -269,7 +269,7 @@ jobs:
           echo "Disk space before mid-cleanup:"
           df -h
           rm -rf ${{ github.workspace }}/trivy-tmp/*
-          docker system prune -af || true
+          docker builder prune -af || true
           echo "Disk space after mid-cleanup:"
           df -h
       - name: Build frontend production image
