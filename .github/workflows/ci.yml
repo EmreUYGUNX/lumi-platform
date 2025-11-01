@@ -239,7 +239,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: fs
-          scan-ref: .
+          input: .
           vuln-type: "os,library"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
