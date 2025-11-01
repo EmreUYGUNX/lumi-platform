@@ -24,6 +24,14 @@ type RepositorySearch = (
   pagination?: unknown,
 ) => Promise<PaginatedResult<ProductWithRelations>>;
 
+const createRepository = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  findBySlug: jest.fn<RepositoryFindBySlug>(),
+  search: jest.fn<RepositorySearch>(),
+  findMany: jest.fn().mockResolvedValue([]),
+  getReviewAggregates: jest.fn().mockResolvedValue(new Map()),
+  ...overrides,
+});
+
 const createProductEntity = (): ProductWithRelations => {
   const timestamp = new Date("2024-01-01T00:00:00.000Z");
 
@@ -128,10 +136,8 @@ describe("ProductService", () => {
       },
     });
 
-    const service = new ProductService({
-      findBySlug: jest.fn<RepositoryFindBySlug>(),
-      search: searchMock,
-    });
+    const repository = createRepository({ search: searchMock });
+    const service = new ProductService(repository as never);
 
     const result = await service.search({ search: "Aurora", page: "1", pageSize: "25" });
 
@@ -143,22 +149,20 @@ describe("ProductService", () => {
   });
 
   it("throws NotFoundError when product cannot be located", async () => {
-    const findBySlugMock = jest.fn<RepositoryFindBySlug>().mockResolvedValue(null);
-    const service = new ProductService({
-      findBySlug: findBySlugMock,
-      search: jest.fn<RepositorySearch>(),
+    const repository = createRepository({
+      findBySlug: jest.fn<RepositoryFindBySlug>().mockResolvedValue(null),
     });
+    const service = new ProductService(repository as never);
 
     await expect(service.getBySlug("missing-product")).rejects.toThrow(NotFoundError);
   });
 
   it("returns mapped DTO when product is found", async () => {
     const product = createProductEntity();
-    const findBySlugMock = jest.fn<RepositoryFindBySlug>().mockResolvedValue(product);
-    const service = new ProductService({
-      findBySlug: findBySlugMock,
-      search: jest.fn<RepositorySearch>(),
+    const repository = createRepository({
+      findBySlug: jest.fn<RepositoryFindBySlug>().mockResolvedValue(product),
     });
+    const service = new ProductService(repository as never);
 
     const dto = await service.getBySlug(product.slug);
     expect(dto.id).toBe(product.id);
@@ -179,10 +183,8 @@ describe("ProductService", () => {
       },
     });
 
-    const service = new ProductService({
-      findBySlug: jest.fn<RepositoryFindBySlug>(),
-      search: searchMock,
-    });
+    const repository = createRepository({ search: searchMock });
+    const service = new ProductService(repository as never);
 
     await service.search({
       filter: {
@@ -231,10 +233,8 @@ describe("ProductService", () => {
       },
     });
 
-    const service = new ProductService({
-      findBySlug: jest.fn<RepositoryFindBySlug>(),
-      search: searchMock,
-    });
+    const repository = createRepository({ search: searchMock });
+    const service = new ProductService(repository as never);
 
     await service.search({
       search: "  orbit desk ",
@@ -271,11 +271,71 @@ describe("ProductService", () => {
     });
   });
 
-  it("rejects cursor-based pagination parameters", async () => {
-    const service = new ProductService({
-      findBySlug: jest.fn<RepositoryFindBySlug>(),
-      search: jest.fn<RepositorySearch>(),
+  it("orders products by average rating when sort=rating", async () => {
+    const firstProduct = createProductEntity();
+    const secondTemplate = createProductEntity();
+    const secondProduct: ProductWithRelations = {
+      ...secondTemplate,
+      id: "ckproduct1111111111111111",
+      title: "Lumen Desk Lamp",
+      slug: "lumen-desk-lamp",
+      createdAt: new Date("2024-01-02T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+      variants: secondTemplate.variants.map((variant, index) => ({
+        ...variant,
+        id: `ckvariant111111111111111${index}`,
+        productId: "ckproduct1111111111111111",
+      })),
+      categories: secondTemplate.categories.map((category) => ({
+        ...category,
+        productId: "ckproduct1111111111111111",
+      })),
+      productMedia: secondTemplate.productMedia.map((media) => ({
+        ...media,
+        productId: "ckproduct1111111111111111",
+      })),
+    };
+
+    const candidates = [
+      { id: firstProduct.id, createdAt: firstProduct.createdAt },
+      { id: secondProduct.id, createdAt: secondProduct.createdAt },
+    ];
+
+    const findManyMock = jest.fn().mockImplementation((args: Prisma.ProductFindManyArgs) => {
+      if (args.select) {
+        return Promise.resolve(candidates);
+      }
+
+      return Promise.resolve([firstProduct, secondProduct]);
     });
+
+    const getReviewAggregatesMock = jest.fn().mockResolvedValue(
+      new Map<string, { average: number; count: number }>([
+        [firstProduct.id, { average: 4.5, count: 12 }],
+        [secondProduct.id, { average: 4.8, count: 3 }],
+      ]),
+    );
+
+    const repository = createRepository({
+      findMany: findManyMock,
+      getReviewAggregates: getReviewAggregatesMock,
+    });
+    const service = new ProductService(repository as never);
+
+    const result = await service.search({ sort: "rating" });
+
+    expect(findManyMock).toHaveBeenCalled();
+    expect(getReviewAggregatesMock).toHaveBeenCalledWith(
+      expect.arrayContaining([firstProduct.id, secondProduct.id]),
+    );
+    expect(result.items.map((item) => item.id)).toEqual([secondProduct.id, firstProduct.id]);
+    expect(result.meta.totalItems).toBe(2);
+    expect(result.meta.hasNextPage).toBe(false);
+  });
+
+  it("rejects cursor-based pagination parameters", async () => {
+    const repository = createRepository();
+    const service = new ProductService(repository as never);
 
     await expect(
       service.search({

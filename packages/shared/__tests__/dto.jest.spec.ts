@@ -489,7 +489,7 @@ describe("DTO schemas", () => {
       productFilterSchema.parse({
         attributes: "not-json",
       }),
-    ).toThrow("Attribute filters must be valid JSON.");
+    ).toThrow("Expected object, received string");
   });
 
   it("builds paginated response schema on demand", () => {

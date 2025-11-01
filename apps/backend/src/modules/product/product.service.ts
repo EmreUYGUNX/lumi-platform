@@ -18,6 +18,7 @@ import {
 
 /* eslint-disable unicorn/no-null */
 import type { ProductSearchFilters } from "./product.repository.js";
+import { buildProductSearchWhere } from "./product.repository.js";
 
 interface ProductRepositoryLike {
   findBySlug(
@@ -39,6 +40,10 @@ interface ProductRepositoryLike {
       "where"
     >,
   ): Promise<PaginatedResult<ProductWithRelations>>;
+  findMany<T extends Prisma.ProductFindManyArgs>(args: T): Promise<Prisma.ProductGetPayload<T>[]>;
+  getReviewAggregates(
+    productIds: string[],
+  ): Promise<Map<string, { average: number; count: number }>>;
 }
 
 const DEFAULT_PRODUCT_INCLUDE: Prisma.ProductInclude = {
@@ -447,23 +452,7 @@ const mapSortToOrderBy = (
       return [{ title: "desc" }];
     }
     case "rating": {
-      return [
-        {
-          reviews: {
-            _avg: {
-              rating: "desc",
-            },
-          },
-        },
-        {
-          reviews: {
-            _count: {
-              id: "desc",
-            },
-          },
-        },
-        { createdAt: "desc" },
-      ];
+      return undefined;
     }
     default: {
       return undefined;
@@ -489,6 +478,9 @@ export class ProductService implements ProductServiceContract {
     const { filter, pagination } = extractSearchParameters(input);
 
     const filters = toRepositoryFilters(filter);
+    if (filter.sort === "rating") {
+      return this.searchByRating(filters, pagination);
+    }
     const orderBy = mapSortToOrderBy(filter.sort);
 
     const result = await this.repository.search(filters, {
@@ -514,6 +506,105 @@ export class ProductService implements ProductServiceContract {
     throw new NotFoundError("Product not found.", {
       details: { slug },
     });
+  }
+
+  private async searchByRating(
+    filters: ProductSearchFilters,
+    pagination: PaginationRequest,
+  ): Promise<ProductSearchResult> {
+    const where = buildProductSearchWhere(filters);
+    const candidates = await this.repository.findMany({
+      where,
+      select: {
+        id: true,
+        createdAt: true,
+      },
+    });
+
+    const page = Math.max(1, pagination.page ?? 1);
+    const pageSize = Math.max(1, pagination.pageSize ?? 24);
+
+    if (candidates.length === 0) {
+      return {
+        items: [],
+        meta: {
+          totalItems: 0,
+          totalPages: 0,
+          page,
+          pageSize,
+          hasNextPage: false,
+          hasPreviousPage: page > 1,
+        },
+      };
+    }
+
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    const aggregates = await this.repository.getReviewAggregates(candidateIds);
+
+    const sorted = [...candidates].sort((left, right) => {
+      const leftStats = aggregates.get(left.id) ?? { average: 0, count: 0 };
+      const rightStats = aggregates.get(right.id) ?? { average: 0, count: 0 };
+
+      if (rightStats.average !== leftStats.average) {
+        return rightStats.average - leftStats.average;
+      }
+
+      if (rightStats.count !== leftStats.count) {
+        return rightStats.count - leftStats.count;
+      }
+
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    });
+
+    const start = (page - 1) * pageSize;
+    const paged = sorted.slice(start, start + pageSize);
+    const pageIds = paged.map((entry) => entry.id);
+
+    if (pageIds.length === 0) {
+      const totalItems = candidates.length;
+      const totalPages = Math.ceil(totalItems / pageSize);
+
+      return {
+        items: [],
+        meta: {
+          totalItems,
+          totalPages,
+          page,
+          pageSize,
+          hasNextPage: false,
+          hasPreviousPage: page > 1,
+        },
+      };
+    }
+
+    const records = await this.repository.findMany({
+      where: {
+        id: { in: pageIds },
+      },
+      include: DEFAULT_PRODUCT_INCLUDE,
+    });
+
+    const recordMap = new Map(records.map((record) => [record.id, record] as const));
+
+    const items = pageIds
+      .map((id) => recordMap.get(id))
+      .filter((record): record is ProductWithRelations => record !== undefined && record !== null)
+      .map((record) => mapProductToSummary(record));
+
+    const totalItems = candidates.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+
+    return {
+      items,
+      meta: {
+        totalItems,
+        totalPages,
+        page,
+        pageSize,
+        hasNextPage: start + pageSize < totalItems,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
 

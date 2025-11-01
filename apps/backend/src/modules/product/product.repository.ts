@@ -1,5 +1,5 @@
 /* eslint-disable import/order */
-import { OrderStatus, Prisma, ProductStatus } from "@prisma/client";
+import { OrderStatus, Prisma, ProductStatus, ReviewStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import {
@@ -229,7 +229,9 @@ const buildAttributeConditions = (
   return conditions;
 };
 
-const buildProductSearchWhere = (filters: ProductSearchFilters): Prisma.ProductWhereInput => {
+export const buildProductSearchWhere = (
+  filters: ProductSearchFilters,
+): Prisma.ProductWhereInput => {
   const where: Prisma.ProductWhereInput = {};
 
   if (!filters.includeDeleted) {
@@ -357,6 +359,39 @@ export class ProductRepository extends BaseRepository<
     });
 
     return products as unknown as ProductListingSummary[];
+  }
+
+  async getReviewAggregates(
+    productIds: string[],
+  ): Promise<Map<string, { average: number; count: number }>> {
+    if (productIds.length === 0) {
+      return new Map();
+    }
+
+    const aggregates = await this.prisma.review.groupBy({
+      by: ["productId"],
+      where: {
+        productId: { in: productIds },
+        status: ReviewStatus.APPROVED,
+      },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const summary = new Map<string, { average: number; count: number }>();
+
+    aggregates.forEach((entry) => {
+      const { productId, _avg: avg, _count: count } = entry;
+      const averageValue = avg.rating ?? 0;
+      const countValue = count.rating ?? 0;
+
+      summary.set(productId, {
+        average: typeof averageValue === "number" ? averageValue : Number(averageValue),
+        count: countValue,
+      });
+    });
+
+    return summary;
   }
 
   async attachMedia(productId: string, mediaId: string, sortOrder?: number): Promise<void> {
