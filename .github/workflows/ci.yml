@@ -224,9 +224,11 @@ jobs:
       - *checkout
       - name: Reclaim Docker disk space
         run: |
-          docker image prune -f || true
-          docker builder prune -af || true
-          docker volume prune -f || true
+          echo "Disk space before cleanup:"
+          df -h
+          docker system prune -af || true
+          echo "Disk space after cleanup:"
+          df -h
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build backend production image
@@ -262,6 +264,14 @@ jobs:
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
+      - name: Clean up disk before frontend build
+        run: |
+          echo "Disk space before mid-cleanup:"
+          df -h
+          rm -rf ${{ github.workspace }}/trivy-tmp/*
+          docker system prune -af || true
+          echo "Disk space after mid-cleanup:"
+          df -h
       - name: Build frontend production image
         run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Frontend image vulnerability scan
