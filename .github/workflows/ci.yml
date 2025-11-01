@@ -236,7 +236,7 @@ jobs:
       - name: Create Trivy temp directory
         run: mkdir -p ${{ github.workspace }}/trivy-tmp
       - name: File system vulnerability scan
-        uses: aquasecurity/trivy-action@latest
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           input: .
@@ -250,7 +250,7 @@ jobs:
           TMPDIR: /github/workspace/trivy-tmp
           TRIVY_TEMP_DIR: /github/workspace/trivy-tmp
       - name: Backend image vulnerability scan
-        uses: aquasecurity/trivy-action@latest
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: lumi-backend-ci:latest
           ignore-unfixed: true
@@ -275,7 +275,7 @@ jobs:
       - name: Build frontend production image
         run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Frontend image vulnerability scan
-        uses: aquasecurity/trivy-action@latest
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: lumi-frontend-ci:latest
           ignore-unfixed: true
