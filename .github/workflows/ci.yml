@@ -247,8 +247,8 @@ jobs:
           trivyignores: .trivyignore
           cache-dir: .trivy-cache
         env:
-          TMPDIR: /github/workspace/trivy-tmp
-          TRIVY_TEMP_DIR: /github/workspace/trivy-tmp
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
