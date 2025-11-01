@@ -450,7 +450,16 @@ const mapSortToOrderBy = (
       return [
         {
           reviews: {
-            _count: "desc",
+            _avg: {
+              rating: "desc",
+            },
+          },
+        },
+        {
+          reviews: {
+            _count: {
+              id: "desc",
+            },
           },
         },
         { createdAt: "desc" },
