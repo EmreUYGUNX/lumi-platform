@@ -7,6 +7,9 @@ turbo
 .turbo
 coverage
 .cache
+.trivy-cache
+.trivy-tmp
+trivy-tmp
 
 # Build outputs
 apps/**/dist

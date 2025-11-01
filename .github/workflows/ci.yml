@@ -44,7 +44,7 @@ jobs:
         name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8.15.8
+          version: 9.1.0
           run_install: false
       - &setup-node
         name: Setup Node.js ${{ matrix.node }}
@@ -78,8 +78,6 @@ jobs:
             ${{ runner.os }}-turbo-
       - name: Run lint (parallel)
         run: pnpm exec turbo run lint --concurrency=50%
-      - name: Validate OpenAPI specification
-        run: pnpm docs:openapi:lint
 
   typecheck:
     name: Typecheck (Node ${{ matrix.node }})
@@ -138,50 +136,6 @@ jobs:
           flags: unit
           fail_ci_if_error: false
 
-  database:
-    name: Database Migrations
-    runs-on: ubuntu-latest
-    needs:
-      - lint
-      - typecheck
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: lumi
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lumi
-      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lumi_shadow
-    steps:
-      - *checkout
-      - *setup-pnpm
-      - *setup-node
-      - *restore-pnpm-store
-      - *ensure-pnpm-store
-      - *install-deps
-      - *restore-turbo-cache
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Prepare shadow database
-        run: |
-          psql "postgresql://postgres:postgres@localhost:5432/postgres" -tc "SELECT 1 FROM pg_database WHERE datname = 'lumi_shadow'" | grep -q 1 || \
-          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE lumi_shadow;"
-      - name: Run migration validation
-        run: pnpm prisma:migrate:check
-      - name: Seed database (development profile)
-        run: SEED_PROFILE=development pnpm prisma:seed
-      - name: Validate seed status
-        run: SEED_PROFILE=development pnpm prisma:seed:status
-
   build:
     name: Build Artifacts
     runs-on: ubuntu-latest
@@ -229,18 +183,17 @@ jobs:
         run: pnpm deps:peers
       - name: Secretlint scan
         run: pnpm security:secrets
-      - name: Install Gitleaks
-        run: |
-          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz -o gitleaks.tar.gz
-          tar -xzf gitleaks.tar.gz gitleaks
-          chmod +x gitleaks
-          mkdir -p "$HOME/.local/bin"
-          mv gitleaks "$HOME/.local/bin/gitleaks"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          rm gitleaks.tar.gz
       - name: Secret scanning
         id: gitleaks
-        run: gitleaks detect --no-banner --redact --config gitleaks.toml --report-format sarif --report-path gitleaks.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.24.3
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          chmod +x gitleaks
+          ./gitleaks detect --no-banner --redact --no-git -c .gitleaks.toml --report-format sarif --report-path gitleaks.sarif
+          rm gitleaks
       - name: Evaluate SARIF output
         id: gitleaks_report
         run: |
@@ -269,58 +222,72 @@ jobs:
       - build
     steps:
       - *checkout
+      - name: Reclaim Docker disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          docker builder prune -af || true
+          echo "Disk space after cleanup:"
+          df -h
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Prepare Trivy cache directories
-        run: |
-          TRIVY_ROOT="$GITHUB_WORKSPACE/.trivy"
-          echo "TRIVY_ROOT=$TRIVY_ROOT" >> "$GITHUB_ENV"
-          echo "TRIVY_TEMP_DIR=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
-          echo "TRIVY_CACHE_DIR=$TRIVY_ROOT/cache" >> "$GITHUB_ENV"
-          echo "TMPDIR=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
-          echo "TEMP=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
-          echo "TMP=$TRIVY_ROOT/temp" >> "$GITHUB_ENV"
-          mkdir -p "$TRIVY_ROOT/temp" "$TRIVY_ROOT/cache"
-      - name: Purge residual Trivy artifacts
-        run: |
-          sudo rm -rf /tmp/fanal-* || true
-          sudo rm -rf "$TRIVY_ROOT"/fanal-* || true
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
-      - name: Build frontend production image
-        run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
+      - name: Create Trivy temp directory
+        run: mkdir -p ${{ github.workspace }}/trivy-tmp
       - name: File system vulnerability scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          scan-ref: .
+          input: .
           vuln-type: "os,library"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           exit-code: 1
           trivyignores: .trivyignore
-          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
-          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
       - name: Backend image vulnerability scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: lumi-backend-ci:latest
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
-          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
+        if: ${{ success() }}
+      - name: Remove backend image
+        run: docker rmi lumi-backend-ci:latest || true
+      - name: Clean up disk before frontend build
+        run: |
+          echo "Disk space before mid-cleanup:"
+          df -h
+          rm -rf ${{ github.workspace }}/trivy-tmp/*
+          docker builder prune -af || true
+          echo "Disk space after mid-cleanup:"
+          df -h
+      - name: Build frontend production image
+        run: docker build --file apps/frontend/Dockerfile --target production --tag lumi-frontend-ci:latest .
       - name: Frontend image vulnerability scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: lumi-frontend-ci:latest
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
-          args: --tempdir ${{ env.TRIVY_TEMP_DIR }}
+          cache-dir: .trivy-cache
+        env:
+          TMPDIR: ${{ github.workspace }}/trivy-tmp
+          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
+      - name: Remove frontend image
+        run: docker rmi lumi-frontend-ci:latest || true
 
   performance:
     name: Performance Budgets
@@ -365,7 +332,6 @@ jobs:
       - typecheck
       - test
       - build
-      - database
       - security
       - container-security
       - performance

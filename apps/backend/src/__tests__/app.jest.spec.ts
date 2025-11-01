@@ -1,3 +1,5 @@
+import { createApiClient } from "@lumi/testing";
+
 import type * as AppModule from "../app.js";
 import { withTemporaryEnvironment } from "../config/testing.js";
 import { createTestConfig } from "../testing/config.js";
@@ -53,5 +55,53 @@ describe("createApp", () => {
 
     expect(getCreateApp()({ config: productionConfig }).get("trust proxy")).toBe(1);
     expect(getCreateApp()({ config: stagingConfig }).get("trust proxy")).toBe(1);
+  });
+
+  it("exposes the OpenAPI document via the docs route with no-store caching", async () => {
+    const config = createTestConfig();
+    const app = getCreateApp()({ config });
+    const client = createApiClient(app);
+
+    const response = await client.get("/api/docs/openapi.json").expect(200);
+
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body?.openapi).toBe("3.1.0");
+    expect(response.body?.info?.title).toContain(config.app.name);
+  });
+
+  it("refreshes registered error handlers when explicitly invoked", () => {
+    const config = createTestConfig();
+    const app = getCreateApp()({ config });
+
+    const refreshErrorHandlers = app.get("refreshErrorHandlers") as (() => void) | undefined;
+    expect(typeof refreshErrorHandlers).toBe("function");
+
+    const storedLayers = [{ name: "error-layer" }];
+    app.set("errorHandlerLayers", storedLayers as unknown as []);
+
+    const sentinelLayer = { name: "sentinel" };
+    const customRouter = { stack: [sentinelLayer, storedLayers[0]] };
+    Reflect.set(app as unknown as Record<string, unknown>, "_router", customRouter);
+
+    refreshErrorHandlers?.();
+
+    expect(customRouter.stack.at(-1)).toBe(storedLayers.at(-1));
+    expect(customRouter.stack).toContain(sentinelLayer);
+  });
+
+  it("skips refresh work when no stored error handlers exist", () => {
+    const config = createTestConfig();
+    const app = getCreateApp()({ config });
+
+    const refreshErrorHandlers = app.get("refreshErrorHandlers") as (() => void) | undefined;
+    expect(typeof refreshErrorHandlers).toBe("function");
+
+    app.set("errorHandlerLayers", []);
+    const originalRouter = Reflect.get(app as unknown as Record<string, unknown>, "_router");
+    Reflect.set(app as unknown as Record<string, unknown>, "_router", undefined);
+
+    expect(() => refreshErrorHandlers?.()).not.toThrow();
+
+    Reflect.set(app as unknown as Record<string, unknown>, "_router", originalRouter);
   });
 });

@@ -236,6 +236,93 @@ describe("loadEnvironment", () => {
     );
   });
 
+  it("rejects blank JWT access TTL values", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "   " }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL is required");
+  });
+
+  it("rejects numeric JWT access TTL values below the minimum threshold", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "30" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must be at least 60 seconds");
+  });
+
+  it("rejects JWT access TTL values with unsupported units", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "15x" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must end with one of: s, m, h, d");
+  });
+
+  it("rejects JWT access TTL values with non-numeric magnitudes", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "1xm" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must use a numeric magnitude (e.g. 15m, 1h)");
+  });
+
+  it("rejects JWT access TTL values with non-positive magnitudes", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "0m" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must be greater than zero");
+  });
+
+  it("rejects fractional JWT access TTL values that fall below the minimum duration", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "30s" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must be at least 60 seconds");
+  });
+
+  it("accepts fractional JWT access TTL values that meet the minimum requirement", async () => {
+    await withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "1.5m" }), async (env) => {
+      expect(env.jwtAccessTtlSeconds).toBe(90);
+    });
+  });
+
+  it("rejects infinite JWT access TTL representations", async () => {
+    await expect(
+      withTemporaryEnvironment(createEnv({ JWT_ACCESS_TTL: "Infinity" }), async () => {}),
+    ).rejects.toThrow("JWT_ACCESS_TTL must end with one of: s, m, h, d");
+  });
+
+  it("parses numeric JWT refresh TTL values declared in seconds", async () => {
+    await withTemporaryEnvironment(createEnv({ JWT_REFRESH_TTL: `${90 * 60}` }), async (env) => {
+      expect(env.jwtRefreshTtlSeconds).toBe(90 * 60);
+    });
+  });
+
+  it("interprets boolean configuration toggles expressed as strings", async () => {
+    await withTemporaryEnvironment(
+      createEnv({
+        SECURITY_HEADERS_HSTS_INCLUDE_SUBDOMAINS: "0",
+        SECURITY_HEADERS_HSTS_PRELOAD: "yes",
+        SECURITY_HEADERS_EXPECT_CT_ENFORCE: "ON",
+      }),
+      async (env) => {
+        expect(env.securityHeaders.strictTransportSecurity.maxAgeSeconds).toBeGreaterThan(0);
+        expect(env.securityHeaders.strictTransportSecurity.includeSubDomains).toBe(false);
+        expect(env.securityHeaders.strictTransportSecurity.preload).toBe(true);
+        expect(env.securityHeaders.expectCt.enforce).toBe(true);
+      },
+    );
+  });
+
+  it("falls back to default request redact fields when the override is empty", async () => {
+    await withTemporaryEnvironment(createEnv({ LOG_REQUEST_REDACT_FIELDS: "   " }), async (env) => {
+      expect(env.logRequestRedactFields).toEqual([
+        "password",
+        "pass",
+        "token",
+        "secret",
+        "authorization",
+        "apikey",
+        "refreshtoken",
+        "accesstoken",
+        "clientsecret",
+        "creditcard",
+      ]);
+    });
+  });
+
   it("enables redis-backed rate limiting when configured", async () => {
     await withTemporaryEnvironment(
       createEnv({

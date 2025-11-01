@@ -7,8 +7,52 @@ import { ConflictError, ValidationError } from "../errors.js";
 import { getRequestContext, logger } from "../logger.js";
 import { registerPrismaExtension } from "../prisma.js";
 
-type Middleware = Prisma.Middleware;
-type MiddlewareParams = Prisma.MiddlewareParams;
+interface MiddlewareParams {
+  model?: string;
+  action: Prisma.PrismaAction;
+  args: Record<string, unknown> | undefined;
+  dataPath: string[];
+  runInTransaction: boolean;
+}
+
+type MiddlewareNext = (params: MiddlewareParams) => Promise<unknown>;
+type Middleware = (params: MiddlewareParams, next: MiddlewareNext) => Promise<unknown>;
+
+const applyMiddlewarePipeline = (client: PrismaClient, middlewares: Middleware[]): PrismaClient => {
+  if (middlewares.length === 0) {
+    return client;
+  }
+
+  const extension = Prisma.defineExtension({
+    name: "legacy-middleware-pipeline",
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args, query }) {
+          const initialParams: MiddlewareParams = {
+            model: model as string | undefined,
+            action: operation as Prisma.PrismaAction,
+            args: args as Record<string, unknown> | undefined,
+            dataPath: [],
+            runInTransaction: false,
+          };
+
+          const run = async (index: number, currentParams: MiddlewareParams): Promise<unknown> => {
+            const handler = middlewares[index];
+            if (!handler) {
+              return query(currentParams.args as typeof args);
+            }
+
+            return handler(currentParams, (nextParams) => run(index + 1, nextParams));
+          };
+
+          return run(0, initialParams);
+        },
+      },
+    },
+  });
+
+  return client.$extends(extension) as PrismaClient;
+};
 
 const INTERNAL_CONTEXT = new AsyncLocalStorage<{ skipGuards?: boolean }>();
 
@@ -241,105 +285,119 @@ const createValidationError = (path: string, message: string) =>
     ],
   });
 
-const createSoftDeleteMiddleware = (): Middleware => async (params, next) => {
-  if (!params.model || !MUTATING_ACTIONS.has(params.action) || shouldSkipGuards()) {
-    return next(params);
-  }
-
-  const field = SOFT_DELETE_MODELS[params.model];
-  if (!field) {
-    return next(params);
-  }
-
-  if (params.action === "delete") {
-    return next({
-      ...params,
-      action: "update",
-      args: {
-        where: params.args.where,
-        data: {
-          [field]: new Date(),
-        },
-      },
-    });
-  }
-
-  if (params.action === "deleteMany") {
-    return next({
-      ...params,
-      action: "updateMany",
-      args: {
-        where: params.args.where,
-        data: {
-          [field]: new Date(),
-        },
-      },
-    });
-  }
-
-  return next(params);
-};
-
-const createTimestampValidationMiddleware = (): Middleware => async (params, next) => {
-  if (!params.model || !MUTATING_ACTIONS.has(params.action) || shouldSkipGuards()) {
-    return next(params);
-  }
-
-  const data = params.args?.data;
-  if (!isObject(data)) {
-    return next(params);
-  }
-
-  if ("createdAt" in data && params.action !== "create") {
-    throw createValidationError("createdAt", "createdAt is immutable once persisted.");
-  }
-
-  if ("updatedAt" in data) {
-    throw createValidationError(
-      "updatedAt",
-      "updatedAt is managed automatically and cannot be set manually.",
-    );
-  }
-
-  return next(params);
-};
-
-const createVersioningMiddleware = (): Middleware => async (params, next) => {
-  if (!params.model || shouldSkipGuards()) {
-    return next(params);
-  }
-
-  const versionField = VERSIONED_MODELS[params.model];
-  if (!versionField) {
-    return next(params);
-  }
-
-  if (
-    (params.action === "update" || params.action === "updateMany" || params.action === "upsert") &&
-    isObject(params.args?.data)
-  ) {
-    const data = params.args.data as Record<string, unknown>;
-    if (versionField in data) {
-      const value = data[versionField];
-      if (!isObject(value) || (!("increment" in value) && !("set" in value))) {
-        throw createValidationError(
-          versionField,
-          "Versioned updates must use { increment: 1 } semantics. Direct assignment is not allowed.",
-        );
-      }
-      if ("set" in value) {
-        throw createValidationError(
-          versionField,
-          "Version field cannot be set manually. Use { increment: 1 } for optimistic locking.",
-        );
-      }
-    } else {
-      data[versionField] = { increment: 1 };
+const createSoftDeleteMiddleware =
+  (): Middleware => async (params: MiddlewareParams, next: MiddlewareNext) => {
+    if (!params.model || !MUTATING_ACTIONS.has(params.action) || shouldSkipGuards()) {
+      return next(params);
     }
-  }
 
-  return next(params);
-};
+    const field = SOFT_DELETE_MODELS[params.model];
+    if (!field) {
+      return next(params);
+    }
+
+    if (!params.args) {
+      return next(params);
+    }
+
+    const { where } = params.args as { where?: unknown };
+    if (where === undefined) {
+      return next(params);
+    }
+
+    if (params.action === "delete") {
+      return next({
+        ...params,
+        action: "update",
+        args: {
+          where,
+          data: {
+            [field]: new Date(),
+          },
+        },
+      });
+    }
+
+    if (params.action === "deleteMany") {
+      return next({
+        ...params,
+        action: "updateMany",
+        args: {
+          where,
+          data: {
+            [field]: new Date(),
+          },
+        },
+      });
+    }
+
+    return next(params);
+  };
+
+const createTimestampValidationMiddleware =
+  (): Middleware => async (params: MiddlewareParams, next: MiddlewareNext) => {
+    if (!params.model || !MUTATING_ACTIONS.has(params.action) || shouldSkipGuards()) {
+      return next(params);
+    }
+
+    const data = params.args?.data;
+    if (!isObject(data)) {
+      return next(params);
+    }
+
+    if ("createdAt" in data && params.action !== "create") {
+      throw createValidationError("createdAt", "createdAt is immutable once persisted.");
+    }
+
+    if ("updatedAt" in data) {
+      throw createValidationError(
+        "updatedAt",
+        "updatedAt is managed automatically and cannot be set manually.",
+      );
+    }
+
+    return next(params);
+  };
+
+const createVersioningMiddleware =
+  (): Middleware => async (params: MiddlewareParams, next: MiddlewareNext) => {
+    if (!params.model || shouldSkipGuards()) {
+      return next(params);
+    }
+
+    const versionField = VERSIONED_MODELS[params.model];
+    if (!versionField) {
+      return next(params);
+    }
+
+    if (
+      (params.action === "update" ||
+        params.action === "updateMany" ||
+        params.action === "upsert") &&
+      isObject(params.args?.data)
+    ) {
+      const data = params.args.data as Record<string, unknown>;
+      if (versionField in data) {
+        const value = data[versionField];
+        if (!isObject(value) || (!("increment" in value) && !("set" in value))) {
+          throw createValidationError(
+            versionField,
+            "Versioned updates must use { increment: 1 } semantics. Direct assignment is not allowed.",
+          );
+        }
+        if ("set" in value) {
+          throw createValidationError(
+            versionField,
+            "Version field cannot be set manually. Use { increment: 1 } for optimistic locking.",
+          );
+        }
+      } else {
+        data[versionField] = { increment: 1 };
+      }
+    }
+
+    return next(params);
+  };
 
 const ensureEmailValidity = (model: string, data: Record<string, unknown>) => {
   if ("email" in data && typeof data.email === "string") {
@@ -748,7 +806,7 @@ const handleCouponUsageRules = async (client: PrismaClient, params: MiddlewarePa
 
 const createValidationMiddleware =
   (client: PrismaClient): Middleware =>
-  async (params, next) => {
+  async (params: MiddlewareParams, next: MiddlewareNext) => {
     if (!params.model || shouldSkipGuards()) {
       return next(params);
     }
@@ -762,11 +820,16 @@ const createValidationMiddleware =
       return next(params);
     }
 
+    const { args } = params;
     let existingRecord: Record<string, unknown> | null = null;
-    if ((params.action === "update" || params.action === "upsert") && isObject(params.args.where)) {
+    if (
+      (params.action === "update" || params.action === "upsert") &&
+      args &&
+      isObject(args.where)
+    ) {
       const delegate = getDelegate(client, params.model);
       existingRecord = delegate?.findUnique
-        ? await delegate.findUnique({ where: params.args.where })
+        ? await delegate.findUnique({ where: args.where })
         : null;
     }
 
@@ -798,7 +861,7 @@ const BUSINESS_RULE_HANDLERS: Record<
 
 const createBusinessRulesMiddleware =
   (client: PrismaClient): Middleware =>
-  async (params, next) => {
+  async (params: MiddlewareParams, next: MiddlewareNext) => {
     if (!params.model || shouldSkipGuards() || !MUTATING_ACTIONS.has(params.action)) {
       return next(params);
     }
@@ -814,7 +877,7 @@ const createBusinessRulesMiddleware =
 
 const createAuditLogMiddleware =
   (client: PrismaClient): Middleware =>
-  async (params, next) => {
+  async (params: MiddlewareParams, next: MiddlewareNext) => {
     if (!params.model || AUDIT_EXCLUDED_MODELS.has(params.model) || shouldSkipGuards()) {
       return next(params);
     }
@@ -900,17 +963,15 @@ export const registerPrismaMiddlewares = (client?: PrismaClient): void => {
 
   registerPrismaExtension((baseClient) => {
     const prismaClient = (client ?? (baseClient as unknown as PrismaClient)) as PrismaClient;
-    const middlewareHost = prismaClient as unknown as {
-      $use: (middleware: Prisma.Middleware) => void;
-    };
-
-    middlewareHost.$use(createSoftDeleteMiddleware());
-    middlewareHost.$use(createTimestampValidationMiddleware());
-    middlewareHost.$use(createVersioningMiddleware());
-    middlewareHost.$use(createValidationMiddleware(prismaClient));
-    middlewareHost.$use(createBusinessRulesMiddleware(prismaClient));
-    middlewareHost.$use(createAuditLogMiddleware(prismaClient));
-    return prismaClient as unknown as typeof baseClient;
+    const enhancedClient = applyMiddlewarePipeline(prismaClient, [
+      createSoftDeleteMiddleware(),
+      createTimestampValidationMiddleware(),
+      createVersioningMiddleware(),
+      createValidationMiddleware(prismaClient),
+      createBusinessRulesMiddleware(prismaClient),
+      createAuditLogMiddleware(prismaClient),
+    ]);
+    return enhancedClient as unknown as typeof baseClient;
   });
 };
 

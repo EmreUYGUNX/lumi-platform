@@ -12,6 +12,13 @@ CVE-2024-24790
 CVE-2023-45288
 CVE-2024-34156
 CVE-2025-47907
+# esbuild 0.25.x is built against Go 1.23; build-time toolchain only, not shipped to production.
+CVE-2025-47912
+CVE-2025-58183
+CVE-2025-58186
+CVE-2025-58187
+CVE-2025-58188
+CVE-2025-61724
 # @redis/json shares the same version scheme as the deprecated `json` CLI.
 # Trivy maps it to CVE-2020-7712, but the redis module is unaffected.
 CVE-2020-7712

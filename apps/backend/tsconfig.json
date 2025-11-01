@@ -5,8 +5,16 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "baseUrl": ".",
-    "types": ["node", "jest", "@prisma/client"],
-    "allowJs": true,
+    "types": [
+      "node",
+      "express",
+      "cors",
+      "cookie-parser",
+      "compression",
+      "jsonwebtoken",
+      "nodemailer",
+      "hpp"
+    ],
     "paths": {
       "@/*": ["./src/*"],
       "@lumi/shared": ["../../packages/shared/src/index.ts"],

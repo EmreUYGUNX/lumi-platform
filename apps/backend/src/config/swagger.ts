@@ -31,6 +31,9 @@ const VERIFY_EMAIL_REQUEST_REF = "#/components/schemas/VerifyEmailRequest" as co
 const FORGOT_PASSWORD_REQUEST_REF = "#/components/schemas/ForgotPasswordRequest" as const;
 const RESET_PASSWORD_REQUEST_REF = "#/components/schemas/ResetPasswordRequest" as const;
 const CHANGE_PASSWORD_REQUEST_REF = "#/components/schemas/ChangePasswordRequest" as const;
+const AUTH_UNAUTHENTICATED_DESCRIPTION = "Caller is not authenticated." as const;
+const AUTH_INVALID_SESSION_DESCRIPTION =
+  "Caller is not authenticated or session is invalid." as const;
 
 const HEALTH_CHECK_VARIANTS = {
   comprehensive: "comprehensive",
@@ -2430,7 +2433,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated.",
+          description: AUTH_UNAUTHENTICATED_DESCRIPTION,
           content: {
             "application/json": {
               schema: {
@@ -2473,7 +2476,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated.",
+          description: AUTH_UNAUTHENTICATED_DESCRIPTION,
           content: {
             "application/json": {
               schema: {
@@ -2508,7 +2511,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated or session is invalid.",
+          description: AUTH_INVALID_SESSION_DESCRIPTION,
           content: {
             "application/json": {
               schema: {
@@ -2592,7 +2595,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated.",
+          description: AUTH_UNAUTHENTICATED_DESCRIPTION,
           content: {
             "application/json": {
               schema: {
@@ -2823,7 +2826,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated.",
+          description: AUTH_UNAUTHENTICATED_DESCRIPTION,
           content: {
             "application/json": {
               schema: {
@@ -2858,7 +2861,7 @@ const authPaths: OpenApi31.PathsObject = {
           },
         },
         401: {
-          description: "Caller is not authenticated.",
+          description: AUTH_UNAUTHENTICATED_DESCRIPTION,
           content: {
             "application/json": {
               schema: {

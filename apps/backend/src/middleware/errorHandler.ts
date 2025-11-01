@@ -95,6 +95,8 @@ const buildErrorResponse = (
   return payload;
 };
 
+export type ExpressErrorMiddleware = RequestHandler | ErrorRequestHandler;
+
 const determineLogLevel = (statusCode: number): "warn" | "error" => {
   if (statusCode >= 500) {
     return "error";
@@ -106,6 +108,76 @@ const determineLogLevel = (statusCode: number): "warn" | "error" => {
 const resolveActiveConfig = (req: Request, fallback: ApplicationConfig): ApplicationConfig => {
   const localsConfig = req.app?.locals?.config as ApplicationConfig | undefined;
   return localsConfig ?? fallback;
+};
+
+const ERROR_HANDLER_REFRESH_FLAG = "__errorHandlerAutoRefreshAttached";
+
+export const attachErrorHandlerAutoRefresh = (app: Express, refresh: () => void): void => {
+  if (app.get(ERROR_HANDLER_REFRESH_FLAG)) {
+    return;
+  }
+
+  const hasRegisteredHandlers = (): boolean => {
+    const storedLayers = app.get("errorHandlerLayers") as ExpressErrorMiddleware[] | undefined;
+    return Boolean(storedLayers?.length);
+  };
+
+  const invokeRefresh = (): void => {
+    if (hasRegisteredHandlers()) {
+      refresh();
+    }
+  };
+
+  const targetApp = app;
+
+  const originalUse = targetApp.use.bind(targetApp);
+  targetApp.use = ((...args: Parameters<typeof originalUse>) => {
+    const result = originalUse(...args);
+    invokeRefresh();
+    return result;
+  }) as typeof app.use;
+
+  const routeMethods = ["all", "delete", "get", "head", "options", "patch", "post", "put"] as const;
+
+  routeMethods.forEach((method) => {
+    type PatchableApp = Record<typeof method, (...args: unknown[]) => unknown>;
+    const methodCollection = targetApp as unknown as PatchableApp;
+
+    // eslint-disable-next-line security/detect-object-injection -- `method` originates from the fixed `routeMethods` tuple.
+    const originalMethod = methodCollection[method].bind(targetApp);
+
+    // eslint-disable-next-line security/detect-object-injection -- `method` originates from the fixed `routeMethods` tuple.
+    methodCollection[method] = (...args: unknown[]) => {
+      const result = originalMethod(...args);
+      if (!(method === "get" && args.length === 1)) {
+        invokeRefresh();
+      }
+      return result;
+    };
+  });
+
+  targetApp.set(ERROR_HANDLER_REFRESH_FLAG, true);
+};
+
+interface RouterStack {
+  stack: {
+    handle?: RequestHandler | ErrorRequestHandler;
+    route?: unknown;
+  }[];
+}
+
+export const resolveRouter = (app: Express): RouterStack | undefined => {
+  const directRouter = Reflect.get(app, "_router") as RouterStack | undefined;
+  if (directRouter?.stack) {
+    return directRouter;
+  }
+
+  const legacyRouter = (app as unknown as { router?: RouterStack }).router;
+  if (legacyRouter?.stack) {
+    return legacyRouter;
+  }
+
+  return undefined;
 };
 
 const createMethodNotAllowedHandler =
@@ -245,8 +317,6 @@ const createGlobalErrorHandler =
     res.status(statusCode).json(payload);
   };
 
-export type ExpressErrorMiddleware = RequestHandler | ErrorRequestHandler;
-
 export const registerErrorHandlers = (
   app: Express,
   config: ApplicationConfig,
@@ -257,27 +327,13 @@ export const registerErrorHandlers = (
     createGlobalErrorHandler(config),
   ];
 
-  const initialRouter = Reflect.get(app, "_router") as
-    | {
-        stack: {
-          handle?: RequestHandler | ErrorRequestHandler;
-          route?: unknown;
-        }[];
-      }
-    | undefined;
+  const initialRouter = resolveRouter(app);
   const routerBeforeLength = initialRouter?.stack?.length ?? 0;
   handlers.forEach((handler) => {
     app.use(handler);
   });
 
-  const router = Reflect.get(app, "_router") as
-    | {
-        stack: {
-          handle?: RequestHandler | ErrorRequestHandler;
-          route?: unknown;
-        }[];
-      }
-    | undefined;
+  const router = resolveRouter(app);
   const addedLayers = router?.stack?.slice(routerBeforeLength) ?? [];
 
   app.set("errorHandlers", handlers);

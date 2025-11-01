@@ -9,6 +9,9 @@ import { listRegisteredTransports, unregisterLogTransport } from "../lib/logger.
 import "./env-defaults.js";
 import { disposeSharedTestDatabase, getTestDatabaseManager } from "./helpers/db.js";
 
+process.env.LUMI_TEST_DATABASE_STRATEGY ??= "embedded";
+process.env.LUMI_TEST_DATABASE_VERBOSE ??= "false";
+
 // eslint-disable-next-line security/detect-non-literal-fs-filename -- resolves a controlled temp directory root for tests
 const LOG_DIR_ROOT = fs.realpathSync(os.tmpdir());
 

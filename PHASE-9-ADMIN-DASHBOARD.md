@@ -158,7 +158,7 @@ const updateProduct = async (req: Request, res: Response) => {
 
 ```typescript
 // ❌ WRONG: Hardcoded credentials
-const ADMIN_API_KEY = "hardcoded-admin-key";
+const ADMIN_API_KEY = "<your-admin-api-key>";
 
 // ✅ CORRECT: Environment variables
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
