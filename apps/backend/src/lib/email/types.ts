@@ -113,6 +113,10 @@ export interface EmailTemplateRegistry {
   ): EmailContent;
 }
 
+export type CartRecoveryEmailPayload = EmailTemplatePayload<"commerce.cart-recovery"> & {
+  to: string;
+};
+
 export const buildTemplateContext = (config: EmailConfig): EmailTemplateContext => ({
   brand: {
     productName: config.template.branding.productName,

@@ -1,4 +1,5 @@
-import type { CartItem, Prisma, PrismaClient } from "@prisma/client";
+import type { CartItem, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { NotFoundError } from "@/lib/errors.js";
 import { BaseRepository, type RepositoryContext } from "@/lib/repository/base.repository.js";
@@ -9,42 +10,22 @@ type CartRepositoryContext = RepositoryContext<
   Prisma.CartOrderByWithRelationInput
 >;
 
-export const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
+const CART_ITEM_INCLUDE = Prisma.validator<Prisma.CartItemInclude>()({
+  productVariant: {
+    include: {
+      product: true,
+    },
+  },
+});
+
+export const CART_DEFAULT_INCLUDE = Prisma.validator<Prisma.CartInclude>()({
   items: {
     where: {
       quantity: {
         gt: 0,
       },
     },
-    include: {
-      productVariant: {
-        select: {
-          id: true,
-          title: true,
-          sku: true,
-          price: true,
-          compareAtPrice: true,
-          stock: true,
-          attributes: true,
-          weightGrams: true,
-          isPrimary: true,
-          createdAt: true,
-          updatedAt: true,
-          product: {
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-              price: true,
-              compareAtPrice: true,
-              currency: true,
-              status: true,
-              inventoryPolicy: true,
-            },
-          },
-        },
-      },
-    },
+    include: CART_ITEM_INCLUDE,
   },
   user: {
     select: {
@@ -54,7 +35,7 @@ export const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
       lastName: true,
     },
   },
-};
+});
 
 export type CartWithRelations = Prisma.CartGetPayload<{ include: typeof CART_DEFAULT_INCLUDE }>;
 

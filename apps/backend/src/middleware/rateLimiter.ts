@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import rateLimit, {
   MemoryStore,
   type RateLimitExceededEventHandler,
@@ -21,6 +21,10 @@ export interface RateLimiterBundle {
 interface StoreFactoryResult {
   store?: RateLimitOptions["store"];
   teardown?: () => Promise<void>;
+}
+
+interface CreateRateLimiterOptions {
+  keyGenerator?: (request: Request) => string | null | undefined;
 }
 
 const NOOP_HANDLER: RequestHandler = (_request, _response, next) => {
@@ -138,9 +142,16 @@ const createRateLimiter = (
   config: ApplicationConfig["security"]["rateLimit"],
   routeConfig: RateLimitRouteConfig,
   scope: string,
+  options: CreateRateLimiterOptions = {},
 ): { middleware: RequestHandler; teardown?: () => Promise<void> } => {
   const windowMs = routeConfig.durationSeconds * 1000;
   const storeFactory = createStoreFactory(config, scope);
+  const resolvedKeyGenerator: RateLimitOptions["keyGenerator"] = (request) => {
+    const candidate = options.keyGenerator?.(request);
+    const fallback = ipKeyGenerator(request.ip ?? "");
+    const key = typeof candidate === "string" && candidate.length > 0 ? candidate : fallback;
+    return `${config.keyPrefix}:${scope}:${key}`;
+  };
 
   const limiter = rateLimit({
     windowMs,
@@ -152,10 +163,7 @@ const createRateLimiter = (
     handler: createRateLimitHandler(scope, routeConfig),
     store: storeFactory.store,
     passOnStoreError: true,
-    keyGenerator: (request) => {
-      const identifier = ipKeyGenerator(request.ip ?? "");
-      return `${config.keyPrefix}:${scope}:${identifier}`;
-    },
+    keyGenerator: resolvedKeyGenerator,
     statusCode: 429,
     validate: {
       creationStack: false,
@@ -216,4 +224,19 @@ export const createRateLimiterBundle = (
       );
     },
   };
+};
+
+export const createScopedRateLimiter = (
+  config: ApplicationConfig["security"]["rateLimit"],
+  scope: string,
+  routeConfig: RateLimitRouteConfig,
+  options: CreateRateLimiterOptions = {},
+) => {
+  if (!config.enabled) {
+    return {
+      middleware: NOOP_HANDLER,
+    };
+  }
+
+  return createRateLimiter(config, routeConfig, scope, options);
 };

@@ -1,7 +1,8 @@
 import { Router } from "express";
 
 import { createRequireAuthMiddleware } from "@/middleware/auth/requireAuth.js";
-import type { ApplicationConfig } from "@lumi/types";
+import { createScopedRateLimiter } from "@/middleware/rateLimiter.js";
+import type { ApplicationConfig, RateLimitRouteConfig } from "@lumi/types";
 
 import { CartController } from "./cart.controller.js";
 import { CartService } from "./cart.service.js";
@@ -13,39 +14,61 @@ export interface CartRouterOptions {
   service?: CartService;
 }
 
+const CART_RATE_LIMIT: RateLimitRouteConfig = {
+  points: 120,
+  durationSeconds: 5 * 60,
+  blockDurationSeconds: 5 * 60,
+};
+
+const CART_ROUTE_BASE = "/cart";
+const CART_ITEMS_ROUTE = "/cart/items";
+const CART_ITEM_ROUTE = "/cart/items/:itemId";
+const CART_MERGE_ROUTE = "/cart/merge";
+const CART_VALIDATE_ROUTE = "/cart/validate";
+
 const register = (registrar: RouteRegistrar | undefined, method: string, path: string) => {
   registrar?.(method, path);
 };
 
 export const createCartRouter = (
-  _config: ApplicationConfig,
+  config: ApplicationConfig,
   options: CartRouterOptions = {},
 ): Router => {
   const router = Router();
   const service = options.service ?? new CartService();
   const controller = new CartController({ service });
   const requireAuth = createRequireAuthMiddleware();
+  const { middleware: cartRateLimiter } = createScopedRateLimiter(
+    config.security.rateLimit,
+    "cart:operations",
+    CART_RATE_LIMIT,
+    {
+      keyGenerator: (request) => request.user?.id ?? request.ip ?? "anonymous",
+    },
+  );
 
-  router.get("/cart", requireAuth, controller.getCart);
-  register(options.registerRoute, "GET", "/cart");
+  router.use(requireAuth, cartRateLimiter);
 
-  router.post("/cart/items", requireAuth, controller.addItem);
-  register(options.registerRoute, "POST", "/cart/items");
+  router.get(CART_ROUTE_BASE, controller.getCart);
+  register(options.registerRoute, "GET", CART_ROUTE_BASE);
 
-  router.put("/cart/items/:itemId", requireAuth, controller.updateItem);
-  register(options.registerRoute, "PUT", "/cart/items/:itemId");
+  router.post(CART_ITEMS_ROUTE, controller.addItem);
+  register(options.registerRoute, "POST", CART_ITEMS_ROUTE);
 
-  router.delete("/cart/items/:itemId", requireAuth, controller.removeItem);
-  register(options.registerRoute, "DELETE", "/cart/items/:itemId");
+  router.put(CART_ITEM_ROUTE, controller.updateItem);
+  register(options.registerRoute, "PUT", CART_ITEM_ROUTE);
 
-  router.delete("/cart", requireAuth, controller.clearCart);
-  register(options.registerRoute, "DELETE", "/cart");
+  router.delete(CART_ITEM_ROUTE, controller.removeItem);
+  register(options.registerRoute, "DELETE", CART_ITEM_ROUTE);
 
-  router.post("/cart/merge", requireAuth, controller.mergeCart);
-  register(options.registerRoute, "POST", "/cart/merge");
+  router.delete(CART_ROUTE_BASE, controller.clearCart);
+  register(options.registerRoute, "DELETE", CART_ROUTE_BASE);
 
-  router.get("/cart/validate", requireAuth, controller.validateCart);
-  register(options.registerRoute, "GET", "/cart/validate");
+  router.post(CART_MERGE_ROUTE, controller.mergeCart);
+  register(options.registerRoute, "POST", CART_MERGE_ROUTE);
+
+  router.get(CART_VALIDATE_ROUTE, controller.validateCart);
+  register(options.registerRoute, "GET", CART_VALIDATE_ROUTE);
 
   return router;
 };

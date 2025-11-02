@@ -45,36 +45,24 @@ export interface CartValidatedEvent extends CartBaseEvent {
 }
 
 export interface CartEventMap {
-  "cart.item_added": CartItemAddedEvent;
-  "cart.item_updated": CartItemUpdatedEvent;
-  "cart.item_removed": CartItemRemovedEvent;
-  "cart.cleared": CartClearedEvent;
-  "cart.merged": CartMergedEvent;
-  "cart.validated": CartValidatedEvent;
+  "cart.item_added": [CartItemAddedEvent];
+  "cart.item_updated": [CartItemUpdatedEvent];
+  "cart.item_removed": [CartItemRemovedEvent];
+  "cart.cleared": [CartClearedEvent];
+  "cart.merged": [CartMergedEvent];
+  "cart.validated": [CartValidatedEvent];
 }
 
 type CartEventName = keyof CartEventMap;
-type CartEventListener<TEvent extends CartEventName> = (payload: CartEventMap[TEvent]) => void;
+type CartEventPayload<TEvent extends CartEventName> = CartEventMap[TEvent][0];
+type CartEventListener<TEvent extends CartEventName> = (payload: CartEventPayload<TEvent>) => void;
 
-class CartEventBus extends EventEmitter {
-  emit<TEvent extends CartEventName>(event: TEvent, payload: CartEventMap[TEvent]): boolean {
-    return super.emit(event, payload);
-  }
-
-  on<TEvent extends CartEventName>(event: TEvent, listener: CartEventListener<TEvent>): this {
-    return super.on(event, listener);
-  }
-
-  off<TEvent extends CartEventName>(event: TEvent, listener: CartEventListener<TEvent>): this {
-    return super.off(event, listener);
-  }
-}
-
-const cartEventBus = new CartEventBus().setMaxListeners(25);
+const cartEventBus = new EventEmitter();
+cartEventBus.setMaxListeners(25);
 
 export const emitCartEvent = <TEvent extends CartEventName>(
   event: TEvent,
-  payload: CartEventMap[TEvent],
+  payload: CartEventPayload<TEvent>,
 ): void => {
   cartEventBus.emit(event, payload);
 };
@@ -83,9 +71,13 @@ export const onCartEvent = <TEvent extends CartEventName>(
   event: TEvent,
   listener: CartEventListener<TEvent>,
 ): (() => void) => {
-  cartEventBus.on(event, listener);
+  const handler: (...args: CartEventMap[TEvent]) => void = (payload) => {
+    listener(payload);
+  };
+
+  cartEventBus.on(event, handler);
   return () => {
-    cartEventBus.off(event, listener);
+    cartEventBus.off(event, handler);
   };
 };
 

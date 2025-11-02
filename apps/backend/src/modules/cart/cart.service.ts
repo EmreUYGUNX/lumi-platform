@@ -12,6 +12,7 @@ import { getPrismaClient } from "@/lib/prisma.js";
 import { recordCartOperationMetric } from "@/observability/index.js";
 import {
   type CartSummaryDTO,
+  type CartWithItems,
   type MoneyDTO,
   type ProductVariantDTO,
   mapCartToSummary,
@@ -48,10 +49,11 @@ interface CartProductVariant {
   id: string;
   title: string;
   sku: string;
+  productId: string;
   price: Prisma.Decimal;
   compareAtPrice: Prisma.Decimal | null;
   stock: number;
-  attributes: unknown;
+  attributes: Prisma.JsonValue | null;
   weightGrams: number | null;
   isPrimary: boolean;
   createdAt: Date;
@@ -60,11 +62,19 @@ interface CartProductVariant {
     id: string;
     title: string;
     slug: string;
+    sku: string | null;
+    summary: string | null;
+    description: string | null;
     price: Prisma.Decimal;
     compareAtPrice: Prisma.Decimal | null;
     currency: string;
     status: ProductStatus;
     inventoryPolicy: InventoryPolicy;
+    attributes: Prisma.JsonValue | null;
+    searchKeywords: string[];
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
   };
 }
 
@@ -511,7 +521,7 @@ export class CartService {
     const materialised = cart as unknown as CartEntity;
     const firstItem = materialised.items[0];
     const currency = firstItem?.productVariant?.product?.currency ?? "TRY";
-    const summary = mapCartToSummary(materialised, currency);
+    const summary = mapCartToSummary(cart as unknown as CartWithItems, currency);
     const enriched = CartService.enrichSummary(summary, materialised, currency);
     const stock = this.computeStockStatus(materialised);
     const delivery = this.estimateDelivery(stock, materialised);
@@ -702,7 +712,7 @@ export class CartService {
   private evaluateCart(cart: CartWithRelations): CartValidationReport {
     const materialised = cart as unknown as CartEntity;
     const currency = materialised.items[0]?.productVariant?.product?.currency ?? "TRY";
-    const { totals } = mapCartToSummary(materialised, currency);
+    const { totals } = mapCartToSummary(cart as unknown as CartWithItems, currency);
 
     const issues: CartValidationIssue[] = [];
     materialised.items.forEach((item) => {
@@ -1114,7 +1124,7 @@ export class CartService {
       const materialised = cart as unknown as CartEntity;
       const itemCount = materialised.items.reduce((total, item) => total + item.quantity, 0);
       const currency = materialised.items[0]?.productVariant?.product?.currency ?? "TRY";
-      const { totals } = mapCartToSummary(materialised, currency);
+      const { totals } = mapCartToSummary(cart as unknown as CartWithItems, currency);
 
       await this.emailService.sendCartRecoveryEmail({
         to: cart.user.email,
