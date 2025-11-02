@@ -6,7 +6,7 @@ describe("string helpers", () => {
   it("normalises text into URL friendly slugs", () => {
     expect(generateSlug(" Aurora Lamp ")).toBe("aurora-lamp");
     expect(generateSlug("Lumi Commerce 2025!")).toBe("lumi-commerce-2025");
-    expect(generateSlug("Türkçe İsim")).toBe("t-rk-e-isim");
+    expect(generateSlug("Türkçe İsim")).toBe("turkce-isim");
   });
 
   it("builds deduplicated keyword lists from title, summary, and explicit array", () => {

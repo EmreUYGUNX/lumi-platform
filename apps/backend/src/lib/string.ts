@@ -1,9 +1,15 @@
-const slugify = (value: string): string =>
-  value
+const slugify = (value: string): string => {
+  const normalised = value
+    .normalize("NFKD")
+    .replaceAll(/\p{Diacritic}/gu, "")
+    .replaceAll("ß", "ss");
+
+  return normalised
     .trim()
     .toLowerCase()
-    .replaceAll(/[^\da-z]+/gu, "-")
+    .replaceAll(/[^\da-z0-9]+/gu, "-")
     .replaceAll(/(^-|-$)+/gu, "");
+};
 
 const MIN_KEYWORD_LENGTH = 3;
 const MAX_KEYWORDS = 50;

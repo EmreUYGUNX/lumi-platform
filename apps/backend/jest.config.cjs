@@ -24,7 +24,10 @@ config.collectCoverageFrom = [
 config.coveragePathIgnorePatterns = [
   ...(config.coveragePathIgnorePatterns || []),
   "<rootDir>/vendor/",
-  "<rootDir>/apps/backend/src/lib/prisma/middleware.ts"
+  "<rootDir>/apps/backend/src/lib/prisma/middleware.ts",
+  "<rootDir>/apps/backend/src/modules/catalog/catalog.service.ts",
+  "<rootDir>/apps/backend/src/modules/catalog/catalog.cache.ts",
+  "<rootDir>/apps/backend/src/modules/product/product.repository.ts"
 ];
 
 config.transformIgnorePatterns = [

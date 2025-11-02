@@ -125,10 +125,15 @@ const createPrismaStub = () => ({
     findUnique: jest.fn().mockResolvedValue(null),
     create: jest.fn(),
     updateMany: jest.fn(),
+    update: jest.fn(),
+    findFirst: jest.fn(),
+    delete: jest.fn(),
   },
   productCategory: {
     groupBy: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
   },
   category: {
     findUnique: jest.fn(),
@@ -141,10 +146,14 @@ const createPrismaStub = () => ({
   },
 });
 
+const PRODUCT_ID = "clprodaurora0000000000000";
+const VARIANT_ID = "clvariantprime00000000000";
+const CATEGORY_ID = "clcategoryroot00000000000";
+
 const createProductEntity = () => {
   const timestamp = new Date("2025-01-01T10:00:00Z");
   return {
-    id: "prod_aurora",
+    id: PRODUCT_ID,
     title: "Aurora Desk Lamp",
     slug: "aurora-desk-lamp",
     summary: "Ambient lighting",
@@ -161,8 +170,8 @@ const createProductEntity = () => {
     deletedAt: null,
     variants: [
       {
-        id: "variant_primary",
-        productId: "prod_aurora",
+        id: VARIANT_ID,
+        productId: PRODUCT_ID,
         title: "Default",
         sku: "AURORA-1",
         price: new Prisma.Decimal(199),
@@ -178,14 +187,14 @@ const createProductEntity = () => {
     ],
     categories: [
       {
-        productId: "prod_aurora",
-        categoryId: "cat_lighting",
+        productId: PRODUCT_ID,
+        categoryId: CATEGORY_ID,
         isPrimary: true,
         assignedAt: timestamp,
         createdAt: timestamp,
         updatedAt: timestamp,
         category: {
-          id: "cat_lighting",
+          id: CATEGORY_ID,
           name: "Lighting",
           slug: "lighting",
           description: null,
@@ -209,6 +218,7 @@ describe("CatalogService", () => {
     const prisma = createPrismaStub();
     const productRepository = createProductRepositoryStub(prisma);
     const cache = createCatalogCacheStub();
+    cache.invalidateCategoryTrees = jest.fn();
 
     const service = new CatalogService({
       productRepository: productRepository as unknown as any,
@@ -287,6 +297,434 @@ describe("CatalogService", () => {
     expect(prisma.productVariant.updateMany).not.toHaveBeenCalled();
   });
 
+  it("prevents archiving products with active orders", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    productRepository.findById.mockResolvedValue({
+      id: PRODUCT_ID,
+      deletedAt: null,
+    });
+    productRepository.countActiveOrderReferences.mockResolvedValue(2);
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    await expect(service.archiveProduct(PRODUCT_ID)).rejects.toBeInstanceOf(ConflictError);
+    expect(productRepository.countActiveOrderReferences).toHaveBeenCalledWith(PRODUCT_ID);
+  });
+
+  it("archives products and clears variants when there are no active orders", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    productRepository.findById.mockResolvedValue({
+      id: PRODUCT_ID,
+      deletedAt: null,
+    });
+
+    const updateMock = jest.fn().mockResolvedValue(undefined);
+    const softDeleteMock = jest.fn().mockResolvedValue(undefined);
+    productRepository.withTransaction = jest.fn(async (handler) =>
+      handler(
+        {
+          update: updateMock,
+          softDelete: softDeleteMock,
+        },
+        prisma,
+      ),
+    );
+
+    const cache = {
+      invalidateProductLists: jest.fn().mockResolvedValue(undefined),
+      invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: cache as unknown as any,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.archiveProduct(PRODUCT_ID);
+
+    expect(productRepository.withTransaction).toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: PRODUCT_ID },
+      data: {
+        status: "ARCHIVED",
+        inventoryPolicy: "DENY",
+      },
+    });
+    expect(softDeleteMock).toHaveBeenCalledWith(PRODUCT_ID);
+    expect(prisma.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { productId: PRODUCT_ID },
+      data: { stock: 0 },
+    });
+    expect(cache.invalidateProductLists).toHaveBeenCalled();
+    expect(cache.invalidateCategoryTrees).toHaveBeenCalled();
+  });
+
+  it("rejects variant updates with negative stock values", async () => {
+    const prisma = createPrismaStub();
+    prisma.productVariant.findUnique.mockResolvedValue({
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
+      sku: "AURORA-1",
+      title: "Default",
+      price: new Prisma.Decimal(199),
+      compareAtPrice: null,
+      stock: 5,
+      isPrimary: true,
+      attributes: null,
+      variantMedia: [],
+      product: {
+        id: PRODUCT_ID,
+        slug: "aurora-desk-lamp",
+        price: new Prisma.Decimal(199),
+        currency: "TRY",
+        deletedAt: null,
+      },
+    });
+
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    await expect(
+      service.updateVariant(PRODUCT_ID, VARIANT_ID, {
+        stock: -1,
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("reassigns primary variant when current primary is unset", async () => {
+    const prisma = createPrismaStub();
+    const replacementVariant = { id: "clreplacement000000000000", isPrimary: false };
+    prisma.productVariant.findUnique.mockResolvedValue({
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
+      sku: "AURORA-1",
+      title: "Default",
+      price: new Prisma.Decimal(199),
+      compareAtPrice: null,
+      stock: 6,
+      isPrimary: true,
+      attributes: null,
+      variantMedia: [],
+      product: {
+        id: PRODUCT_ID,
+        slug: "aurora-desk-lamp",
+        price: new Prisma.Decimal(199),
+        currency: "TRY",
+        deletedAt: null,
+      },
+    });
+    prisma.productVariant.findFirst.mockResolvedValue(replacementVariant);
+
+    const updatedVariantRecord = {
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
+      title: "Default",
+      sku: "AURORA-1",
+      price: new Prisma.Decimal(199),
+      compareAtPrice: null,
+      stock: 4,
+      isPrimary: false,
+      attributes: null,
+      weightGrams: null,
+      variantMedia: [],
+    };
+
+    prisma.productVariant.update.mockResolvedValue(updatedVariantRecord);
+    const productRepository = createProductRepositoryStub(prisma);
+    productRepository.withTransaction = jest.fn(async (handler) => handler({}, prisma));
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    const variant = await service.updateVariant(PRODUCT_ID, VARIANT_ID, {
+      stock: 4,
+      isPrimary: false,
+    });
+
+    expect(prisma.productVariant.update).toHaveBeenCalledWith({
+      where: { id: VARIANT_ID },
+      data: expect.objectContaining({ stock: 4, isPrimary: false }),
+      include: { variantMedia: { include: { media: true } } },
+    });
+    expect(prisma.productVariant.findFirst).toHaveBeenCalledWith({
+      where: { productId: PRODUCT_ID, id: { not: VARIANT_ID } },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(prisma.productVariant.update).toHaveBeenCalledWith({
+      where: { id: replacementVariant.id },
+      data: { isPrimary: true },
+    });
+    expect(variant.isPrimary).toBe(false);
+  });
+
+  it("promotes new variant to primary when existing variants are non-primary", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    productRepository.findById.mockResolvedValue({
+      id: PRODUCT_ID,
+      slug: "aurora-desk-lamp",
+      price: new Prisma.Decimal(199),
+      currency: "TRY",
+      attributes: null,
+      deletedAt: null,
+      variants: [
+        { id: "variant-1", isPrimary: false },
+        { id: "variant-2", isPrimary: false },
+      ],
+    });
+
+    prisma.productVariant.create.mockResolvedValue({
+      id: VARIANT_ID,
+      title: "Large",
+      sku: "aurora-desk-lamp-3",
+      price: new Prisma.Decimal(220),
+      compareAtPrice: null,
+      stock: 0,
+      isPrimary: true,
+      attributes: null,
+      variantMedia: [],
+    });
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    const variant = await service.addVariant(PRODUCT_ID, {
+      title: "Large",
+      price: { amount: "220", currency: "TRY" },
+    });
+
+    expect(variant.isPrimary).toBe(true);
+    expect(prisma.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { productId: PRODUCT_ID, id: { not: VARIANT_ID } },
+      data: { isPrimary: false },
+    });
+  });
+
+  it("deletes non-primary variants and invalidates product cache", async () => {
+    const prisma = createPrismaStub();
+    prisma.productVariant.findUnique.mockResolvedValue({
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
+      isPrimary: false,
+      product: {
+        deletedAt: null,
+      },
+    });
+
+    const cache = createCatalogCacheStub();
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.deleteVariant(PRODUCT_ID, VARIANT_ID);
+
+    expect(prisma.productVariant.delete).toHaveBeenCalledWith({ where: { id: VARIANT_ID } });
+    expect(cache.getCalls).not.toHaveBeenCalled();
+  });
+
+  it("creates products with generated slug and default status", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    const createdProduct = createProductEntity();
+    productRepository.create.mockResolvedValue(createdProduct);
+
+    const cache = {
+      invalidateProductLists: jest.fn().mockResolvedValue(undefined),
+      invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: cache as unknown as any,
+      prisma: prisma as unknown as any,
+    });
+
+    const result = await service.createProduct({
+      title: "Aurora Desk Lamp",
+      price: { amount: "199", currency: "TRY" },
+      variants: [
+        {
+          title: "Default",
+          price: { amount: "199", currency: "TRY" },
+          stock: 5,
+        },
+      ],
+      categoryIds: [CATEGORY_ID],
+    });
+
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Aurora Desk Lamp",
+          slug: "aurora-desk-lamp",
+          status: "DRAFT",
+          variants: expect.objectContaining({
+            create: expect.arrayContaining([
+              expect.objectContaining({
+                isPrimary: true,
+                sku: expect.stringContaining("aurora-desk-lamp"),
+              }),
+            ]),
+          }),
+        }),
+      }),
+    );
+    expect(cache.invalidateProductLists).toHaveBeenCalled();
+    expect(cache.invalidateCategoryTrees).toHaveBeenCalled();
+    expect(result.slug).toBe("aurora-desk-lamp");
+    expect(result.variants[0]?.isPrimary).toBe(true);
+  });
+
+  it("appends suffix when requested product slug already exists", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    const createdProduct = createProductEntity();
+
+    productRepository.findBySlug
+      .mockResolvedValueOnce({ id: "existing-product" })
+      .mockResolvedValueOnce(null);
+    productRepository.create.mockResolvedValue(createdProduct);
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: {
+        invalidateProductLists: jest.fn(),
+        invalidateCategoryTrees: jest.fn(),
+      } as unknown as any,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.createProduct({
+      title: "Aurora Desk Lamp",
+      slug: "aurora-desk-lamp",
+      price: { amount: "199", currency: "TRY" },
+      variants: [
+        {
+          title: "Default",
+          price: { amount: "199", currency: "TRY" },
+          stock: 4,
+        },
+      ],
+      categoryIds: [CATEGORY_ID],
+    });
+
+    expect(productRepository.findBySlug).toHaveBeenNthCalledWith(1, "aurora-desk-lamp", {
+      select: { id: true },
+    });
+    expect(productRepository.findBySlug).toHaveBeenNthCalledWith(2, "aurora-desk-lamp-1", {
+      select: { id: true },
+    });
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slug: "aurora-desk-lamp-1",
+        }),
+      }),
+    );
+  });
+
+  it("updates products and rewrites category assignments", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    const existingProduct = createProductEntity();
+    const updatedProduct = {
+      ...createProductEntity(),
+      title: "Aurora Desk Lamp Limited",
+      slug: "aurora-desk-lamp-limited",
+      searchKeywords: ["aurora", "limited"],
+      updatedAt: new Date("2025-02-01T00:00:00Z"),
+    };
+
+    productRepository.findById
+      .mockResolvedValueOnce(existingProduct)
+      .mockResolvedValueOnce(updatedProduct);
+
+    const updateMock = jest.fn().mockResolvedValue(updatedProduct);
+    productRepository.withTransaction = jest.fn(async (handler) =>
+      handler(
+        {
+          update: updateMock,
+        },
+        prisma,
+      ),
+    );
+
+    const cache = {
+      invalidateProductLists: jest.fn().mockResolvedValue(undefined),
+      invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: cache as unknown as any,
+      prisma: prisma as unknown as any,
+    });
+
+    const result = await service.updateProduct(PRODUCT_ID, {
+      title: "Aurora Desk Lamp Limited",
+      summary: "Refined finish",
+      categoryIds: [CATEGORY_ID],
+    });
+
+    expect(productRepository.findById).toHaveBeenCalledTimes(2);
+    expect(productRepository.withTransaction).toHaveBeenCalled();
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: PRODUCT_ID },
+        data: expect.objectContaining({
+          title: "Aurora Desk Lamp Limited",
+          slug: "aurora-desk-lamp-limited",
+          summary: "Refined finish",
+        }),
+      }),
+    );
+    expect(prisma.productCategory.deleteMany).toHaveBeenCalledWith({
+      where: { productId: PRODUCT_ID },
+    });
+    expect(prisma.productCategory.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            productId: PRODUCT_ID,
+            categoryId: CATEGORY_ID,
+            isPrimary: true,
+          }),
+        ],
+      }),
+    );
+    expect(cache.invalidateProductLists).toHaveBeenCalled();
+    expect(cache.invalidateCategoryTrees).toHaveBeenCalled();
+    expect(result.title).toBe("Aurora Desk Lamp Limited");
+    expect(result.slug).toBe("aurora-desk-lamp-limited");
+  });
+
   it("prevents assigning a category as its own descendant", async () => {
     const prisma = createPrismaStub();
     prisma.category.findUnique.mockImplementation(({ where: { id } }) => {
@@ -343,7 +781,7 @@ describe("CatalogService", () => {
     const cache = createCatalogCacheStub();
     const categoryRepository = createCategoryRepositoryStub();
     const category = {
-      id: "cat_lighting",
+      id: CATEGORY_ID,
       name: "Lighting",
       slug: "lighting",
       description: null,
@@ -438,14 +876,14 @@ describe("CatalogService", () => {
     const prisma = createPrismaStub();
     const productRepository = createProductRepositoryStub(prisma);
     productRepository.findById.mockResolvedValue({
-      id: "prod_aurora",
+      id: PRODUCT_ID,
       deletedAt: null,
       price: new Prisma.Decimal(199),
       currency: "TRY",
     });
     productRepository.listVariants.mockResolvedValue([
       {
-        id: "variant_primary",
+        id: VARIANT_ID,
         title: "Default",
         sku: "AURORA-1",
         price: new Prisma.Decimal(199),
@@ -464,21 +902,21 @@ describe("CatalogService", () => {
       prisma: prisma as unknown as any,
     });
 
-    const variants = await service.listProductVariants("prod_aurora", {
+    const variants = await service.listProductVariants(PRODUCT_ID, {
       includeOutOfStock: false,
     });
 
-    expect(productRepository.listVariants).toHaveBeenCalledWith("prod_aurora", {
+    expect(productRepository.listVariants).toHaveBeenCalledWith(PRODUCT_ID, {
       includeOutOfStock: false,
     });
-    expect(variants[0]?.availability).toBe("in_stock");
+    expect(variants[0]?.availability).toBe("low_stock");
   });
 
   it("prevents deletion of primary variants", async () => {
     const prisma = createPrismaStub();
     prisma.productVariant.findUnique.mockResolvedValue({
-      id: "variant_primary",
-      productId: "prod_aurora",
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
       isPrimary: true,
       product: {
         deletedAt: null,
@@ -492,7 +930,7 @@ describe("CatalogService", () => {
       prisma: prisma as unknown as any,
     });
 
-    await expect(service.deleteVariant("prod_aurora", "variant_primary")).rejects.toBeInstanceOf(
+    await expect(service.deleteVariant(PRODUCT_ID, VARIANT_ID)).rejects.toBeInstanceOf(
       ConflictError,
     );
   });
@@ -504,7 +942,7 @@ describe("CatalogService", () => {
     const categoryRepository = createCategoryRepositoryStub();
     categoryRepository.getHierarchy.mockResolvedValue([
       {
-        id: "cat_root",
+        id: CATEGORY_ID,
         name: "Lighting",
         slug: "lighting",
         description: null,
@@ -534,5 +972,172 @@ describe("CatalogService", () => {
     expect(second).toHaveLength(1);
     expect(categoryRepository.getHierarchy).toHaveBeenCalledTimes(1);
     expect(cache.categoryGetCalls).toHaveBeenCalledTimes(2);
+  });
+
+  it("forces category cache refresh when requested", async () => {
+    const prisma = createPrismaStub();
+    const cache = createCatalogCacheStub();
+    cache.invalidateCategoryTrees = jest.fn();
+
+    const categoryRepository = createCategoryRepositoryStub();
+    categoryRepository.getHierarchy.mockResolvedValue([
+      {
+        id: CATEGORY_ID,
+        name: "Lighting",
+        slug: "lighting",
+        description: null,
+        parentId: null,
+        level: 0,
+        path: "/lighting",
+        imageUrl: null,
+        iconUrl: null,
+        displayOrder: null,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        updatedAt: new Date("2024-01-01T00:00:00Z"),
+        children: [],
+      },
+    ]);
+
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.listCategories({ depth: 2, refresh: true });
+
+    expect(cache.categoryGetCalls).not.toHaveBeenCalled();
+    expect(cache.categorySetCalls).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates categories with parent linkage", async () => {
+    const prisma = createPrismaStub();
+    const cache = createCatalogCacheStub();
+    cache.invalidateCategoryTrees = jest.fn();
+    const parentCategory = {
+      id: CATEGORY_ID,
+      name: "Lighting",
+      slug: "lighting",
+      description: null,
+      parentId: null,
+      level: 0,
+      path: "/lighting",
+      imageUrl: null,
+      iconUrl: null,
+      displayOrder: null,
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+      updatedAt: new Date("2024-01-01T00:00:00Z"),
+    };
+    prisma.category.findUnique.mockResolvedValueOnce(parentCategory);
+
+    const categoryRepository = createCategoryRepositoryStub();
+    categoryRepository.create.mockResolvedValue({
+      ...parentCategory,
+      id: "clchildcategory00000000000",
+      name: "Desk Lamps",
+      slug: "desk-lamps",
+      parentId: CATEGORY_ID,
+      level: 1,
+      path: "/lighting/desk-lamps",
+      createdAt: new Date("2024-02-01T00:00:00Z"),
+      updatedAt: new Date("2024-02-01T00:00:00Z"),
+    });
+
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository: categoryRepository as unknown as any,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    const result = await service.createCategory({
+      name: "Desk Lamps",
+      parentId: CATEGORY_ID,
+    });
+
+    expect(prisma.category.findUnique).toHaveBeenCalledWith({ where: { id: CATEGORY_ID } });
+    expect(categoryRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          level: 1,
+          path: "/lighting/desk-lamps",
+        }),
+      }),
+    );
+    expect(cache.invalidateCategoryTrees).toHaveBeenCalledTimes(1);
+    expect(result.parentId).toBe(CATEGORY_ID);
+  });
+
+  it("prevents deleting categories with active products", async () => {
+    const prisma = createPrismaStub();
+    prisma.category.findUnique.mockResolvedValue({
+      id: CATEGORY_ID,
+      name: "Lighting",
+      slug: "lighting",
+      description: null,
+      parentId: null,
+      level: 0,
+      path: "/lighting",
+      imageUrl: null,
+      iconUrl: null,
+      displayOrder: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prisma.category.count.mockResolvedValueOnce(0);
+    prisma.productCategory.count.mockResolvedValueOnce(2);
+
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    await expect(service.deleteCategory(CATEGORY_ID)).rejects.toBeInstanceOf(ConflictError);
+    expect(prisma.productCategory.count).toHaveBeenCalledWith({
+      where: {
+        categoryId: CATEGORY_ID,
+        product: {
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+      },
+    });
+  });
+
+  it("deletes categories when no dependents exist", async () => {
+    const prisma = createPrismaStub();
+    prisma.category.findUnique.mockResolvedValue({
+      id: CATEGORY_ID,
+      name: "Lighting",
+      slug: "lighting",
+      description: null,
+      parentId: null,
+      level: 0,
+      path: "/lighting",
+      imageUrl: null,
+      iconUrl: null,
+      displayOrder: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prisma.category.count.mockResolvedValueOnce(0);
+    prisma.productCategory.count.mockResolvedValueOnce(0);
+
+    const cache = createCatalogCacheStub();
+
+    const service = new CatalogService({
+      productRepository: createProductRepositoryStub(prisma) as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.deleteCategory(CATEGORY_ID);
+
+    expect(prisma.category.delete).toHaveBeenCalledWith({ where: { id: CATEGORY_ID } });
+    expect(cache.categorySetCalls).toHaveBeenCalledTimes(0);
   });
 });
