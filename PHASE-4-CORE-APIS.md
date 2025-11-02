@@ -50,6 +50,7 @@
 ### API Standards (Q2 Format)
 
 **Q2 Response Format:**
+
 ```typescript
 // Success Response
 {
@@ -191,6 +192,7 @@ docs/api/
 ### 1. API Foundation & Middleware (18 items)
 
 #### 1.1 Response Formatter Middleware
+
 - [ ] Create `responseFormatter.ts` middleware
 - [ ] Implement `formatSuccess(data, meta?)` helper
 - [ ] Implement `formatError(error, meta?)` helper
@@ -200,6 +202,7 @@ docs/api/
 - [ ] Add Q2 format validation tests
 
 #### 1.2 Error Handler Middleware
+
 - [ ] Create centralized error handler
 - [ ] Map Prisma errors to HTTP status codes
 - [ ] Map Zod validation errors to 422 responses
@@ -209,16 +212,18 @@ docs/api/
 - [ ] Test all error scenarios
 
 #### 1.3 Rate Limiter Middleware
+
 - [ ] Install `express-rate-limit` package
 - [ ] Create Redis store for rate limiting
 - [ ] Configure customer rate limits (120 req/5min)
 - [ ] Configure admin rate limits (300 req/5min)
-- [ ] Add rate limit headers (X-RateLimit-*)
+- [ ] Add rate limit headers (X-RateLimit-\*)
 - [ ] Implement IP-based tracking
 - [ ] Add bypass for internal services
 - [ ] Test rate limit enforcement
 
 #### 1.4 Request Logger & Audit
+
 - [ ] Create request logging middleware
 - [ ] Log all admin actions to audit table
 - [ ] Include user ID, IP, action, timestamp
@@ -232,81 +237,85 @@ docs/api/
 ### 2. Catalog Management API (32 items)
 
 #### 2.1 Product CRUD Endpoints (Public)
-- [ ] GET `/api/v1/products` - List products with filters
-  - [ ] Implement pagination (default 24 items)
-  - [ ] Add filter by category (query param)
-  - [ ] Add filter by price range (min/max)
-  - [ ] Add filter by attributes (JSON query)
-  - [ ] Add filter by status (active only for public)
-  - [ ] Add sort options (relevance, price, newest, rating)
-  - [ ] Implement full-text search (searchKeywords)
-  - [ ] Add Redis caching (60s TTL)
-- [ ] GET `/api/v1/products/:slug` - Get product by slug
-  - [ ] Include variants with stock info
-  - [ ] Include categories (breadcrumb data)
-  - [ ] Include media assets (Cloudinary URLs)
-  - [ ] Include review statistics
-  - [ ] Add ETag header for caching
-  - [ ] Return 404 for inactive products
-- [ ] GET `/api/v1/products/:id/variants` - List product variants
-  - [ ] Include stock levels
-  - [ ] Include pricing (base + adjustment)
-  - [ ] Include variant media
-  - [ ] Filter by in-stock availability
+
+- [x] GET `/api/v1/products` - List products with filters
+  - [x] Implement pagination (default 24 items)
+  - [x] Add filter by category (query param)
+  - [x] Add filter by price range (min/max)
+  - [x] Add filter by attributes (JSON query)
+  - [x] Add filter by status (active only for public)
+  - [x] Add sort options (relevance, price, newest, rating)
+  - [x] Implement full-text search (searchKeywords)
+  - [x] Add Redis caching (60s TTL)
+- [x] GET `/api/v1/products/:slug` - Get product by slug
+  - [x] Include variants with stock info
+  - [x] Include categories (breadcrumb data)
+  - [x] Include media assets (Cloudinary URLs)
+  - [x] Include review statistics
+  - [x] Add ETag header for caching
+  - [x] Return 404 for inactive products
+- [x] GET `/api/v1/products/:id/variants` - List product variants
+  - [x] Include stock levels
+  - [x] Include pricing (base + adjustment)
+  - [x] Include variant media
+  - [x] Filter by in-stock availability
 
 #### 2.2 Product CRUD Endpoints (Admin)
-- [ ] POST `/api/v1/admin/products` - Create product
-  - [ ] Validate required fields (title, sku, price)
-  - [ ] Auto-generate slug from title
-  - [ ] Validate unique slug
-  - [ ] Create primary variant automatically
-  - [ ] Set default status to DRAFT
-  - [ ] Audit log creation
-- [ ] PUT `/api/v1/admin/products/:id` - Update product
-  - [ ] Partial update support
-  - [ ] Validate slug uniqueness on change
-  - [ ] Update searchKeywords array
-  - [ ] Audit log update
-- [ ] DELETE `/api/v1/admin/products/:id` - Soft delete product
-  - [ ] Set status to ARCHIVED
-  - [ ] Archive all variants
-  - [ ] Check for active orders
-  - [ ] Audit log deletion
-- [ ] POST `/api/v1/admin/products/:id/variants` - Add variant
-  - [ ] Validate unique SKU
-  - [ ] Set isPrimary if first variant
-  - [ ] Validate attributes match product
-- [ ] PUT `/api/v1/admin/products/:id/variants/:variantId` - Update variant
-  - [ ] Validate stock >= 0
-  - [ ] Prevent primary variant deletion
-  - [ ] Audit log variant changes
-- [ ] DELETE `/api/v1/admin/products/:id/variants/:variantId` - Delete variant
+
+- [x] POST `/api/v1/admin/products` - Create product
+  - [x] Validate required fields (title, sku, price)
+  - [x] Auto-generate slug from title
+  - [x] Validate unique slug
+  - [x] Create primary variant automatically
+  - [x] Set default status to DRAFT
+  - [x] Audit log creation
+- [x] PUT `/api/v1/admin/products/:id` - Update product
+  - [x] Partial update support
+  - [x] Validate slug uniqueness on change
+  - [x] Update searchKeywords array
+  - [x] Audit log update
+- [x] DELETE `/api/v1/admin/products/:id` - Soft delete product
+  - [x] Set status to ARCHIVED
+  - [x] Archive all variants
+  - [x] Check for active orders
+  - [x] Audit log deletion
+- [x] POST `/api/v1/admin/products/:id/variants` - Add variant
+  - [x] Validate unique SKU
+  - [x] Set isPrimary if first variant
+  - [x] Validate attributes match product
+- [x] PUT `/api/v1/admin/products/:id/variants/:variantId` - Update variant
+  - [x] Validate stock >= 0
+  - [x] Prevent primary variant deletion
+  - [x] Audit log variant changes
+- [x] DELETE `/api/v1/admin/products/:id/variants/:variantId` - Delete variant
 
 #### 2.3 Category Management
-- [ ] GET `/api/v1/categories` - List categories (tree structure)
-  - [ ] Include product count per category
-  - [ ] Support depth limiting (query param)
-  - [ ] Cache category tree (15min TTL)
-- [ ] GET `/api/v1/categories/:slug` - Get category with products
-  - [ ] Include subcategories
-  - [ ] Include category products (paginated)
-  - [ ] Include breadcrumb path
-- [ ] POST `/api/v1/admin/categories` - Create category
-  - [ ] Validate unique slug
-  - [ ] Calculate level and path
-  - [ ] Validate parent exists
-- [ ] PUT `/api/v1/admin/categories/:id` - Update category
-  - [ ] Recalculate path if parent changed
-  - [ ] Update all children paths
-- [ ] DELETE `/api/v1/admin/categories/:id` - Delete category
-  - [ ] Check for products in category
-  - [ ] Reassign products or prevent deletion
+
+- [x] GET `/api/v1/categories` - List categories (tree structure)
+  - [x] Include product count per category
+  - [x] Support depth limiting (query param)
+  - [x] Cache category tree (15min TTL)
+- [x] GET `/api/v1/categories/:slug` - Get category with products
+  - [x] Include subcategories
+  - [x] Include category products (paginated)
+  - [x] Include breadcrumb path
+- [x] POST `/api/v1/admin/categories` - Create category
+  - [x] Validate unique slug
+  - [x] Calculate level and path
+  - [x] Validate parent exists
+- [x] PUT `/api/v1/admin/categories/:id` - Update category
+  - [x] Recalculate path if parent changed
+  - [x] Update all children paths
+- [x] DELETE `/api/v1/admin/categories/:id` - Delete category
+  - [x] Check for products in category
+  - [x] Reassign products or prevent deletion
 
 ---
 
 ### 3. Cart Management API (28 items)
 
 #### 3.1 Cart Operations (Authenticated Users)
+
 - [ ] GET `/api/v1/cart` - Get current user's cart
   - [ ] Include all items with product details
   - [ ] Calculate subtotal, tax, total
@@ -333,6 +342,7 @@ docs/api/
   - [ ] Keep cart record for history
 
 #### 3.2 Cart Session Handling
+
 - [ ] POST `/api/v1/cart/merge` - Merge guest cart after login
   - [ ] Find guest cart by session ID
   - [ ] Merge into user cart
@@ -346,6 +356,7 @@ docs/api/
   - [ ] Return detailed validation report
 
 #### 3.3 Cart Business Logic
+
 - [ ] Implement automatic cart expiry (30 days)
 - [ ] Create cleanup job for abandoned carts
 - [ ] Implement cart recovery email trigger
@@ -359,6 +370,7 @@ docs/api/
 ### 4. Order Processing API (35 items)
 
 #### 4.1 Order Creation & Lifecycle
+
 - [ ] POST `/api/v1/orders` - Create order (checkout)
   - [ ] Validate cart not empty
   - [ ] Validate all items in stock (atomic)
@@ -395,6 +407,7 @@ docs/api/
   - [ ] Audit log cancellation
 
 #### 4.2 Order Tracking
+
 - [ ] GET `/api/v1/orders/:reference/track` - Public order tracking
   - [ ] Validate order reference format
   - [ ] Return order status timeline
@@ -403,6 +416,7 @@ docs/api/
   - [ ] No authentication required (public endpoint)
 
 #### 4.3 Admin Order Management
+
 - [ ] GET `/api/v1/admin/orders` - List all orders
   - [ ] Advanced filtering (status, date, user, amount)
   - [ ] Search by order reference
@@ -441,6 +455,7 @@ docs/api/
 ### 5. User Management API (24 items)
 
 #### 5.1 User Profile Management
+
 - [ ] GET `/api/v1/users/me` - Get current user profile
   - [ ] Include all profile fields
   - [ ] Exclude sensitive data (passwordHash)
@@ -460,6 +475,7 @@ docs/api/
   - [ ] Audit log password change
 
 #### 5.2 Address Management
+
 - [ ] GET `/api/v1/users/me/addresses` - List user addresses
   - [ ] Include default flag
   - [ ] Sort by isDefault DESC, createdAt DESC
@@ -480,6 +496,7 @@ docs/api/
   - [ ] Set new default atomically
 
 #### 5.3 User Preferences
+
 - [ ] GET `/api/v1/users/me/preferences` - Get preferences
 - [ ] PUT `/api/v1/users/me/preferences` - Update preferences
   - [ ] Notification settings
@@ -489,6 +506,7 @@ docs/api/
   - [ ] Privacy settings
 
 #### 5.4 Admin User Management
+
 - [ ] GET `/api/v1/admin/users` - List all users
   - [ ] Filter by status, role, date
   - [ ] Search by email, name
@@ -512,6 +530,7 @@ docs/api/
 ### 6. Validation & Security (22 items)
 
 #### 6.1 Zod Validation Schemas
+
 - [ ] Create `catalog.validators.ts`
   - [ ] ProductCreateSchema
   - [ ] ProductUpdateSchema
@@ -532,6 +551,7 @@ docs/api/
   - [ ] UpdatePreferencesSchema
 
 #### 6.2 Input Sanitization (S2)
+
 - [ ] Install `validator` and `sanitize-html` packages
 - [ ] Create sanitization middleware
 - [ ] Sanitize all string inputs
@@ -542,6 +562,7 @@ docs/api/
 - [ ] Test SQL injection prevention
 
 #### 6.3 RBAC & Authorization (S3)
+
 - [ ] Implement `requireRole(role)` middleware
 - [ ] Implement `requirePermission(permission)` middleware
 - [ ] Create RBAC service for permission checks
@@ -558,6 +579,7 @@ docs/api/
 ### 7. Performance Optimization (18 items)
 
 #### 7.1 Database Indexing (P1)
+
 - [ ] Add index on `Product.slug` (unique)
 - [ ] Add index on `Product.status`
 - [ ] Add composite index on `Product(status, createdAt)`
@@ -570,6 +592,7 @@ docs/api/
 - [ ] Verify all indexes created with `EXPLAIN ANALYZE`
 
 #### 7.2 Caching Strategy (P2)
+
 - [ ] Configure Redis client
 - [ ] Cache product listings (60s TTL)
 - [ ] Cache category tree (15min TTL)
@@ -580,6 +603,7 @@ docs/api/
 - [ ] Support `If-None-Match` header (304 responses)
 
 #### 7.3 Query Optimization
+
 - [ ] Use `select` to limit returned fields
 - [ ] Use `include` strategically (avoid N+1)
 - [ ] Implement pagination helpers
@@ -593,6 +617,7 @@ docs/api/
 ### 8. API Documentation (16 items)
 
 #### 8.1 OpenAPI Specification
+
 - [ ] Create `packages/shared/src/api-schemas/openapi.yaml`
 - [ ] Define all endpoints with full specs
 - [ ] Define all request/response schemas
@@ -603,6 +628,7 @@ docs/api/
 - [ ] Validate spec with Spectral
 
 #### 8.2 Swagger UI Integration
+
 - [ ] Install `swagger-ui-express` package
 - [ ] Serve Swagger UI at `/api/docs`
 - [ ] Configure API key authentication
@@ -611,6 +637,7 @@ docs/api/
 - [ ] Protect docs endpoint (optional)
 
 #### 8.3 API Documentation Files
+
 - [ ] Create `docs/api/catalog.md`
   - [ ] List all catalog endpoints
   - [ ] Add request/response examples
@@ -626,6 +653,7 @@ docs/api/
   - [ ] Document address management
 
 #### 8.4 Postman Collection
+
 - [ ] Export OpenAPI spec to Postman
 - [ ] Create environment variables
 - [ ] Add authentication setup
@@ -637,6 +665,7 @@ docs/api/
 ### 9. Testing Implementation (30 items)
 
 #### 9.1 Unit Tests
+
 - [ ] Test `catalog.service.ts` methods
   - [ ] `createProduct()` - creates product with variant
   - [ ] `updateProduct()` - updates and validates slug
@@ -662,6 +691,7 @@ docs/api/
   - [ ] `updatePreferences()` - updates preferences
 
 #### 9.2 Integration Tests
+
 - [ ] Test product listing endpoint
   - [ ] Returns Q2 format
   - [ ] Filters work correctly
@@ -687,6 +717,7 @@ docs/api/
   - [ ] Audit logs created
 
 #### 9.3 Average/Error/Recovery Tests
+
 - [ ] **Average Tests** (`tests/average/api-average.test.ts`)
   - [ ] Login → Browse catalog → Add to cart → Checkout flow
   - [ ] Verify response times < 250ms (P95)
@@ -703,6 +734,7 @@ docs/api/
   - [ ] Order cancellation → Refund initiated → Inventory released
 
 #### 9.4 Contract Tests
+
 - [ ] Install `jest-openapi` package
 - [ ] Test all responses against OpenAPI spec
 - [ ] Validate request schemas
@@ -714,6 +746,7 @@ docs/api/
 ### 10. Operational Readiness (15 items)
 
 #### 10.1 Monitoring & Observability
+
 - [ ] Add Prometheus metrics
   - [ ] `http_requests_total{route}`
   - [ ] `http_request_duration_seconds`
@@ -724,12 +757,14 @@ docs/api/
 - [ ] Log slow queries (> 100ms)
 
 #### 10.2 API Versioning Strategy
+
 - [ ] Document versioning approach (`/api/v1`, `/api/v2`)
 - [ ] Create deprecation policy
 - [ ] Add `X-API-Version` header
 - [ ] Plan for backward compatibility
 
 #### 10.3 Runbook Documentation
+
 - [ ] Create `docs/backend/api-runbook.md`
   - [ ] Document rate limit changes procedure
   - [ ] Document feature flag rollout
@@ -741,6 +776,7 @@ docs/api/
 - [ ] Create API changelog
 
 #### 10.4 Production Deployment
+
 - [ ] Configure production environment variables
 - [ ] Set up API gateway/load balancer
 - [ ] Configure CORS for production domains
@@ -778,13 +814,13 @@ pnpm --filter @lumi/backend test:coverage
 ```typescript
 // Product listing performance test
 const start = Date.now();
-const response = await request(app).get('/api/v1/products?page=1&perPage=24');
+const response = await request(app).get("/api/v1/products?page=1&perPage=24");
 const duration = Date.now() - start;
 expect(duration).toBeLessThan(250); // P1: < 250ms P95
 
 // Order creation performance test
 const orderStart = Date.now();
-const orderResponse = await request(app).post('/api/v1/orders').send(orderData);
+const orderResponse = await request(app).post("/api/v1/orders").send(orderData);
 const orderDuration = Date.now() - orderStart;
 expect(orderDuration).toBeLessThan(500); // < 500ms for complex operation
 ```
@@ -822,7 +858,7 @@ expect(auditLog).toBeDefined();
 
 ```typescript
 // Success response format test
-const response = await request(app).get('/api/v1/products');
+const response = await request(app).get("/api/v1/products");
 expect(response.body).toMatchObject({
   success: true,
   data: expect.any(Array),
@@ -833,23 +869,21 @@ expect(response.body).toMatchObject({
       page: expect.any(Number),
       perPage: expect.any(Number),
       total: expect.any(Number),
-      totalPages: expect.any(Number)
-    }
-  }
+      totalPages: expect.any(Number),
+    },
+  },
 });
 
 // Error response format test
-const errorResponse = await request(app)
-  .post('/api/v1/cart/items')
-  .send({ invalidData: true });
+const errorResponse = await request(app).post("/api/v1/cart/items").send({ invalidData: true });
 expect(errorResponse.body).toMatchObject({
   success: false,
   error: {
     code: expect.any(String),
     message: expect.any(String),
-    details: expect.any(Array)
+    details: expect.any(Array),
   },
-  meta: expect.any(Object)
+  meta: expect.any(Object),
 });
 ```
 
@@ -864,13 +898,14 @@ pnpm --filter @lumi/backend test:contract
 ```
 
 ```typescript
-import jestOpenAPI from 'jest-openapi';
-import openApiSpec from '@lumi/shared/api-schemas/openapi.yaml';
+import jestOpenAPI from "jest-openapi";
+
+import openApiSpec from "@lumi/shared/api-schemas/openapi.yaml";
 
 jestOpenAPI(openApiSpec);
 
-test('Product listing matches OpenAPI spec', async () => {
-  const response = await request(app).get('/api/v1/products');
+test("Product listing matches OpenAPI spec", async () => {
+  const response = await request(app).get("/api/v1/products");
   expect(response).toSatisfyApiSpec();
 });
 ```
@@ -880,6 +915,7 @@ test('Product listing matches OpenAPI spec', async () => {
 ## 📊 SUCCESS METRICS
 
 ### Code Quality Metrics
+
 - ✅ Test coverage ≥85% (all modules)
 - ✅ 0 TypeScript errors
 - ✅ 0 ESLint errors
@@ -887,6 +923,7 @@ test('Product listing matches OpenAPI spec', async () => {
 - ✅ 100% endpoint documentation coverage
 
 ### Performance Metrics
+
 - ✅ Product queries < 100ms (P95)
 - ✅ Order queries < 150ms (P95)
 - ✅ Cart operations < 50ms (P95)
@@ -894,6 +931,7 @@ test('Product listing matches OpenAPI spec', async () => {
 - ✅ Cache hit rate > 70% for product listings
 
 ### Security Metrics
+
 - ✅ 100% admin endpoints protected (S3)
 - ✅ 100% inputs sanitized (S2)
 - ✅ Rate limiting active on all endpoints
@@ -901,6 +939,7 @@ test('Product listing matches OpenAPI spec', async () => {
 - ✅ 0 high/critical security vulnerabilities
 
 ### API Quality Metrics
+
 - ✅ 100% endpoints return Q2 format
 - ✅ OpenAPI spec 100% coverage
 - ✅ Postman collection with all endpoints
@@ -912,7 +951,9 @@ test('Product listing matches OpenAPI spec', async () => {
 ## 🚨 COMMON PITFALLS TO AVOID
 
 ### 1. Inconsistent Response Formats
+
 ❌ **Wrong:**
+
 ```typescript
 // Different endpoints returning different formats
 return res.json({ products: [...] }); // No standard format
@@ -920,19 +961,23 @@ return res.json({ success: true, items: [...] }); // Inconsistent naming
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Always use Q2 format helper
 return formatSuccess(res, products, { pagination });
 ```
 
 ### 2. Missing Input Validation
+
 ❌ **Wrong:**
+
 ```typescript
 // Direct database access without validation
 const product = await prisma.product.create({ data: req.body });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Validate with Zod schema first (S2)
 const validated = ProductCreateSchema.parse(req.body);
@@ -941,89 +986,106 @@ const product = await prisma.product.create({ data: sanitized });
 ```
 
 ### 3. N+1 Query Problems
+
 ❌ **Wrong:**
+
 ```typescript
 // Fetches products, then variants separately for each
 const products = await prisma.product.findMany();
 for (const product of products) {
   product.variants = await prisma.productVariant.findMany({
-    where: { productId: product.id }
+    where: { productId: product.id },
   });
 }
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Eager load with include
 const products = await prisma.product.findMany({
-  include: { variants: true }
+  include: { variants: true },
 });
 ```
 
 ### 4. Missing RBAC Protection
+
 ❌ **Wrong:**
+
 ```typescript
 // Admin endpoint without protection
-router.get('/admin/users', getUsers);
+router.get("/admin/users", getUsers);
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Protected with RBAC middleware (S3)
-router.get('/admin/users', requireAuth, requireRole('admin'), getUsers);
+router.get("/admin/users", requireAuth, requireRole("admin"), getUsers);
 ```
 
 ### 5. No Rate Limiting
+
 ❌ **Wrong:**
+
 ```typescript
 // Endpoint with no rate limiting
-router.post('/cart/items', addCartItem);
+router.post("/cart/items", addCartItem);
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Rate limited endpoint
-router.post('/cart/items', rateLimiter({ max: 120, window: '5m' }), addCartItem);
+router.post("/cart/items", rateLimiter({ max: 120, window: "5m" }), addCartItem);
 ```
 
 ### 6. Missing Audit Logging
+
 ❌ **Wrong:**
+
 ```typescript
 // Admin action with no logging
 await prisma.product.delete({ where: { id } });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Log admin action (S3)
 await prisma.product.delete({ where: { id } });
 await auditLog.create({
   userId: req.user.id,
-  action: 'product.delete',
+  action: "product.delete",
   resourceId: id,
-  ipAddress: req.ip
+  ipAddress: req.ip,
 });
 ```
 
 ### 7. Hardcoded Pagination
+
 ❌ **Wrong:**
+
 ```typescript
 // Hardcoded page size, no flexibility
 const products = await prisma.product.findMany({ take: 20 });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Use pagination helper (P2)
 const { page, perPage } = parsePagination(req.query);
 const products = await prisma.product.findMany({
   skip: (page - 1) * perPage,
-  take: perPage
+  take: perPage,
 });
 ```
 
 ### 8. Missing Transaction for Order Creation
+
 ❌ **Wrong:**
+
 ```typescript
 // No transaction, can fail mid-process
 const order = await prisma.order.create({ data });
@@ -1032,6 +1094,7 @@ await createPayment(order);
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Atomic transaction
 await prisma.$transaction(async (tx) => {
@@ -1046,6 +1109,7 @@ await prisma.$transaction(async (tx) => {
 ## 📦 DELIVERABLES
 
 ### 1. API Implementation
+
 - ✅ All endpoints implemented and tested
 - ✅ Q2 format responses on all endpoints
 - ✅ RBAC protection on admin endpoints
@@ -1054,6 +1118,7 @@ await prisma.$transaction(async (tx) => {
 - ✅ Error handling with proper status codes
 
 ### 2. Documentation
+
 - ✅ OpenAPI 3.1 specification (`openapi.yaml`)
 - ✅ Swagger UI served at `/api/docs`
 - ✅ API documentation files (catalog.md, cart.md, order.md, user.md)
@@ -1062,6 +1127,7 @@ await prisma.$transaction(async (tx) => {
 - ✅ API changelog
 
 ### 3. Testing
+
 - ✅ Unit tests for all services (≥85% coverage)
 - ✅ Integration tests for all endpoints
 - ✅ Average/Error/Recovery test suite
@@ -1069,6 +1135,7 @@ await prisma.$transaction(async (tx) => {
 - ✅ Performance tests validating P1/P2
 
 ### 4. Infrastructure
+
 - ✅ Database indexes for performance (P1)
 - ✅ Redis caching configured (P2)
 - ✅ Rate limiting middleware
@@ -1077,6 +1144,7 @@ await prisma.$transaction(async (tx) => {
 - ✅ Error tracking (Sentry)
 
 ### 5. Security
+
 - ✅ Input sanitization on all endpoints (S2)
 - ✅ RBAC enforcement (S3)
 - ✅ Audit logging for admin actions (S3)
@@ -1091,12 +1159,14 @@ await prisma.$transaction(async (tx) => {
 # PHASE 4: Core APIs - Completion Report
 
 ## Implementation Summary
+
 - **Start Date**: [Date]
 - **End Date**: [Date]
 - **Duration**: [Days]
 - **Team Members**: [Names]
 
 ## Completed Items
+
 - [x] Total Items: 218/218 (100%)
 - [x] Catalog API: 32/32 endpoints
 - [x] Cart API: 28/28 endpoints
@@ -1106,6 +1176,7 @@ await prisma.$transaction(async (tx) => {
 - [x] Documentation: 16/16 items
 
 ## Metrics Achieved
+
 - **Test Coverage**: X% (Target: ≥85%)
 - **API Response Time**: Xms P95 (Target: <250ms)
 - **OpenAPI Coverage**: 100%
@@ -1113,9 +1184,11 @@ await prisma.$transaction(async (tx) => {
 - **Performance**: P1 ✅, P2 ✅
 
 ## Known Issues
+
 - [List any known issues or technical debt]
 
 ## Next Phase Preparation
+
 - Phase 5 dependencies ready: ✅
 - Documentation complete: ✅
 - Production deployment checklist: ✅
@@ -1126,6 +1199,7 @@ await prisma.$transaction(async (tx) => {
 ## 🎯 NEXT PHASE PREVIEW
 
 **Phase 5: Cloudinary Media System**
+
 - Cloudinary integration for image management
 - WebP conversion and optimization (P2)
 - Multiple size variants and transformations
@@ -1133,6 +1207,7 @@ await prisma.$transaction(async (tx) => {
 - Frontend media components
 
 **Dependencies from Phase 4:**
+
 - Product model with media relations ✅
 - User model for upload permissions ✅
 - Admin endpoints for media management ✅
@@ -1145,15 +1220,19 @@ await prisma.$transaction(async (tx) => {
 ### Common Issues
 
 **Issue: Rate limit too restrictive**
+
 - Solution: Adjust `rateLimiter` config in middleware
 
 **Issue: Slow product queries**
+
 - Solution: Check index usage with `EXPLAIN ANALYZE`, add caching
 
 **Issue: Cart merge conflicts**
+
 - Solution: Review merge logic, ensure atomic updates
 
 **Issue: Order creation fails**
+
 - Solution: Check inventory reservation, review transaction logs
 
 ### Debug Commands
