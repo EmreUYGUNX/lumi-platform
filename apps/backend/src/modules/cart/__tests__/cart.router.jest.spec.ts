@@ -126,6 +126,27 @@ const createTestApp = () => {
   return { app, service };
 };
 
+const createAnonymousApp = () => {
+  const config = createTestConfig();
+  const service = createCartServiceMock();
+  const app = express();
+  app.use(express.json());
+  app.use(
+    "/api",
+    createCartRouter(config, {
+      service,
+    }),
+  );
+  app.use(
+    (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      const error = err as { statusCode?: number; code?: string };
+      res.status(error.statusCode ?? 500).json({ code: error.code ?? "ERROR" });
+    },
+  );
+
+  return { app };
+};
+
 describe("cart router", () => {
   it("returns the active cart for the authenticated user", async () => {
     const { app, service } = createTestApp();
@@ -175,5 +196,47 @@ describe("cart router", () => {
 
     expect(service.validateCart).toHaveBeenCalledTimes(1);
     expect(response.body.data.valid).toBe(true);
+  });
+
+  it("clears the cart when requested", async () => {
+    const { app, service } = createTestApp();
+
+    await request(app).delete("/api/cart").expect(200);
+
+    expect(service.clearCart).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_test", sessionId: "session_test" }),
+    );
+  });
+
+  it("removes individual cart items", async () => {
+    const { app, service } = createTestApp();
+
+    await request(app).delete("/api/cart/items/ckitem000000000000000000000").expect(200);
+
+    expect(service.removeItem).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_test" }),
+      "ckitem000000000000000000000",
+    );
+  });
+
+  it("merges carts using the authenticated user context", async () => {
+    const { app, service } = createTestApp();
+
+    await request(app)
+      .post("/api/cart/merge")
+      .send({ sessionId: "guest_session", strategy: "replace" })
+      .expect(200);
+
+    expect(service.mergeCart).toHaveBeenCalledWith("user_test", {
+      sessionId: "guest_session",
+      strategy: "replace",
+    });
+  });
+
+  it("requires authentication for cart routes", async () => {
+    const { app } = createAnonymousApp();
+
+    const response = await request(app).get("/api/cart").expect(401);
+    expect(response.body.code).toBe("UNAUTHORIZED");
   });
 });

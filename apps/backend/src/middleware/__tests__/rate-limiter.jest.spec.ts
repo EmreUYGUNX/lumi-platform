@@ -312,3 +312,67 @@ describe("rate limiter middleware", () => {
     resetRateLimitConfig();
   });
 });
+
+describe("createScopedRateLimiter", () => {
+  beforeEach(() => {
+    resetRateLimitConfig();
+  });
+
+  it("returns a noop middleware when rate limiting is disabled", async () => {
+    const config = getMockConfig();
+    config.security.rateLimit.enabled = false;
+    setMockConfig(config);
+
+    const { createScopedRateLimiter } = await import("../rateLimiter.js");
+    const limiter = createScopedRateLimiter(
+      config.security.rateLimit,
+      "scoped:test",
+      {
+        points: 5,
+        durationSeconds: 60,
+        blockDurationSeconds: 120,
+      },
+      {
+        keyGenerator: () => "user-key",
+      },
+    );
+
+    const next = jest.fn();
+    await limiter.middleware({} as express.Request, {} as express.Response, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  it("honours custom key generators for scoped limiters", async () => {
+    const config = getMockConfig();
+    config.security.rateLimit.enabled = true;
+    config.security.rateLimit.points = 1;
+    config.security.rateLimit.durationSeconds = 60;
+    setMockConfig(config);
+
+    const { createScopedRateLimiter } = await import("../rateLimiter.js");
+    const limiter = createScopedRateLimiter(
+      config.security.rateLimit,
+      "scoped:test",
+      {
+        points: 1,
+        durationSeconds: 60,
+        blockDurationSeconds: 120,
+      },
+      {
+        keyGenerator: () => "custom-key",
+      },
+    );
+
+    const app = express();
+    app.use(responseFormatter);
+    app.use(limiter.middleware);
+    app.get("/resource", respondOk);
+
+    const agent = createApiClient(app);
+    await agent.get("/resource").expect(200);
+    const limited = await agent.get("/resource").expect(429);
+
+    expect(limited.status).toBe(429);
+  });
+});

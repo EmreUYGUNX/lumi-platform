@@ -8,7 +8,7 @@ import type { EmailService } from "@/lib/email/email.service.js";
 import type { CartCache, CartCacheScope } from "../cart.cache.js";
 import type { CartRepository, CartWithRelations } from "../cart.repository.js";
 import { CartService } from "../cart.service.js";
-import type { CartSummaryView } from "../cart.types.js";
+import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
 
 const createCartFixture = (): CartWithRelations => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
@@ -64,8 +64,13 @@ const createCartFixture = (): CartWithRelations => {
   } as unknown as CartWithRelations;
 };
 
-const createService = (overrides: Partial<CartRepository> = {}) => {
-  const cart = createCartFixture();
+interface ServiceOverrides {
+  cart?: CartWithRelations;
+  repository?: Partial<CartRepository>;
+}
+
+const createService = (overrides: ServiceOverrides = {}) => {
+  const cart = overrides.cart ?? createCartFixture();
   const repository = {
     findActiveCartByUser: jest.fn(async () => cart),
     create: jest.fn(),
@@ -73,7 +78,7 @@ const createService = (overrides: Partial<CartRepository> = {}) => {
     withTransaction: jest.fn(async (callback: (repo: CartRepository, tx: unknown) => unknown) =>
       callback(repository as unknown as CartRepository, {}),
     ),
-    ...overrides,
+    ...overrides.repository,
   } as unknown as CartRepository;
 
   const cacheGetMock = jest.fn(
@@ -145,5 +150,94 @@ describe("CartService", () => {
     const second = await service.getCart({ userId: "user_fixture", sessionId: "session_fixture" });
     expect(cacheGet).toHaveBeenCalled();
     expect(second).toBe(first);
+  });
+
+  it("computes stock warnings when inventory is running low", () => {
+    const lowStockCart = createCartFixture();
+    const item = lowStockCart.items[0];
+    if (!item) {
+      throw new Error("Cart item fixture missing");
+    }
+
+    const variant = item.productVariant;
+    if (!variant) {
+      throw new Error("Variant fixture missing");
+    }
+
+    variant.stock = 4;
+    item.quantity = 3;
+
+    const { service } = createService({ cart: lowStockCart });
+    const internals = service as unknown as {
+      computeStockStatus: (cart: CartWithRelations) => CartSummaryView["stock"];
+    };
+
+    const stock = internals.computeStockStatus(lowStockCart);
+    expect(stock.status).toBe("warning");
+    expect(stock.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "low_stock",
+          availableQuantity: 4,
+          requestedQuantity: 3,
+        }),
+      ]),
+    );
+  });
+
+  it("flags unavailable variants and returns backorder delivery estimates", () => {
+    const variantMissing = createCartFixture();
+    const item = variantMissing.items[0];
+    if (!item) {
+      throw new Error("Cart item fixture missing");
+    }
+    // eslint-disable-next-line unicorn/no-null -- emulate variant removal
+    item.productVariant = null as unknown as typeof item.productVariant;
+
+    const { service } = createService({ cart: variantMissing });
+    const internals = service as unknown as {
+      computeStockStatus: (cart: CartWithRelations) => CartSummaryView["stock"];
+      estimateDelivery: (
+        stock: CartSummaryView["stock"],
+        cart: CartWithRelations,
+      ) => CartSummaryView["delivery"];
+    };
+
+    const stock = internals.computeStockStatus(variantMissing);
+    expect(stock.status).toBe("error");
+    const delivery = internals.estimateDelivery(stock, variantMissing);
+    expect(delivery.status).toBe("backorder");
+  });
+
+  it("detects price mismatches during cart evaluation", () => {
+    const mismatchCart = createCartFixture();
+    const item = mismatchCart.items[0];
+    if (!item) {
+      throw new Error("Cart item fixture missing");
+    }
+
+    const variant = item.productVariant;
+    if (!variant) {
+      throw new Error("Variant fixture missing");
+    }
+    variant.stock = 10;
+    variant.product.status = ProductStatus.ACTIVE;
+    item.unitPrice = new Prisma.Decimal("209.00");
+
+    const { service } = createService({ cart: mismatchCart });
+    const internals = service as unknown as {
+      evaluateCart: (cart: CartWithRelations) => CartValidationReport;
+    };
+
+    const report = internals.evaluateCart(mismatchCart);
+    expect(report.valid).toBe(true);
+    expect(report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "price_mismatch",
+          expectedUnitPrice: { amount: "199.00", currency: "TRY" },
+        }),
+      ]),
+    );
   });
 });
