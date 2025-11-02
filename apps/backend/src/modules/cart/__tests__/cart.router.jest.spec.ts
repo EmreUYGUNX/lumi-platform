@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment, unicorn/no-null */
 import { describe, expect, it, jest } from "@jest/globals";
 import express from "express";
+import type { RequestHandler } from "express";
 import request from "supertest";
 
+import { createScopedRateLimiter } from "@/middleware/rateLimiter.js";
 import { createTestConfig } from "@/testing/config.js";
+import type { RateLimitRouteConfig } from "@lumi/types";
 
 import { createCartRouter } from "../cart.router.js";
 import type { CartService } from "../cart.service.js";
@@ -91,17 +94,30 @@ const createAuthenticatedUser = () => ({
   },
 });
 
+const attachUser: RequestHandler = (req, _res, next) => {
+  Object.assign(req, { user: createAuthenticatedUser() });
+  next();
+};
+
 const createTestApp = () => {
   const config = createTestConfig();
   const service = createCartServiceMock();
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => {
-    Object.assign(req, { user: createAuthenticatedUser() });
-    next();
-  });
+  const testLimiterConfig: RateLimitRouteConfig = {
+    points: 25,
+    durationSeconds: 60,
+    blockDurationSeconds: 60,
+  };
+  const { middleware: authStubLimiter } = createScopedRateLimiter(
+    config.security.rateLimit,
+    "cart:test-auth",
+    testLimiterConfig,
+  );
   app.use(
     "/api",
+    authStubLimiter,
+    attachUser,
     createCartRouter(config, {
       service,
     }),
