@@ -9,6 +9,7 @@ import type { CartCache, CartCacheScope } from "../cart.cache.js";
 import type { CartRepository, CartWithRelations } from "../cart.repository.js";
 import { CartService } from "../cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
+import { CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
 
 const createCartFixture = (): CartWithRelations => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
@@ -239,5 +240,260 @@ describe("CartService", () => {
         }),
       ]),
     );
+  });
+});
+
+const createVariant = (
+  overrides: Partial<NonNullable<CartWithRelations["items"][number]["productVariant"]>> = {},
+): NonNullable<CartWithRelations["items"][number]["productVariant"]> => {
+  const timestamp = new Date("2025-03-01T10:00:00.000Z");
+  return {
+    id: "variant-base",
+    title: "Aurora Variant",
+    sku: "SKU-V1",
+    price: new Prisma.Decimal("199.00"),
+    compareAtPrice: null,
+    stock: 10,
+    attributes: null,
+    weightGrams: null,
+    isPrimary: true,
+    productId: "product-base",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    product: {
+      id: "product-base",
+      title: "Aurora Lamp",
+      slug: "aurora-lamp",
+      sku: "SKU-P1",
+      summary: null,
+      description: null,
+      price: new Prisma.Decimal("199.00"),
+      compareAtPrice: null,
+      currency: "TRY",
+      status: ProductStatus.ACTIVE,
+      inventoryPolicy: InventoryPolicy.TRACK,
+      attributes: null,
+      searchKeywords: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    },
+    ...overrides,
+  };
+};
+
+const createCartWithItems = ({
+  id,
+  variant,
+  quantity,
+  sessionId,
+}: {
+  id: string;
+  variant: NonNullable<CartWithRelations["items"][number]["productVariant"]>;
+  quantity: number;
+  sessionId?: string | null;
+}): CartWithRelations => {
+  const timestamp = new Date("2025-03-01T10:00:00.000Z");
+  return {
+    id,
+    userId: "user-fixture",
+    sessionId: sessionId ?? null,
+    status: "ACTIVE",
+    expiresAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    items: [
+      {
+        id: `${id}-item`,
+        cartId: id,
+        productVariantId: variant.id,
+        quantity,
+        unitPrice: variant.price,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        productVariant: variant,
+      },
+    ],
+    user: {
+      id: "user-fixture",
+      email: "user@example.com",
+      firstName: "Cart",
+      lastName: "User",
+    },
+  } as unknown as CartWithRelations;
+};
+
+const createMergeTransaction = (
+  variants: NonNullable<CartWithRelations["items"][number]["productVariant"]>[],
+) => {
+  const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
+  return {
+    productVariant: {
+      findUnique: jest.fn(
+        async ({ where: { id } }: { where: { id: string } }) => variantMap.get(id) ?? null,
+      ),
+    },
+    cartItem: {
+      update: jest.fn(async () => {}),
+      create: jest.fn(async () => {}),
+      deleteMany: jest.fn(async () => {}),
+    },
+    cart: {
+      update: jest.fn(async () => {}),
+    },
+  };
+};
+
+describe("CartService.applyMergeCarts", () => {
+  it("reconciles existing items when merging with sum strategy", async () => {
+    const baseVariant = createVariant({ id: "variant-sum" });
+    const guestCart = createCartWithItems({
+      id: "guest-cart",
+      variant: baseVariant,
+      quantity: 3,
+    });
+    guestCart.items.push({
+      id: "guest-item-2",
+      cartId: guestCart.id,
+      productVariantId: baseVariant.id,
+      quantity: 4,
+      unitPrice: baseVariant.price,
+      createdAt: guestCart.createdAt,
+      updatedAt: guestCart.updatedAt,
+      productVariant: baseVariant,
+    } as unknown as (typeof guestCart.items)[number]);
+
+    const userCart = createCartWithItems({
+      id: "user-cart",
+      variant: baseVariant,
+      quantity: 2,
+    });
+
+    const transaction = createMergeTransaction([baseVariant]);
+    const { service } = createService();
+    const internals = service as unknown as {
+      applyMergeCarts: (
+        tx: Prisma.TransactionClient,
+        guest: CartWithRelations,
+        user: CartWithRelations,
+        strategy: "sum" | "replace",
+      ) => Promise<{ mergedItems: number }>;
+    };
+
+    const result = await internals.applyMergeCarts(
+      transaction as unknown as Prisma.TransactionClient,
+      guestCart,
+      userCart,
+      "sum",
+    );
+
+    const userItem = userCart.items[0];
+    if (!userItem) {
+      throw new Error("User cart item missing");
+    }
+
+    expect(transaction.cartItem.update).toHaveBeenCalledWith({
+      where: { id: userItem.id },
+      data: expect.objectContaining({
+        quantity: { set: Math.min(2 + 3 + 4, CART_ITEM_MAX_QUANTITY) },
+      }),
+    });
+    expect(transaction.cart.update).toHaveBeenCalledWith({
+      where: { id: guestCart.id },
+      data: expect.objectContaining({ status: "ABANDONED" }),
+    });
+    expect(transaction.cartItem.deleteMany).toHaveBeenCalledWith({
+      where: { cartId: guestCart.id },
+    });
+    expect(result.mergedItems).toBe(2);
+  });
+
+  it("creates new cart items when merging distinct variants", async () => {
+    const userVariant = createVariant({ id: "variant-existing" });
+    const guestVariant = createVariant({ id: "variant-new" });
+
+    const userCart = createCartWithItems({
+      id: "user-cart",
+      variant: userVariant,
+      quantity: 1,
+    });
+    const guestCart = createCartWithItems({
+      id: "guest-cart",
+      variant: guestVariant,
+      quantity: 2,
+    });
+
+    const txDistinct = createMergeTransaction([userVariant, guestVariant]);
+    const { service } = createService();
+    const internals = service as unknown as {
+      applyMergeCarts: (
+        tx: Prisma.TransactionClient,
+        guest: CartWithRelations,
+        user: CartWithRelations,
+        strategy: "sum" | "replace",
+      ) => Promise<{ mergedItems: number }>;
+    };
+
+    const result = await internals.applyMergeCarts(
+      txDistinct as unknown as Prisma.TransactionClient,
+      guestCart,
+      userCart,
+      "sum",
+    );
+
+    expect(txDistinct.cartItem.create).toHaveBeenCalledWith({
+      data: {
+        cartId: userCart.id,
+        productVariantId: guestVariant.id,
+        quantity: 2,
+        unitPrice: guestVariant.price,
+      },
+    });
+    expect(result.mergedItems).toBe(1);
+  });
+
+  it("replaces quantities when using replace strategy", async () => {
+    const variant = createVariant({ id: "variant-replace" });
+    const userCart = createCartWithItems({
+      id: "user-cart",
+      variant,
+      quantity: 9,
+    });
+    const guestCart = createCartWithItems({
+      id: "guest-cart",
+      variant,
+      quantity: 4,
+    });
+
+    const txReplace = createMergeTransaction([variant]);
+    const { service } = createService();
+    const internals = service as unknown as {
+      applyMergeCarts: (
+        tx: Prisma.TransactionClient,
+        guest: CartWithRelations,
+        user: CartWithRelations,
+        strategy: "sum" | "replace",
+      ) => Promise<{ mergedItems: number }>;
+    };
+
+    await internals.applyMergeCarts(
+      txReplace as unknown as Prisma.TransactionClient,
+      guestCart,
+      userCart,
+      "replace",
+    );
+
+    const userItem = userCart.items[0];
+    if (!userItem) {
+      throw new Error("User cart item missing");
+    }
+
+    expect(txReplace.cartItem.update).toHaveBeenCalledWith({
+      where: { id: userItem.id },
+      data: expect.objectContaining({
+        quantity: { set: 4 },
+        unitPrice: variant.price,
+      }),
+    });
   });
 });
