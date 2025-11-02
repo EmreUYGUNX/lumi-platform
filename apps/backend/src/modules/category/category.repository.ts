@@ -114,4 +114,48 @@ export class CategoryRepository extends BaseRepository<
       take: limit,
     });
   }
+
+  async findBySlug(slug: string): Promise<Category | null> {
+    return this.findFirst({
+      where: { slug },
+    }) as Promise<Category | null>;
+  }
+
+  async updateDescendantPaths(
+    categoryId: string,
+    parentPath: string,
+    parentLevel: number,
+  ): Promise<void> {
+    const updateChildren = async (
+      client: Prisma.TransactionClient,
+      id: string,
+      path: string,
+      level: number,
+    ): Promise<void> => {
+      const children = await client.category.findMany({
+        where: { parentId: id },
+      });
+
+      await Promise.all(
+        children.map(async (child) => {
+          const nextPath = `${path}/${child.slug}`.replaceAll(/\/+/g, "/");
+          const nextLevel = level + 1;
+
+          await client.category.update({
+            where: { id: child.id },
+            data: {
+              path: nextPath,
+              level: nextLevel,
+            },
+          });
+
+          await updateChildren(client, child.id, nextPath, nextLevel);
+        }),
+      );
+    };
+
+    await this.withTransaction(async (_repository, client) => {
+      await updateChildren(client, categoryId, parentPath, parentLevel);
+    });
+  }
 }
