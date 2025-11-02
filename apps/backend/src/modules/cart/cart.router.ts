@@ -47,27 +47,25 @@ export const createCartRouter = (
     },
   );
 
-  router.use(requireAuth, cartRateLimiter);
-
-  router.get(CART_ROUTE_BASE, controller.getCart);
+  router.get(CART_ROUTE_BASE, requireAuth, cartRateLimiter, controller.getCart);
   register(options.registerRoute, "GET", CART_ROUTE_BASE);
 
-  router.post(CART_ITEMS_ROUTE, controller.addItem);
+  router.post(CART_ITEMS_ROUTE, requireAuth, cartRateLimiter, controller.addItem);
   register(options.registerRoute, "POST", CART_ITEMS_ROUTE);
 
-  router.put(CART_ITEM_ROUTE, controller.updateItem);
+  router.put(CART_ITEM_ROUTE, requireAuth, cartRateLimiter, controller.updateItem);
   register(options.registerRoute, "PUT", CART_ITEM_ROUTE);
 
-  router.delete(CART_ITEM_ROUTE, controller.removeItem);
+  router.delete(CART_ITEM_ROUTE, requireAuth, cartRateLimiter, controller.removeItem);
   register(options.registerRoute, "DELETE", CART_ITEM_ROUTE);
 
-  router.delete(CART_ROUTE_BASE, controller.clearCart);
+  router.delete(CART_ROUTE_BASE, requireAuth, cartRateLimiter, controller.clearCart);
   register(options.registerRoute, "DELETE", CART_ROUTE_BASE);
 
-  router.post(CART_MERGE_ROUTE, controller.mergeCart);
+  router.post(CART_MERGE_ROUTE, requireAuth, cartRateLimiter, controller.mergeCart);
   register(options.registerRoute, "POST", CART_MERGE_ROUTE);
 
-  router.get(CART_VALIDATE_ROUTE, controller.validateCart);
+  router.get(CART_VALIDATE_ROUTE, requireAuth, cartRateLimiter, controller.validateCart);
   register(options.registerRoute, "GET", CART_VALIDATE_ROUTE);
 
   return router;
