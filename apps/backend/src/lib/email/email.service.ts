@@ -17,6 +17,7 @@ import { createSignedUrl } from "./signed-url.js";
 import { renderEmailTemplate } from "./templates/index.js";
 import { buildTemplateContext } from "./types.js";
 import type {
+  CartRecoveryEmailPayload,
   EmailContent,
   EmailTemplateContext,
   EmailTemplateId,
@@ -502,6 +503,16 @@ export class EmailService {
       html: email.html,
       text: email.text,
       previewText: email.previewText,
+    });
+  }
+
+  async sendCartRecoveryEmail(payload: CartRecoveryEmailPayload): Promise<void> {
+    await this.sendTemplate(payload.to, "commerce.cart-recovery", {
+      firstName: payload.firstName ?? undefined,
+      cartId: payload.cartId,
+      resumeUrl: payload.resumeUrl,
+      itemCount: payload.itemCount,
+      total: payload.total,
     });
   }
 }

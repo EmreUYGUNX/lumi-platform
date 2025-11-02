@@ -238,77 +238,77 @@ docs/api/
 
 #### 2.1 Product CRUD Endpoints (Public)
 
-- [x] GET `/api/v1/products` - List products with filters
-  - [x] Implement pagination (default 24 items)
-  - [x] Add filter by category (query param)
-  - [x] Add filter by price range (min/max)
-  - [x] Add filter by attributes (JSON query)
-  - [x] Add filter by status (active only for public)
-  - [x] Add sort options (relevance, price, newest, rating)
-  - [x] Implement full-text search (searchKeywords)
-  - [x] Add Redis caching (60s TTL)
-- [x] GET `/api/v1/products/:slug` - Get product by slug
-  - [x] Include variants with stock info
-  - [x] Include categories (breadcrumb data)
-  - [x] Include media assets (Cloudinary URLs)
-  - [x] Include review statistics
-  - [x] Add ETag header for caching
-  - [x] Return 404 for inactive products
-- [x] GET `/api/v1/products/:id/variants` - List product variants
-  - [x] Include stock levels
-  - [x] Include pricing (base + adjustment)
-  - [x] Include variant media
-  - [x] Filter by in-stock availability
+- [ ] GET `/api/v1/products` - List products with filters
+  - [ ] Implement pagination (default 24 items)
+  - [ ] Add filter by category (query param)
+  - [ ] Add filter by price range (min/max)
+  - [ ] Add filter by attributes (JSON query)
+  - [ ] Add filter by status (active only for public)
+  - [ ] Add sort options (relevance, price, newest, rating)
+  - [ ] Implement full-text search (searchKeywords)
+  - [ ] Add Redis caching (60s TTL)
+- [ ] GET `/api/v1/products/:slug` - Get product by slug
+  - [ ] Include variants with stock info
+  - [ ] Include categories (breadcrumb data)
+  - [ ] Include media assets (Cloudinary URLs)
+  - [ ] Include review statistics
+  - [ ] Add ETag header for caching
+  - [ ] Return 404 for inactive products
+- [ ] GET `/api/v1/products/:id/variants` - List product variants
+  - [ ] Include stock levels
+  - [ ] Include pricing (base + adjustment)
+  - [ ] Include variant media
+  - [ ] Filter by in-stock availability
 
 #### 2.2 Product CRUD Endpoints (Admin)
 
-- [x] POST `/api/v1/admin/products` - Create product
-  - [x] Validate required fields (title, sku, price)
-  - [x] Auto-generate slug from title
-  - [x] Validate unique slug
-  - [x] Create primary variant automatically
-  - [x] Set default status to DRAFT
-  - [x] Audit log creation
-- [x] PUT `/api/v1/admin/products/:id` - Update product
-  - [x] Partial update support
-  - [x] Validate slug uniqueness on change
-  - [x] Update searchKeywords array
-  - [x] Audit log update
-- [x] DELETE `/api/v1/admin/products/:id` - Soft delete product
-  - [x] Set status to ARCHIVED
-  - [x] Archive all variants
-  - [x] Check for active orders
-  - [x] Audit log deletion
-- [x] POST `/api/v1/admin/products/:id/variants` - Add variant
-  - [x] Validate unique SKU
-  - [x] Set isPrimary if first variant
-  - [x] Validate attributes match product
-- [x] PUT `/api/v1/admin/products/:id/variants/:variantId` - Update variant
-  - [x] Validate stock >= 0
-  - [x] Prevent primary variant deletion
-  - [x] Audit log variant changes
-- [x] DELETE `/api/v1/admin/products/:id/variants/:variantId` - Delete variant
+- [ ] POST `/api/v1/admin/products` - Create product
+  - [ ] Validate required fields (title, sku, price)
+  - [ ] Auto-generate slug from title
+  - [ ] Validate unique slug
+  - [ ] Create primary variant automatically
+  - [ ] Set default status to DRAFT
+  - [ ] Audit log creation
+- [ ] PUT `/api/v1/admin/products/:id` - Update product
+  - [ ] Partial update support
+  - [ ] Validate slug uniqueness on change
+  - [ ] Update searchKeywords array
+  - [ ] Audit log update
+- [ ] DELETE `/api/v1/admin/products/:id` - Soft delete product
+  - [ ] Set status to ARCHIVED
+  - [ ] Archive all variants
+  - [ ] Check for active orders
+  - [ ] Audit log deletion
+- [ ] POST `/api/v1/admin/products/:id/variants` - Add variant
+  - [ ] Validate unique SKU
+  - [ ] Set isPrimary if first variant
+  - [ ] Validate attributes match product
+- [ ] PUT `/api/v1/admin/products/:id/variants/:variantId` - Update variant
+  - [ ] Validate stock >= 0
+  - [ ] Prevent primary variant deletion
+  - [ ] Audit log variant changes
+- [ ] DELETE `/api/v1/admin/products/:id/variants/:variantId` - Delete variant
 
 #### 2.3 Category Management
 
-- [x] GET `/api/v1/categories` - List categories (tree structure)
-  - [x] Include product count per category
-  - [x] Support depth limiting (query param)
-  - [x] Cache category tree (15min TTL)
-- [x] GET `/api/v1/categories/:slug` - Get category with products
-  - [x] Include subcategories
-  - [x] Include category products (paginated)
-  - [x] Include breadcrumb path
-- [x] POST `/api/v1/admin/categories` - Create category
-  - [x] Validate unique slug
-  - [x] Calculate level and path
-  - [x] Validate parent exists
-- [x] PUT `/api/v1/admin/categories/:id` - Update category
-  - [x] Recalculate path if parent changed
-  - [x] Update all children paths
-- [x] DELETE `/api/v1/admin/categories/:id` - Delete category
-  - [x] Check for products in category
-  - [x] Reassign products or prevent deletion
+- [ ] GET `/api/v1/categories` - List categories (tree structure)
+  - [ ] Include product count per category
+  - [ ] Support depth limiting (query param)
+  - [ ] Cache category tree (15min TTL)
+- [ ] GET `/api/v1/categories/:slug` - Get category with products
+  - [ ] Include subcategories
+  - [ ] Include category products (paginated)
+  - [ ] Include breadcrumb path
+- [ ] POST `/api/v1/admin/categories` - Create category
+  - [ ] Validate unique slug
+  - [ ] Calculate level and path
+  - [ ] Validate parent exists
+- [ ] PUT `/api/v1/admin/categories/:id` - Update category
+  - [ ] Recalculate path if parent changed
+  - [ ] Update all children paths
+- [ ] DELETE `/api/v1/admin/categories/:id` - Delete category
+  - [ ] Check for products in category
+  - [ ] Reassign products or prevent deletion
 
 ---
 

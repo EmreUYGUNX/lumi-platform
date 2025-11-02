@@ -9,23 +9,37 @@ type CartRepositoryContext = RepositoryContext<
   Prisma.CartOrderByWithRelationInput
 >;
 
-const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
+export const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
   items: {
+    where: {
+      quantity: {
+        gt: 0,
+      },
+    },
     include: {
       productVariant: {
         select: {
           id: true,
           title: true,
+          sku: true,
           price: true,
           compareAtPrice: true,
           stock: true,
+          attributes: true,
+          weightGrams: true,
+          isPrimary: true,
+          createdAt: true,
+          updatedAt: true,
           product: {
             select: {
               id: true,
               title: true,
               slug: true,
               price: true,
+              compareAtPrice: true,
               currency: true,
+              status: true,
+              inventoryPolicy: true,
             },
           },
         },
@@ -42,7 +56,7 @@ const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
   },
 };
 
-type CartWithRelations = Prisma.CartGetPayload<{ include: typeof CART_DEFAULT_INCLUDE }>;
+export type CartWithRelations = Prisma.CartGetPayload<{ include: typeof CART_DEFAULT_INCLUDE }>;
 
 const buildActiveCartCondition = (): Prisma.CartWhereInput => ({
   status: "ACTIVE",
@@ -78,24 +92,30 @@ export class CartRepository extends BaseRepository<
     return new CartRepository(this.prisma, context) as this;
   }
 
-  async findActiveCartByUser(userId: string, options: { include?: Prisma.CartInclude } = {}) {
-    return this.findFirst({
+  async findActiveCartByUser(
+    userId: string,
+    options: { include?: Prisma.CartInclude } = {},
+  ): Promise<CartWithRelations | null> {
+    return (await this.findFirst({
       where: {
         ...buildActiveCartCondition(),
         userId,
       },
       include: options.include ?? CART_DEFAULT_INCLUDE,
-    });
+    })) as CartWithRelations | null;
   }
 
-  async findActiveCartBySession(sessionId: string, options: { include?: Prisma.CartInclude } = {}) {
-    return this.findFirst({
+  async findActiveCartBySession(
+    sessionId: string,
+    options: { include?: Prisma.CartInclude } = {},
+  ): Promise<CartWithRelations | null> {
+    return (await this.findFirst({
       where: {
         ...buildActiveCartCondition(),
         sessionId,
       },
       include: options.include ?? CART_DEFAULT_INCLUDE,
-    });
+    })) as CartWithRelations | null;
   }
 
   async ensureActiveCart(cartId: string): Promise<CartWithRelations> {
