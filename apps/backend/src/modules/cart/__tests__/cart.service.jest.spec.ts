@@ -238,6 +238,18 @@ const createCartForVariant = (
   return cart;
 };
 
+const createContext = () => ({
+  userId: "user-fixture",
+  sessionId: "session-fixture",
+});
+
+const createAddItemMutation = () => ({
+  itemId: "item-new",
+  variantId: "variant-new",
+  previousQuantity: 1,
+  newQuantity: 3,
+});
+
 interface AddItemTransactionOptions {
   variant: NonNullable<CartWithRelations["items"][number]["productVariant"]>;
   cart: CartWithRelations;
@@ -990,5 +1002,173 @@ describe("CartService.applyMergeCarts", () => {
         unitPrice: variant.price,
       }),
     });
+  });
+});
+
+describe("CartService public operations", () => {
+  it("adds an item through repository transaction and refreshes the cache", async () => {
+    const { service, repository, cart } = createService();
+    const context = createContext();
+    const input = {
+      productVariantId: cart.items[0]?.productVariantId ?? "variant-fallback",
+      quantity: 2,
+    };
+
+    const internal = service as unknown as { applyAddItem: jest.Mock };
+    const mutation = createAddItemMutation();
+    const applySpy = jest.spyOn(internal, "applyAddItem").mockResolvedValue(mutation);
+
+    cart.items[0]!.quantity = mutation.newQuantity;
+
+    const view = await service.addItem(context, input);
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(applySpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), context, input);
+    expect(view.cart.items[0]?.quantity).toBe(mutation.newQuantity);
+
+    applySpy.mockRestore();
+  });
+
+  it("throws when refreshed cart cannot be found after addItem", async () => {
+    const { service, repository, cart } = createService();
+    const context = createContext();
+    const input = {
+      productVariantId: cart.items[0]?.productVariantId ?? "variant-missing",
+      quantity: 1,
+    };
+
+    const internal = service as unknown as { applyAddItem: jest.Mock };
+    const applySpy = jest
+      .spyOn(internal, "applyAddItem")
+      .mockResolvedValue(createAddItemMutation());
+
+    (repository.findById as jest.Mock).mockResolvedValueOnce(null);
+
+    await expect(service.addItem(context, input)).rejects.toThrow(NotFoundError);
+
+    applySpy.mockRestore();
+  });
+
+  it("updates item quantity and emits removal when quantity becomes zero", async () => {
+    const { service, repository, cart } = createService();
+    const context = createContext();
+    const item = cart.items[0];
+    if (!item) {
+      throw new Error("cart fixture missing item");
+    }
+
+    const internal = service as unknown as {
+      applyUpdateItem: jest.Mock;
+    };
+    const applySpy = jest.spyOn(internal, "applyUpdateItem").mockResolvedValue({
+      itemId: item.id,
+      variantId: item.productVariantId,
+      previousQuantity: 2,
+      newQuantity: 0,
+    });
+
+    const view = await service.updateItem(context, item.id, { quantity: 0 });
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(applySpy).toHaveBeenCalled();
+    expect(view.cart.id).toBe(cart.id);
+
+    applySpy.mockRestore();
+  });
+
+  it("clears the cart and returns refreshed state", async () => {
+    const { service, repository, cart } = createService();
+    const context = createContext();
+
+    const internal = service as unknown as { applyClearCart: jest.Mock };
+    const clearSpy = jest.spyOn(internal, "applyClearCart").mockResolvedValue(1);
+
+    const view = await service.clearCart(context);
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(clearSpy).toHaveBeenCalled();
+    expect(view.cart.id).toBe(cart.id);
+
+    clearSpy.mockRestore();
+  });
+
+  it("claims guest cart when no user cart exists during merge", async () => {
+    const guestVariant = createVariant({ id: "variant-guest" });
+    const guestCart = createCartWithItems({
+      id: "guest-cart-1",
+      variant: guestVariant,
+      quantity: 1,
+      sessionId: "guest-session",
+    });
+    guestCart.userId = null;
+
+    const overrides = {
+      repository: {
+        findActiveCartBySession: jest.fn(async () => guestCart as CartWithRelations),
+        findActiveCartByUser: jest.fn(async () => null),
+        findById: jest
+          .fn()
+          .mockResolvedValueOnce(guestCart as CartWithRelations)
+          .mockResolvedValue(guestCart as CartWithRelations),
+      },
+    } satisfies ServiceOverrides;
+
+    const { service, repository } = createService(overrides);
+
+    const view = await service.mergeCart("user-claim", {
+      sessionId: "guest-session",
+      strategy: "sum",
+    });
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(view.cart.id).toBe(guestCart.id);
+    expect(view.cart.userId).toBe("user-claim");
+  });
+
+  it("merges into existing user cart and tracks merged item count", async () => {
+    const guestVariant = createVariant({ id: "variant-guest-merge" });
+    const userVariant = createVariant({ id: "variant-user-merge" });
+    const guestCart = createCartWithItems({
+      id: "guest-cart-merge",
+      variant: guestVariant,
+      quantity: 1,
+      sessionId: "guest-session-merge",
+    });
+    guestCart.userId = null;
+
+    const userCart = createCartWithItems({
+      id: "user-cart-merge",
+      variant: userVariant,
+      quantity: 2,
+      sessionId: null,
+    });
+
+    const overrides = {
+      repository: {
+        findActiveCartBySession: jest.fn(async () => guestCart as CartWithRelations),
+        findActiveCartByUser: jest.fn(async () => userCart as CartWithRelations),
+        findById: jest
+          .fn()
+          .mockResolvedValueOnce(userCart as CartWithRelations)
+          .mockResolvedValue(userCart as CartWithRelations),
+      },
+    } satisfies ServiceOverrides;
+
+    const { service, repository } = createService(overrides);
+    const internal = service as unknown as { applyMergeCarts: jest.Mock };
+    const mergeSpy = jest.spyOn(internal, "applyMergeCarts").mockResolvedValue({
+      mergedItems: 2,
+    });
+
+    const view = await service.mergeCart("user-fixture", {
+      sessionId: "guest-session-merge",
+      strategy: "sum",
+    });
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(mergeSpy).toHaveBeenCalled();
+    expect(view.cart.id).toBe(userCart.id);
+
+    mergeSpy.mockRestore();
   });
 });
