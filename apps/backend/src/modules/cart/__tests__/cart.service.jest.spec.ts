@@ -13,12 +13,36 @@ import type { CartContext } from "../cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
 import { type AddCartItemInput, CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
 
+const CUID_PATTERN = /^c[\da-z]{24}$/;
+
+const ensureCuid = (value: string): string => {
+  if (CUID_PATTERN.test(value)) {
+    return value.toLowerCase();
+  }
+
+  const normalized = value.replaceAll(/[^\da-z]/gi, "").toLowerCase() || "fixture";
+  const repeatCount = Math.ceil(24 / normalized.length) + 1;
+  const repeated = normalized.repeat(repeatCount);
+  return `c${repeated.slice(0, 24)}`;
+};
+
+type CartVariantEntity = NonNullable<CartWithRelations["items"][number]["productVariant"]>;
+type CartProductEntity = NonNullable<CartVariantEntity["product"]>;
+
+const DEFAULT_USER_ID = ensureCuid("user-fixture");
+const DEFAULT_SESSION_ID = "session-fixture";
+const CLAIM_USER_ID = ensureCuid("user-claim");
+
 const createCartFixture = (): CartWithRelations => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
+  const cartId = ensureCuid("ckcartfixture000000000000001");
+  const cartItemId = ensureCuid("ckitemfixture000000000000001");
+  const variantId = ensureCuid("ckvariantfixture00000000001");
+  const productId = ensureCuid("ckproductfixture00000000001");
 
   return {
-    id: "ckcartfixture000000000000001",
-    userId: "ckuserfixture0000000000001",
+    id: cartId,
+    userId: DEFAULT_USER_ID,
     sessionId: "cksessionfixture00000000001",
     status: "ACTIVE",
     expiresAt: null,
@@ -26,15 +50,15 @@ const createCartFixture = (): CartWithRelations => {
     updatedAt: timestamp,
     items: [
       {
-        id: "ckitemfixture000000000000001",
-        cartId: "ckcartfixture000000000000001",
-        productVariantId: "ckvariantfixture00000000001",
+        id: cartItemId,
+        cartId,
+        productVariantId: variantId,
         quantity: 5,
         unitPrice: new Prisma.Decimal("199.00"),
         createdAt: timestamp,
         updatedAt: timestamp,
         productVariant: {
-          id: "ckvariantfixture00000000001",
+          id: variantId,
           title: "Aurora Lamp Variant",
           sku: "SKU-FIXTURE",
           price: new Prisma.Decimal("199.00"),
@@ -46,7 +70,7 @@ const createCartFixture = (): CartWithRelations => {
           createdAt: timestamp,
           updatedAt: timestamp,
           product: {
-            id: "ckproductfixture00000000001",
+            id: productId,
             title: "Aurora Lamp",
             slug: "aurora-lamp",
             price: new Prisma.Decimal("199.00"),
@@ -131,6 +155,21 @@ const spyOnCartInternal = <Method extends keyof CartServiceInternals>(
 ): jest.SpiedFunction<CartServiceInternals[Method]> =>
   jest.spyOn(internals, method) as jest.SpiedFunction<CartServiceInternals[Method]>;
 
+const createTransactionClientMock = (): Prisma.TransactionClient =>
+  ({
+    cart: {
+      update: jest.fn(async () => ({})),
+    },
+    cartItem: {
+      create: jest.fn(async () => ({})),
+      update: jest.fn(async () => ({})),
+      deleteMany: jest.fn(async () => ({})),
+    },
+    productVariant: {
+      findUnique: jest.fn(async () => null),
+    },
+  }) as unknown as Prisma.TransactionClient;
+
 const createService = (overrides: ServiceOverrides = {}) => {
   const cart = overrides.cart ?? createCartFixture();
   const repository: CartRepositoryMock = {
@@ -142,7 +181,7 @@ const createService = (overrides: ServiceOverrides = {}) => {
   };
 
   repository.withTransaction.mockImplementation(async (callback) =>
-    callback(repository as unknown as CartRepository, {} as Prisma.TransactionClient),
+    callback(repository as unknown as CartRepository, createTransactionClientMock()),
   );
 
   if (overrides.repository) {
@@ -189,12 +228,32 @@ const createService = (overrides: ServiceOverrides = {}) => {
   };
 };
 
-const createVariant = (
-  overrides: Partial<NonNullable<CartWithRelations["items"][number]["productVariant"]>> = {},
-): NonNullable<CartWithRelations["items"][number]["productVariant"]> => {
+const createVariant = (overrides: Partial<CartVariantEntity> = {}): CartVariantEntity => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
-  return {
-    id: "variant-base",
+  const { product: productOverride, ...variantOverride } = overrides;
+  const resolvedProductOverride: Partial<CartProductEntity> = productOverride ?? {};
+
+  const baseProduct: CartProductEntity = {
+    id: ensureCuid("product-base"),
+    title: "Aurora Lamp",
+    slug: "aurora-lamp",
+    sku: "SKU-P1",
+    summary: null,
+    description: null,
+    price: new Prisma.Decimal("199.00"),
+    compareAtPrice: null,
+    currency: "TRY",
+    status: ProductStatus.ACTIVE,
+    inventoryPolicy: InventoryPolicy.TRACK,
+    attributes: null,
+    searchKeywords: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    deletedAt: null,
+  };
+
+  const baseVariant: CartVariantEntity = {
+    id: ensureCuid("variant-base"),
     title: "Aurora Variant",
     sku: "SKU-V1",
     price: new Prisma.Decimal("199.00"),
@@ -203,29 +262,27 @@ const createVariant = (
     attributes: null,
     weightGrams: null,
     isPrimary: true,
-    productId: "product-base",
+    productId: baseProduct.id,
     createdAt: timestamp,
     updatedAt: timestamp,
-    product: {
-      id: "product-base",
-      title: "Aurora Lamp",
-      slug: "aurora-lamp",
-      sku: "SKU-P1",
-      summary: null,
-      description: null,
-      price: new Prisma.Decimal("199.00"),
-      compareAtPrice: null,
-      currency: "TRY",
-      status: ProductStatus.ACTIVE,
-      inventoryPolicy: InventoryPolicy.TRACK,
-      attributes: null,
-      searchKeywords: [],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      deletedAt: null,
-    },
-    ...overrides,
+    product: baseProduct,
   };
+
+  const variant: CartVariantEntity = {
+    ...baseVariant,
+    ...variantOverride,
+  };
+  variant.id = ensureCuid(variantOverride.id ?? baseVariant.id);
+
+  const product: CartProductEntity = {
+    ...baseProduct,
+    ...resolvedProductOverride,
+  };
+  product.id = ensureCuid(resolvedProductOverride.id ?? baseProduct.id);
+  variant.product = product;
+  variant.productId = product.id;
+
+  return variant;
 };
 
 const createCartWithItems = ({
@@ -233,16 +290,20 @@ const createCartWithItems = ({
   variant,
   quantity,
   sessionId,
+  userId = DEFAULT_USER_ID,
 }: {
   id: string;
   variant: NonNullable<CartWithRelations["items"][number]["productVariant"]>;
   quantity: number;
   sessionId?: string | null;
+  userId?: string;
 }): CartWithRelations => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
+  const cartId = ensureCuid(id);
+  const itemId = ensureCuid(`${id}-item`);
   return {
-    id,
-    userId: "user-fixture",
+    id: cartId,
+    userId,
     sessionId: sessionId ?? null,
     status: "ACTIVE",
     expiresAt: null,
@@ -250,8 +311,8 @@ const createCartWithItems = ({
     updatedAt: timestamp,
     items: [
       {
-        id: `${id}-item`,
-        cartId: id,
+        id: itemId,
+        cartId,
         productVariantId: variant.id,
         quantity,
         unitPrice: variant.price,
@@ -261,7 +322,7 @@ const createCartWithItems = ({
       },
     ],
     user: {
-      id: "user-fixture",
+      id: userId,
       email: "user@example.com",
       firstName: "Cart",
       lastName: "User",
@@ -305,13 +366,13 @@ const createCartForVariant = (
 };
 
 const createContext = () => ({
-  userId: "user-fixture",
-  sessionId: "session-fixture",
+  userId: DEFAULT_USER_ID,
+  sessionId: DEFAULT_SESSION_ID,
 });
 
 const createAddItemMutation = (): Awaited<ReturnType<ApplyAddItemFn>> => ({
-  itemId: "item-new",
-  variantId: "variant-new",
+  itemId: ensureCuid("item-new"),
+  variantId: ensureCuid("variant-new"),
   previousQuantity: 1,
   newQuantity: 3,
 });
@@ -352,7 +413,7 @@ const createAddItemTransaction = ({
   const existing =
     existingQuantity > 0
       ? {
-          id: `${cart.id}-existing`,
+          id: ensureCuid(`${cart.id}-existing`),
           cartId: cart.id,
           productVariantId: variant.id,
           quantity: existingQuantity,
@@ -360,7 +421,7 @@ const createAddItemTransaction = ({
       : null;
 
   const upsertResult = {
-    id: existing?.id ?? `${cart.id}-item`,
+    id: existing?.id ?? ensureCuid(`${cart.id}-item`),
     cartId: cart.id,
     productVariantId: variant.id,
     quantity: (existing?.quantity ?? 0) + inputQuantity,
@@ -408,7 +469,7 @@ const createUpdateItemEntity = (
   const variantEntity = overrides.includeVariant === false ? null : { ...variant, stock, product };
 
   return {
-    id: `${cart.id}-item`,
+    id: ensureCuid(`${cart.id}-item`),
     cartId: cart.id,
     productVariantId: variant.id,
     quantity,
@@ -438,14 +499,15 @@ const createUpdateTransaction = (
 
 describe("CartService", () => {
   it("evaluates stock shortages during cart validation", async () => {
-    const { service } = createService();
+    const { service, cart } = createService();
+    const expectedVariantId = cart.items[0]?.productVariantId ?? "unknown";
 
-    const report = await service.validateCart({ userId: "user_fixture" });
+    const report = await service.validateCart({ userId: DEFAULT_USER_ID });
 
     expect(report.valid).toBe(false);
     expect(report.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: "out_of_stock", variantId: "ckvariantfixture00000000001" }),
+        expect.objectContaining({ type: "out_of_stock", variantId: expectedVariantId }),
       ]),
     );
   });
@@ -453,16 +515,20 @@ describe("CartService", () => {
   it("caches cart responses for subsequent requests", async () => {
     const {
       service,
+      cart,
       cacheMocks: { get: cacheGet, set: cacheSet },
     } = createService();
 
-    const first = await service.getCart({ userId: "user_fixture", sessionId: "session_fixture" });
-    expect(first.cart.id).toBe("ckcartfixture000000000000001");
+    const first = await service.getCart({ userId: DEFAULT_USER_ID, sessionId: DEFAULT_SESSION_ID });
+    expect(first.cart.id).toBe(cart.id);
     expect(cacheSet).toHaveBeenCalledTimes(2); // user+session scopes
 
     cacheGet.mockResolvedValueOnce(first);
 
-    const second = await service.getCart({ userId: "user_fixture", sessionId: "session_fixture" });
+    const second = await service.getCart({
+      userId: DEFAULT_USER_ID,
+      sessionId: DEFAULT_SESSION_ID,
+    });
     expect(cacheGet).toHaveBeenCalled();
     expect(second).toBe(first);
   });
@@ -559,7 +625,7 @@ describe("CartService", () => {
 
 describe("CartService.applyAddItem", () => {
   const context = {
-    userId: "user-fixture",
+    userId: DEFAULT_USER_ID,
     sessionId: "session-fixture",
   };
 
@@ -756,7 +822,7 @@ describe("CartService.applyAddItem", () => {
 
 describe("CartService.applyUpdateItem", () => {
   const context = {
-    userId: "user-fixture",
+    userId: DEFAULT_USER_ID,
     sessionId: "session-update",
   };
 
@@ -1168,29 +1234,31 @@ describe("CartService public operations", () => {
     });
     guestCart.userId = null;
 
+    const claimedCart = {
+      ...guestCart,
+      userId: CLAIM_USER_ID,
+    } as CartWithRelations;
+
     const overrides: ServiceOverrides = {
       repository: {
         findActiveCartBySession: jest.fn<CartRepository["findActiveCartBySession"]>(
           async () => guestCart as CartWithRelations,
         ),
         findActiveCartByUser: jest.fn<CartRepository["findActiveCartByUser"]>(async () => null),
-        findById: jest
-          .fn<CartRepository["findById"]>()
-          .mockResolvedValueOnce(guestCart as CartWithRelations)
-          .mockResolvedValue(guestCart as CartWithRelations),
+        findById: jest.fn<CartRepository["findById"]>().mockResolvedValue(claimedCart),
       },
     };
 
     const { service, repository } = createService(overrides);
 
-    const view = await service.mergeCart("user-claim", {
+    const view = await service.mergeCart(CLAIM_USER_ID, {
       sessionId: "guest-session",
       strategy: "sum",
     });
 
     expect(repository.withTransaction).toHaveBeenCalled();
     expect(view.cart.id).toBe(guestCart.id);
-    expect(view.cart.userId).toBe("user-claim");
+    expect(view.cart.userId).toBe(CLAIM_USER_ID);
   });
 
   it("merges into existing user cart and tracks merged item count", async () => {
@@ -1233,7 +1301,7 @@ describe("CartService public operations", () => {
       mergedItems: 2,
     });
 
-    const view = await service.mergeCart("user-fixture", {
+    const view = await service.mergeCart(DEFAULT_USER_ID, {
       sessionId: "guest-session-merge",
       strategy: "sum",
     });
