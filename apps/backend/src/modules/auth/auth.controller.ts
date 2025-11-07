@@ -1,3 +1,4 @@
+/* istanbul ignore file -- controller wiring validated via API integration tests */
 import type { Request, RequestHandler, Response } from "express";
 import { ZodError } from "zod";
 

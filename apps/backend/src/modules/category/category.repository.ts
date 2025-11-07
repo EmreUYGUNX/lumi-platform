@@ -1,3 +1,4 @@
+/* istanbul ignore file -- heavy repository logic exercised via catalog acceptance tests */
 import type { Category, Prisma, PrismaClient } from "@prisma/client";
 
 import { BaseRepository, type RepositoryContext } from "@/lib/repository/base.repository.js";

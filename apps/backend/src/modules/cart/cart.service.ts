@@ -1143,3 +1143,8 @@ export class CartService {
     }
   }
 }
+
+export const cartServiceInternals = {
+  toMoney,
+  compareMoney,
+};

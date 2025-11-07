@@ -8,7 +8,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js";
 
 import type { CartCache, CartCacheScope } from "../cart.cache.js";
 import type { CartRepository, CartWithRelations } from "../cart.repository.js";
-import { CartService } from "../cart.service.js";
+import { CartService, cartServiceInternals } from "../cart.service.js";
 import type { CartContext } from "../cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
 import { type AddCartItemInput, CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
@@ -377,6 +377,65 @@ const createAddItemMutation = (): Awaited<ReturnType<ApplyAddItemFn>> => ({
   newQuantity: 3,
 });
 
+interface MaintenanceServiceOptions {
+  staleCarts?: {
+    id: string;
+    user?: {
+      id: string;
+      email?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }[];
+  detailedCart?: CartWithRelations | null;
+}
+
+const createMaintenanceService = (options: MaintenanceServiceOptions = {}) => {
+  const cacheMocks = {
+    get: jest.fn(async () => undefined as CartSummaryView | undefined),
+    set: jest.fn(async () => {}),
+    invalidate: jest.fn(async () => {}),
+    invalidateByCartId: jest.fn(async () => {}),
+    shutdown: jest.fn(async () => {}),
+  };
+  const cache: CartCache = {
+    get: cacheMocks.get as CartCache["get"],
+    set: cacheMocks.set as CartCache["set"],
+    invalidate: cacheMocks.invalidate as CartCache["invalidate"],
+    invalidateByCartId: cacheMocks.invalidateByCartId as CartCache["invalidateByCartId"],
+    shutdown: cacheMocks.shutdown as CartCache["shutdown"],
+  };
+  const emailServiceMock = {
+    sendCartRecoveryEmail: jest.fn(async () => {}),
+  };
+  const repositoryMock = {
+    findById: jest.fn(async () => options.detailedCart ?? null),
+  };
+  const prismaMock = {
+    cart: {
+      findMany: jest.fn(async () => options.staleCarts ?? []),
+      update: jest.fn(async () => {}),
+    },
+  };
+
+  const service = new CartService({
+    repository: repositoryMock as unknown as CartRepository,
+    cache,
+    prisma: prismaMock as unknown as PrismaClient,
+    emailService: emailServiceMock as unknown as EmailService,
+    disableCleanupJob: true,
+    now: () => new Date("2025-03-01T10:00:00.000Z"),
+  });
+
+  return {
+    service,
+    cacheMocks,
+    emailServiceMock,
+    repositoryMock,
+    prismaMock,
+  };
+};
+
 interface AddItemTransactionOptions {
   variant: NonNullable<CartWithRelations["items"][number]["productVariant"]>;
   cart: CartWithRelations;
@@ -531,6 +590,46 @@ describe("CartService", () => {
     });
     expect(cacheGet).toHaveBeenCalled();
     expect(second).toBe(first);
+  });
+
+  it("creates a cart when no active cart exists for the user", async () => {
+    const variant = createVariant({ id: "variant-new-cart" });
+    const createdCart = createCartWithItems({
+      id: "cart-new",
+      variant,
+      quantity: 0,
+      sessionId: null,
+      userId: DEFAULT_USER_ID,
+    });
+    createdCart.items = [];
+
+    const overrides: ServiceOverrides = {
+      repository: {
+        findActiveCartByUser: jest
+          .fn<CartRepository["findActiveCartByUser"]>()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue(createdCart as CartWithRelations),
+        create: jest.fn<CartRepository["create"]>(async () => createdCart as never),
+        findById: jest.fn<CartRepository["findById"]>(async () => createdCart as CartWithRelations),
+      },
+    };
+
+    const {
+      service,
+      cacheMocks: { set: cacheSet },
+    } = createService(overrides);
+
+    const view = await service.getCart({ userId: DEFAULT_USER_ID });
+
+    expect(overrides.repository?.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: DEFAULT_USER_ID,
+        sessionId: null,
+        status: "ACTIVE",
+      }),
+    });
+    expect(cacheSet).toHaveBeenCalledTimes(1); // only user cache due to missing session
+    expect(view.cart.id).toBe(createdCart.id);
   });
 
   it("computes stock warnings when inventory is running low", () => {
@@ -1311,5 +1410,77 @@ describe("CartService public operations", () => {
     expect(view.cart.id).toBe(userCart.id);
 
     mergeSpy.mockRestore();
+  });
+
+  describe("maintenance operations", () => {
+    it("skips cleanup when there are no stale carts", async () => {
+      const { service, cacheMocks, prismaMock } = createMaintenanceService();
+
+      await service.cleanupExpiredCarts();
+
+      expect(prismaMock.cart.update).not.toHaveBeenCalled();
+      expect(cacheMocks.invalidateByCartId).not.toHaveBeenCalled();
+    });
+
+    it("abandons stale carts and triggers recovery emails", async () => {
+      const variant = createVariant({ id: "variant-stale" });
+      const detailedCart = createCartWithItems({
+        id: "stale-cart",
+        variant,
+        quantity: 1,
+        sessionId: null,
+      });
+
+      const { service, cacheMocks, prismaMock, emailServiceMock, repositoryMock } =
+        createMaintenanceService({
+          staleCarts: [
+            {
+              id: detailedCart.id,
+              user: {
+                id: DEFAULT_USER_ID,
+                email: "user@example.com",
+                firstName: "Cart",
+                lastName: "User",
+              },
+            },
+          ],
+          detailedCart,
+        });
+
+      repositoryMock.findById.mockResolvedValueOnce(detailedCart as CartWithRelations);
+
+      await service.cleanupExpiredCarts();
+
+      expect(prismaMock.cart.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: detailedCart.id },
+          data: expect.objectContaining({
+            status: "ABANDONED",
+          }),
+        }),
+      );
+      expect(cacheMocks.invalidateByCartId).toHaveBeenCalledWith(detailedCart.id);
+      expect(emailServiceMock.sendCartRecoveryEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ cartId: detailedCart.id }),
+      );
+    });
+  });
+});
+
+describe("cartServiceInternals", () => {
+  it("converts numeric money values to DTO format", () => {
+    const numeric = cartServiceInternals.toMoney(19.987, "USD");
+    expect(numeric).toEqual({ amount: "19.99", currency: "USD" });
+
+    const fromString = cartServiceInternals.toMoney("42", "USD");
+    expect(fromString.amount).toBe("42.00");
+  });
+
+  it("compares Prisma decimals for equality", () => {
+    const left = new Prisma.Decimal("1.00");
+    const right = new Prisma.Decimal("1");
+    const different = new Prisma.Decimal("2");
+    expect(cartServiceInternals.compareMoney(left, right)).toBe(true);
+    expect(cartServiceInternals.compareMoney(left, different)).toBe(false);
   });
 });

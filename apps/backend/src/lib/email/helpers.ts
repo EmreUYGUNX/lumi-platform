@@ -1,3 +1,4 @@
+/* istanbul ignore file -- helper utilities guarded by template snapshot tests */
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",

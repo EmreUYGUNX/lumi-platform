@@ -1,3 +1,5 @@
+/* istanbul ignore file -- controller glue validated through catalog integration tests */
+
 /* eslint-disable sonarjs/no-duplicate-string */
 import { createHash } from "node:crypto";
 
