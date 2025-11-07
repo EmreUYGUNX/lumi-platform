@@ -9,8 +9,9 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js";
 import type { CartCache, CartCacheScope } from "../cart.cache.js";
 import type { CartRepository, CartWithRelations } from "../cart.repository.js";
 import { CartService } from "../cart.service.js";
+import type { CartContext } from "../cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
-import { CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
+import { type AddCartItemInput, CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
 
 const createCartFixture = (): CartWithRelations => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
@@ -66,22 +67,87 @@ const createCartFixture = (): CartWithRelations => {
   } as unknown as CartWithRelations;
 };
 
+type RepositoryWithTransaction = (
+  callback: (repo: CartRepository, tx: Prisma.TransactionClient) => Promise<unknown>,
+) => Promise<unknown>;
+
+interface CartRepositoryMock {
+  findActiveCartByUser: jest.MockedFunction<CartRepository["findActiveCartByUser"]>;
+  findActiveCartBySession: jest.MockedFunction<CartRepository["findActiveCartBySession"]>;
+  findById: jest.MockedFunction<CartRepository["findById"]>;
+  withTransaction: jest.MockedFunction<RepositoryWithTransaction>;
+  create: jest.MockedFunction<CartRepository["create"]>;
+}
+
 interface ServiceOverrides {
   cart?: CartWithRelations;
-  repository?: Partial<CartRepository>;
+  repository?: Partial<CartRepositoryMock>;
 }
+
+type ApplyAddItemFn = (
+  tx: Prisma.TransactionClient,
+  cart: CartWithRelations,
+  ctx: CartContext,
+  input: AddCartItemInput,
+) => Promise<{
+  itemId: string;
+  variantId: string;
+  previousQuantity: number;
+  newQuantity: number;
+}>;
+
+type ApplyUpdateItemFn = (
+  tx: Prisma.TransactionClient,
+  cart: CartWithRelations,
+  ctx: CartContext,
+  itemId: string,
+  quantity: number,
+) => Promise<{
+  itemId: string;
+  variantId: string;
+  previousQuantity: number;
+  newQuantity: number;
+}>;
+
+type ApplyClearCartFn = (tx: Prisma.TransactionClient, cart: CartWithRelations) => Promise<number>;
+
+type ApplyMergeCartsFn = (
+  tx: Prisma.TransactionClient,
+  guest: CartWithRelations,
+  user: CartWithRelations,
+  strategy: "sum" | "replace",
+) => Promise<{ mergedItems: number }>;
+
+interface CartServiceInternals {
+  applyAddItem: ApplyAddItemFn;
+  applyUpdateItem: ApplyUpdateItemFn;
+  applyClearCart: ApplyClearCartFn;
+  applyMergeCarts: ApplyMergeCartsFn;
+}
+
+const spyOnCartInternal = <Method extends keyof CartServiceInternals>(
+  internals: CartServiceInternals,
+  method: Method,
+): jest.SpiedFunction<CartServiceInternals[Method]> =>
+  jest.spyOn(internals, method) as jest.SpiedFunction<CartServiceInternals[Method]>;
 
 const createService = (overrides: ServiceOverrides = {}) => {
   const cart = overrides.cart ?? createCartFixture();
-  const repository = {
-    findActiveCartByUser: jest.fn(async () => cart),
-    create: jest.fn(),
-    findById: jest.fn(async () => cart),
-    withTransaction: jest.fn(async (callback: (repo: CartRepository, tx: unknown) => unknown) =>
-      callback(repository as unknown as CartRepository, {}),
-    ),
-    ...overrides.repository,
-  } as unknown as CartRepository;
+  const repository: CartRepositoryMock = {
+    findActiveCartByUser: jest.fn<CartRepository["findActiveCartByUser"]>(async () => cart),
+    findActiveCartBySession: jest.fn<CartRepository["findActiveCartBySession"]>(async () => cart),
+    create: jest.fn<CartRepository["create"]>(async () => cart),
+    findById: jest.fn<CartRepository["findById"]>(async () => cart),
+    withTransaction: jest.fn<RepositoryWithTransaction>(),
+  };
+
+  repository.withTransaction.mockImplementation(async (callback) =>
+    callback(repository as unknown as CartRepository, {} as Prisma.TransactionClient),
+  );
+
+  if (overrides.repository) {
+    Object.assign(repository, overrides.repository);
+  }
 
   const cacheGetMock = jest.fn(
     async (_scope: CartCacheScope, _key: string) => undefined as CartSummaryView | undefined,
@@ -103,7 +169,7 @@ const createService = (overrides: ServiceOverrides = {}) => {
   } as unknown as EmailService;
 
   const service = new CartService({
-    repository,
+    repository: repository as unknown as CartRepository,
     cache,
     prisma: {} as PrismaClient,
     disableCleanupJob: true,
@@ -243,7 +309,7 @@ const createContext = () => ({
   sessionId: "session-fixture",
 });
 
-const createAddItemMutation = () => ({
+const createAddItemMutation = (): Awaited<ReturnType<ApplyAddItemFn>> => ({
   itemId: "item-new",
   variantId: "variant-new",
   previousQuantity: 1,
@@ -1014,9 +1080,10 @@ describe("CartService public operations", () => {
       quantity: 2,
     };
 
-    const internal = service as unknown as { applyAddItem: jest.Mock };
+    const internal = service as unknown as CartServiceInternals;
     const mutation = createAddItemMutation();
-    const applySpy = jest.spyOn(internal, "applyAddItem").mockResolvedValue(mutation);
+    const applySpy = spyOnCartInternal(internal, "applyAddItem");
+    applySpy.mockResolvedValue(mutation);
 
     cart.items[0]!.quantity = mutation.newQuantity;
 
@@ -1037,12 +1104,11 @@ describe("CartService public operations", () => {
       quantity: 1,
     };
 
-    const internal = service as unknown as { applyAddItem: jest.Mock };
-    const applySpy = jest
-      .spyOn(internal, "applyAddItem")
-      .mockResolvedValue(createAddItemMutation());
+    const internal = service as unknown as CartServiceInternals;
+    const applySpy = spyOnCartInternal(internal, "applyAddItem");
+    applySpy.mockResolvedValue(createAddItemMutation());
 
-    (repository.findById as jest.Mock).mockResolvedValueOnce(null);
+    repository.findById.mockResolvedValueOnce(null);
 
     await expect(service.addItem(context, input)).rejects.toThrow(NotFoundError);
 
@@ -1057,10 +1123,9 @@ describe("CartService public operations", () => {
       throw new Error("cart fixture missing item");
     }
 
-    const internal = service as unknown as {
-      applyUpdateItem: jest.Mock;
-    };
-    const applySpy = jest.spyOn(internal, "applyUpdateItem").mockResolvedValue({
+    const internal = service as unknown as CartServiceInternals;
+    const applySpy = spyOnCartInternal(internal, "applyUpdateItem");
+    applySpy.mockResolvedValue({
       itemId: item.id,
       variantId: item.productVariantId,
       previousQuantity: 2,
@@ -1080,8 +1145,9 @@ describe("CartService public operations", () => {
     const { service, repository, cart } = createService();
     const context = createContext();
 
-    const internal = service as unknown as { applyClearCart: jest.Mock };
-    const clearSpy = jest.spyOn(internal, "applyClearCart").mockResolvedValue(1);
+    const internal = service as unknown as CartServiceInternals;
+    const clearSpy = spyOnCartInternal(internal, "applyClearCart");
+    clearSpy.mockResolvedValue(1);
 
     const view = await service.clearCart(context);
 
@@ -1102,16 +1168,18 @@ describe("CartService public operations", () => {
     });
     guestCart.userId = null;
 
-    const overrides = {
+    const overrides: ServiceOverrides = {
       repository: {
-        findActiveCartBySession: jest.fn(async () => guestCart as CartWithRelations),
-        findActiveCartByUser: jest.fn(async () => null),
+        findActiveCartBySession: jest.fn<CartRepository["findActiveCartBySession"]>(
+          async () => guestCart as CartWithRelations,
+        ),
+        findActiveCartByUser: jest.fn<CartRepository["findActiveCartByUser"]>(async () => null),
         findById: jest
-          .fn()
+          .fn<CartRepository["findById"]>()
           .mockResolvedValueOnce(guestCart as CartWithRelations)
           .mockResolvedValue(guestCart as CartWithRelations),
       },
-    } satisfies ServiceOverrides;
+    };
 
     const { service, repository } = createService(overrides);
 
@@ -1143,20 +1211,25 @@ describe("CartService public operations", () => {
       sessionId: null,
     });
 
-    const overrides = {
+    const overrides: ServiceOverrides = {
       repository: {
-        findActiveCartBySession: jest.fn(async () => guestCart as CartWithRelations),
-        findActiveCartByUser: jest.fn(async () => userCart as CartWithRelations),
+        findActiveCartBySession: jest.fn<CartRepository["findActiveCartBySession"]>(
+          async () => guestCart as CartWithRelations,
+        ),
+        findActiveCartByUser: jest.fn<CartRepository["findActiveCartByUser"]>(
+          async () => userCart as CartWithRelations,
+        ),
         findById: jest
-          .fn()
+          .fn<CartRepository["findById"]>()
           .mockResolvedValueOnce(userCart as CartWithRelations)
           .mockResolvedValue(userCart as CartWithRelations),
       },
-    } satisfies ServiceOverrides;
+    };
 
     const { service, repository } = createService(overrides);
-    const internal = service as unknown as { applyMergeCarts: jest.Mock };
-    const mergeSpy = jest.spyOn(internal, "applyMergeCarts").mockResolvedValue({
+    const internal = service as unknown as CartServiceInternals;
+    const mergeSpy = spyOnCartInternal(internal, "applyMergeCarts");
+    mergeSpy.mockResolvedValue({
       mergedItems: 2,
     });
 
