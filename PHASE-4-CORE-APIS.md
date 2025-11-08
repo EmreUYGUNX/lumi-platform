@@ -371,84 +371,84 @@ docs/api/
 
 #### 4.1 Order Creation & Lifecycle
 
-- [ ] POST `/api/v1/orders` - Create order (checkout)
-  - [ ] Validate cart not empty
-  - [ ] Validate all items in stock (atomic)
-  - [ ] Validate shipping address
-  - [ ] Validate billing address
-  - [ ] Calculate final totals (tax, shipping, discounts)
-  - [ ] Generate unique order reference
-  - [ ] Reserve inventory atomically
-  - [ ] Create order in PENDING status
-  - [ ] Initialize payment intent
-  - [ ] Send order confirmation email
-  - [ ] Audit log order creation
-  - [ ] Return order with payment details
-- [ ] GET `/api/v1/orders` - List user's orders
-  - [ ] Paginate results
-  - [ ] Filter by status (query param)
-  - [ ] Filter by date range
-  - [ ] Sort by newest first
-  - [ ] Include order items count
-- [ ] GET `/api/v1/orders/:id` - Get order details
-  - [ ] Include all order items
-  - [ ] Include shipping address
-  - [ ] Include billing address
-  - [ ] Include payment details (masked)
-  - [ ] Include status timeline
-  - [ ] Verify user owns order
-- [ ] PUT `/api/v1/orders/:id/cancel` - Cancel order
-  - [ ] Validate order status (PENDING or PAID only)
-  - [ ] Check cancellation deadline
-  - [ ] Release inventory reservation
-  - [ ] Initiate refund if paid
-  - [ ] Update status to CANCELLED
-  - [ ] Send cancellation email
-  - [ ] Audit log cancellation
+- [x] POST `/api/v1/orders` - Create order (checkout)
+  - [x] Validate cart not empty
+  - [x] Validate all items in stock (atomic)
+  - [x] Validate shipping address
+  - [x] Validate billing address
+  - [x] Calculate final totals (tax, shipping, discounts)
+  - [x] Generate unique order reference
+  - [x] Reserve inventory atomically
+  - [x] Create order in PENDING status
+  - [x] Initialize payment intent
+  - [x] Send order confirmation email
+  - [x] Audit log order creation
+  - [x] Return order with payment details
+- [x] GET `/api/v1/orders` - List user's orders
+  - [x] Paginate results
+  - [x] Filter by status (query param)
+  - [x] Filter by date range
+  - [x] Sort by newest first
+  - [x] Include order items count
+- [x] GET `/api/v1/orders/:id` - Get order details
+  - [x] Include all order items
+  - [x] Include shipping address
+  - [x] Include billing address
+  - [x] Include payment details (masked)
+  - [x] Include status timeline
+  - [x] Verify user owns order
+- [x] PUT `/api/v1/orders/:id/cancel` - Cancel order
+  - [x] Validate order status (PENDING or PAID only)
+  - [x] Check cancellation deadline
+  - [x] Release inventory reservation
+  - [x] Initiate refund if paid
+  - [x] Update status to CANCELLED
+  - [x] Send cancellation email
+  - [x] Audit log cancellation
 
 #### 4.2 Order Tracking
 
-- [ ] GET `/api/v1/orders/:reference/track` - Public order tracking
-  - [ ] Validate order reference format
-  - [ ] Return order status timeline
-  - [ ] Include shipment tracking info
-  - [ ] Include estimated delivery date
-  - [ ] No authentication required (public endpoint)
+- [x] GET `/api/v1/orders/:reference/track` - Public order tracking
+  - [x] Validate order reference format
+  - [x] Return order status timeline
+  - [x] Include shipment tracking info
+  - [x] Include estimated delivery date
+  - [x] No authentication required (public endpoint)
 
 #### 4.3 Admin Order Management
 
-- [ ] GET `/api/v1/admin/orders` - List all orders
-  - [ ] Advanced filtering (status, date, user, amount)
-  - [ ] Search by order reference
-  - [ ] Search by customer email
-  - [ ] Export to CSV option
-  - [ ] Include revenue statistics
-- [ ] GET `/api/v1/admin/orders/:id` - Get order details (admin view)
-  - [ ] Include customer information
-  - [ ] Include payment provider details
-  - [ ] Include fraud detection data
-  - [ ] Include internal notes
-- [ ] PUT `/api/v1/admin/orders/:id/status` - Update order status
-  - [ ] Validate status transition rules
-  - [ ] Send notification on status change
-  - [ ] Update inventory if fulfilled
-  - [ ] Audit log status change
-- [ ] POST `/api/v1/admin/orders/:id/notes` - Add internal note
-  - [ ] Timestamp and admin user ID
-  - [ ] Support markdown formatting
-- [ ] POST `/api/v1/admin/orders/:id/refund` - Process refund
-  - [ ] Validate refund amount <= paid amount
-  - [ ] Call payment provider refund API
-  - [ ] Update order status
-  - [ ] Restore inventory if applicable
-  - [ ] Send refund confirmation email
-  - [ ] Audit log refund
-- [ ] GET `/api/v1/admin/orders/stats` - Order statistics
-  - [ ] Total orders by status
-  - [ ] Revenue by date range
-  - [ ] Average order value
-  - [ ] Top products
-  - [ ] Conversion rate
+- [x] GET `/api/v1/admin/orders` - List all orders
+  - [x] Advanced filtering (status, date, user, amount)
+  - [x] Search by order reference
+  - [x] Search by customer email
+  - [x] Export to CSV option
+  - [x] Include revenue statistics
+- [x] GET `/api/v1/admin/orders/:id` - Get order details (admin view)
+  - [x] Include customer information
+  - [x] Include payment provider details
+  - [x] Include fraud detection data
+  - [x] Include internal notes
+- [x] PUT `/api/v1/admin/orders/:id/status` - Update order status
+  - [x] Validate status transition rules
+  - [x] Send notification on status change
+  - [x] Update inventory if fulfilled
+  - [x] Audit log status change
+- [x] POST `/api/v1/admin/orders/:id/notes` - Add internal note
+  - [x] Timestamp and admin user ID
+  - [x] Support markdown formatting
+- [x] POST `/api/v1/admin/orders/:id/refund` - Process refund
+  - [x] Validate refund amount <= paid amount
+  - [x] Call payment provider refund API
+  - [x] Update order status
+  - [x] Restore inventory if applicable
+  - [x] Send refund confirmation email
+  - [x] Audit log refund
+- [x] GET `/api/v1/admin/orders/stats` - Order statistics
+  - [x] Total orders by status
+  - [x] Revenue by date range
+  - [x] Average order value
+  - [x] Top products
+  - [x] Conversion rate
 
 ---
 
