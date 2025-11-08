@@ -52,6 +52,17 @@ const ACTIVE_RESERVATION_STATUSES: InventoryReservationStatus[] = [
 const PRODUCT_INACTIVE_MESSAGE = "This product is no longer available.";
 const VARIANT_UNAVAILABLE_MESSAGE = "The selected product variant is no longer available.";
 
+interface CartVariantInventory {
+  id: string;
+  productVariantId: string;
+  quantityAvailable: number;
+  quantityReserved: number;
+  quantityOnHand: number;
+  lowStockThreshold: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface CartProductVariant {
   id: string;
   title: string;
@@ -65,12 +76,7 @@ interface CartProductVariant {
   isPrimary: boolean;
   createdAt: Date;
   updatedAt: Date;
-  inventory: {
-    quantityAvailable: number;
-    quantityReserved: number;
-    quantityOnHand: number;
-    lowStockThreshold: number | null;
-  } | null;
+  inventory: CartVariantInventory | null;
   product: {
     id: string;
     title: string;
@@ -409,13 +415,18 @@ export class CartService {
 
   async validateCart(
     context: CartContext,
-    options: ValidateCartQueryInput = {},
+    options: Partial<ValidateCartQueryInput> = {},
   ): Promise<CartValidationReport> {
+    const resolvedOptions: ValidateCartQueryInput = {
+      includeTotals: true,
+      reserveInventory: false,
+      ...options,
+    };
     const cart = await this.ensureActiveCartForUser(context);
     const baseReport = this.evaluateCart(cart);
     recordCartOperationMetric("validate_cart");
 
-    if (options.reserveInventory) {
+    if (resolvedOptions.reserveInventory) {
       if (!baseReport.valid) {
         throw new ConflictError("Unable to reserve inventory for an invalid cart.", {
           details: {
@@ -860,6 +871,7 @@ export class CartService {
       where: { id: input.productVariantId },
       include: {
         product: true,
+        inventory: true,
       },
     });
 
@@ -962,6 +974,7 @@ export class CartService {
         productVariant: {
           include: {
             product: true,
+            inventory: true,
           },
         },
         cart: true,
@@ -1093,7 +1106,7 @@ export class CartService {
     });
     const variants = await tx.productVariant.findMany({
       where: { id: { in: variantIds } },
-      include: { product: true },
+      include: { product: true, inventory: true },
     });
     const variantLookup = new Map(variants.map((variant) => [variant.id, variant]));
 

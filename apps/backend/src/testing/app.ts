@@ -7,6 +7,7 @@ import type { CreateAppOptions } from "../app.js";
 import { NotFoundError } from "../lib/errors.js";
 import type { CartService } from "../modules/cart/cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../modules/cart/cart.types.js";
+import type { ValidateCartQueryInput } from "../modules/cart/cart.validators.js";
 import type {
   CatalogService,
   CategoryDetailResult,
@@ -168,7 +169,7 @@ const createCartServiceStub = () => {
     removeItem: async () => emptyCart,
     clearCart: async () => emptyCart,
     mergeCart: async () => emptyCart,
-    validateCart: async (_context: unknown, options?: { reserveInventory?: boolean }) =>
+    validateCart: async (_context: unknown, options?: Partial<ValidateCartQueryInput>) =>
       options?.reserveInventory ? { ...validationReport, reservation } : validationReport,
     cleanupExpiredCarts: async () => {},
     shutdown: async () => {},

@@ -155,14 +155,39 @@ const spyOnCartInternal = <Method extends keyof CartServiceInternals>(
 ): jest.SpiedFunction<CartServiceInternals[Method]> =>
   jest.spyOn(internals, method) as jest.SpiedFunction<CartServiceInternals[Method]>;
 
-const createTransactionClientMock = (): Prisma.TransactionClient => {
+interface TransactionMockOptions {
+  reservation?: {
+    id?: string;
+    cartId?: string;
+    userId?: string;
+    status?: InventoryReservationStatus;
+    expiresAt?: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
+    items?: {
+      id: string;
+      reservationId: string;
+      productVariantId: string;
+      quantity: number;
+      createdAt: Date;
+      updatedAt: Date;
+    }[];
+  };
+}
+
+const createTransactionClientMock = (
+  options: TransactionMockOptions = {},
+): Prisma.TransactionClient => {
+  const timestamp = new Date("2025-03-01T11:00:00.000Z");
   const reservation = {
-    id: ensureCuid("reservation"),
-    cartId: ensureCuid("cart"),
-    userId: DEFAULT_USER_ID,
-    status: InventoryReservationStatus.ACTIVE,
-    expiresAt: new Date("2025-03-01T11:00:00.000Z"),
-    items: [],
+    id: options.reservation?.id ?? ensureCuid("reservation"),
+    cartId: options.reservation?.cartId ?? ensureCuid("cart"),
+    userId: options.reservation?.userId ?? DEFAULT_USER_ID,
+    status: options.reservation?.status ?? InventoryReservationStatus.ACTIVE,
+    expiresAt: options.reservation?.expiresAt ?? timestamp,
+    createdAt: options.reservation?.createdAt ?? timestamp,
+    updatedAt: options.reservation?.updatedAt ?? timestamp,
+    items: options.reservation?.items ?? [],
   };
 
   return {
@@ -250,7 +275,7 @@ const createService = (overrides: ServiceOverrides = {}) => {
 
 const createVariant = (overrides: Partial<CartVariantEntity> = {}): CartVariantEntity => {
   const timestamp = new Date("2025-03-01T10:00:00.000Z");
-  const { product: productOverride, ...variantOverride } = overrides;
+  const { product: productOverride, inventory: inventoryOverride, ...variantOverride } = overrides;
   const resolvedProductOverride: Partial<CartProductEntity> = productOverride ?? {};
 
   const baseProduct: CartProductEntity = {
@@ -272,7 +297,7 @@ const createVariant = (overrides: Partial<CartVariantEntity> = {}): CartVariantE
     deletedAt: null,
   };
 
-  const baseVariant: CartVariantEntity = {
+  const baseVariant: Omit<CartVariantEntity, "product" | "inventory"> = {
     id: ensureCuid("variant-base"),
     title: "Aurora Variant",
     sku: "SKU-V1",
@@ -285,24 +310,45 @@ const createVariant = (overrides: Partial<CartVariantEntity> = {}): CartVariantE
     productId: baseProduct.id,
     createdAt: timestamp,
     updatedAt: timestamp,
-    product: baseProduct,
   };
-
-  const variant: CartVariantEntity = {
-    ...baseVariant,
-    ...variantOverride,
-  };
-  variant.id = ensureCuid(variantOverride.id ?? baseVariant.id);
 
   const product: CartProductEntity = {
     ...baseProduct,
     ...resolvedProductOverride,
   };
   product.id = ensureCuid(resolvedProductOverride.id ?? baseProduct.id);
-  variant.product = product;
-  variant.productId = product.id;
 
-  return variant;
+  const variantId = ensureCuid(variantOverride.id ?? baseVariant.id);
+
+  const resolvedInventory =
+    (inventoryOverride as CartVariantEntity["inventory"]) ??
+    ({
+      id: ensureCuid(`inventory-${variantId}`),
+      productVariantId: variantId,
+      quantityAvailable: variantOverride.stock ?? baseVariant.stock,
+      quantityReserved: 0,
+      quantityOnHand: variantOverride.stock ?? baseVariant.stock,
+      lowStockThreshold: 5,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    } satisfies CartVariantEntity["inventory"]);
+
+  return {
+    ...baseVariant,
+    ...variantOverride,
+    id: variantId,
+    productId: product.id,
+    product,
+    inventory: resolvedInventory
+      ? {
+          ...resolvedInventory,
+          id: resolvedInventory.id ?? ensureCuid(`inventory-${variantId}`),
+          productVariantId: variantId,
+          createdAt: resolvedInventory.createdAt ?? timestamp,
+          updatedAt: resolvedInventory.updatedAt ?? timestamp,
+        }
+      : null,
+  };
 };
 
 const createCartWithItems = ({
@@ -504,6 +550,7 @@ const createAddItemTransaction = ({
       inventoryPolicy: resolvedInventoryPolicy,
       status: resolvedProductStatus,
     },
+    inventory: variant.inventory,
   };
 
   const existing =
@@ -569,7 +616,15 @@ const createUpdateItemEntity = (
     status: variant.product.status,
   };
 
-  const variantEntity = overrides.includeVariant === false ? null : { ...variant, stock, product };
+  const variantEntity =
+    overrides.includeVariant === false
+      ? null
+      : {
+          ...variant,
+          stock,
+          product,
+          inventory: variant.inventory,
+        };
 
   return {
     id: ensureCuid(`${cart.id}-item`),
@@ -650,27 +705,30 @@ describe("CartService", () => {
       variant,
       quantity: 2,
     });
-    const { service, repository } = createService({ cart: reservableCart });
-    const tx = createTransactionClientMock();
-    const expiresAt = new Date("2025-03-01T12:00:00.000Z");
     const reservationId = ensureCuid("reservation-ctx");
-    (tx.inventoryReservation.create as jest.Mock).mockResolvedValue({
-      id: reservationId,
-      cartId: reservableCart.id,
-      userId: reservableCart.userId ?? DEFAULT_USER_ID,
-      status: InventoryReservationStatus.ACTIVE,
-      expiresAt,
-      items: [
-        {
-          id: ensureCuid("reservation-item"),
-          reservationId,
-          productVariantId: reservableCart.items[0]!.productVariantId,
-          quantity: reservableCart.items[0]!.quantity,
-          createdAt: expiresAt,
-          updatedAt: expiresAt,
-        },
-      ],
+    const expiresAt = new Date("2025-03-01T12:00:00.000Z");
+    const tx = createTransactionClientMock({
+      reservation: {
+        id: reservationId,
+        cartId: reservableCart.id,
+        userId: reservableCart.userId ?? DEFAULT_USER_ID,
+        status: InventoryReservationStatus.ACTIVE,
+        expiresAt,
+        createdAt: expiresAt,
+        updatedAt: expiresAt,
+        items: [
+          {
+            id: ensureCuid("reservation-item"),
+            reservationId,
+            productVariantId: reservableCart.items[0]!.productVariantId,
+            quantity: reservableCart.items[0]!.quantity,
+            createdAt: expiresAt,
+            updatedAt: expiresAt,
+          },
+        ],
+      },
     });
+    const { service, repository } = createService({ cart: reservableCart });
 
     repository.withTransaction.mockImplementation(async (callback) =>
       callback(repository as unknown as CartRepository, tx),
