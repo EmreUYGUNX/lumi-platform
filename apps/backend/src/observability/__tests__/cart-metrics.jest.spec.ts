@@ -8,18 +8,21 @@ const createCounterMock = jest.fn(() => ({
   labels: labelsMock,
 }));
 const isMetricsEnabledMock = jest.fn(() => true);
-const loggerDebugMock = jest.fn();
+let loggerDebugMock: jest.Mock;
 
 jest.mock("../metrics.js", () => ({
   createCounter: createCounterMock,
   isMetricsCollectionEnabled: isMetricsEnabledMock,
 }));
 
-jest.mock("../../lib/logger.js", () => ({
-  logger: {
-    debug: loggerDebugMock,
-  },
-}));
+jest.mock("../../lib/logger.js", () => {
+  loggerDebugMock = jest.fn();
+  return {
+    logger: {
+      debug: loggerDebugMock,
+    },
+  };
+});
 
 describe("cart metrics", () => {
   beforeEach(() => {
