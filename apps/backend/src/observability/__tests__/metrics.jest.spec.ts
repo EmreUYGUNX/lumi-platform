@@ -27,21 +27,33 @@ const BASE_ENV = {
   CI: "true",
 } as const;
 
+const loadConfigModule = async () => import("../../config/index.js");
+
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+let activeMetricsModule: Awaited<ReturnType<typeof import("../metrics.js")>> | undefined;
+
+const importMetricsModule = async () => {
+  const module = await import("../metrics.js");
+  activeMetricsModule = module;
+  return module;
+};
+
 beforeEach(() => {
   jest.resetModules();
+  activeMetricsModule = undefined;
 });
 
 afterEach(() => {
+  activeMetricsModule?.metricsInternals.resetForTest();
+  activeMetricsModule = undefined;
   resetEnvironmentCache();
   jest.resetModules();
 });
 
-const loadConfigModule = async () => import("../../config/index.js");
-
 describe("metrics", () => {
   it("generates prefixed metrics and exposes registry snapshot", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const counter = metrics.createCounter({
         name: "custom_requests_total",
         help: "Counts HTTP requests.",
@@ -71,7 +83,7 @@ describe("metrics", () => {
         METRICS_ENABLED: "false",
       },
       async () => {
-        const metrics = await import("../metrics.js");
+        const metrics = await importMetricsModule();
         const snapshot = await metrics.getMetricsSnapshot();
         expect(snapshot).toBe("");
       },
@@ -80,7 +92,7 @@ describe("metrics", () => {
 
   it("reconfigures metrics on environment reload", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       expect(metrics.isMetricsCollectionEnabled()).toBe(true);
       process.env.METRICS_ENABLED = "false";
       const { reloadConfiguration } = await loadConfigModule();
@@ -91,7 +103,7 @@ describe("metrics", () => {
 
   it("skips async timers when metrics disabled", async () => {
     await withTemporaryEnvironment({ ...BASE_ENV, METRICS_ENABLED: "false" }, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const histogram = {
         startTimer: jest.fn(() => jest.fn()),
       } as unknown as Parameters<typeof metrics.trackDurationAsync>[0];
@@ -103,7 +115,7 @@ describe("metrics", () => {
 
   it("stops async timers when the wrapped operation throws", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const end = jest.fn();
       const histogram = {
         startTimer: jest.fn(() => end),
@@ -119,7 +131,7 @@ describe("metrics", () => {
 
   it("reuses existing counter instances when requesting the same metric", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const first = metrics.createCounter({ name: "duplicate_counter", help: "Dup" });
       const second = metrics.createCounter({ name: "duplicate_counter", help: "Dup" });
       expect(second).toBe(first);
@@ -128,7 +140,7 @@ describe("metrics", () => {
 
   it("records async durations when metrics are enabled", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const end = jest.fn();
       const histogram = {
         startTimer: jest.fn(() => end),
@@ -141,7 +153,7 @@ describe("metrics", () => {
 
   it("records uptime gauge immediately when requested", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const gauge = metrics.metricsRegistry.getSingleMetric("lumi_uptime_seconds");
       expect(gauge).toBeDefined();
       const setSpy = jest.spyOn(gauge as unknown as { set: (value: number) => void }, "set");
@@ -153,7 +165,7 @@ describe("metrics", () => {
 
   it("does not double prefix metric names that already contain the prefix", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const gauge = metrics.createGauge({
         name: "lumi_existing_metric",
         help: "Prefixed gauge",
@@ -165,7 +177,7 @@ describe("metrics", () => {
 
   it("logs failures when HTTP metric instruments throw", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const { logger } = await import("../../lib/logger.js");
 
       interface HistogramMetric {
@@ -210,7 +222,7 @@ describe("metrics", () => {
 
   it("normalises and records observed HTTP metrics", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const { logger } = await import("../../lib/logger.js");
 
       interface HistogramLabels {
@@ -272,7 +284,7 @@ describe("metrics", () => {
       },
       async () => {
         jest.resetModules();
-        const metrics = await import("../metrics.js");
+        const metrics = await importMetricsModule();
         expect(metrics.isMetricsCollectionEnabled()).toBe(true);
         expect(metrics.metricsInternals.isDefaultCollectorActive()).toBe(true);
 
@@ -291,7 +303,7 @@ describe("metrics", () => {
         METRICS_ENABLED: "false",
       },
       async () => {
-        const metrics = await import("../metrics.js");
+        const metrics = await importMetricsModule();
         const end = jest.fn();
         const histogram = {
           startTimer: jest.fn(() => end),
@@ -307,7 +319,7 @@ describe("metrics", () => {
 
   it("records HTTP metrics through observation helpers", async () => {
     await withTemporaryEnvironment(BASE_ENV, async () => {
-      const metrics = await import("../metrics.js");
+      const metrics = await importMetricsModule();
       const stopTimer = metrics.beginHttpRequestObservation("get", "api/v1/users/:id");
       stopTimer("200");
 
@@ -338,7 +350,7 @@ describe("metrics", () => {
       },
       async () => {
         jest.resetModules();
-        const metrics = await import("../metrics.js");
+        const metrics = await importMetricsModule();
         expect(metrics.metricsInternals.getUptimeIntervalMs()).toBe(2000);
         metrics.metricsInternals.resetForTest();
       },

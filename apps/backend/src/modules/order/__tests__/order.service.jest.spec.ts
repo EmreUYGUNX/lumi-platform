@@ -24,7 +24,7 @@ import type { PaymentRepository } from "../../payment/payment.repository.js";
 import type { OrderRepository } from "../order.repository.js";
 import { OrderService } from "../order.service.js";
 import type { OrderContext } from "../order.service.js";
-import type { CreateOrderInput } from "../order.validators.js";
+import type { AdminOrderListQuery, CreateOrderInput } from "../order.validators.js";
 
 type AsyncRepositoryMock = jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
 type CartServiceContract = Pick<CartService, "validateCart">;
@@ -216,6 +216,13 @@ const createService = (
     addressRepository: addressRepositoryImpl,
   };
 };
+
+const getAdminWhereBuilder = () =>
+  (
+    OrderService as unknown as {
+      buildAdminWhere: (query: AdminOrderListQuery) => Record<string, unknown>;
+    }
+  ).buildAdminWhere;
 
 const createProductFixture = () => ({
   id: PRODUCT_ID,
@@ -1118,5 +1125,60 @@ describe("OrderService", () => {
     );
 
     jest.useRealTimers();
+  });
+
+  describe("buildAdminWhere", () => {
+    it("maps filter fields into prisma where clauses", () => {
+      const buildWhere = getAdminWhereBuilder();
+      const result = buildWhere({
+        page: 1,
+        pageSize: 25,
+        format: "json",
+        includeStats: true,
+        filter: {
+          status: [OrderStatus.PAID, OrderStatus.CANCELLED],
+          userId: "user-1",
+          reference: "LM-123",
+          createdAt: { from: "2025-01-01T00:00:00.000Z", to: "2025-02-01T00:00:00.000Z" },
+          updatedAt: { from: "2025-02-05T00:00:00.000Z" },
+          totalAmount: { min: "100", max: "250" },
+        },
+      } as unknown as AdminOrderListQuery);
+
+      expect(result.status).toEqual({ in: [OrderStatus.PAID, OrderStatus.CANCELLED] });
+      expect(result.userId).toBe("user-1");
+      expect(result.reference).toBe("LM-123");
+      expect(result.createdAt).toEqual({
+        gte: new Date("2025-01-01T00:00:00.000Z"),
+        lte: new Date("2025-02-01T00:00:00.000Z"),
+      });
+      expect(result.updatedAt).toEqual({
+        gte: new Date("2025-02-05T00:00:00.000Z"),
+        lte: undefined,
+      });
+      expect(result.totalAmount).toMatchObject({
+        gte: expect.any(Prisma.Decimal),
+        lte: expect.any(Prisma.Decimal),
+      });
+    });
+
+    it("overrides amount filters with top-level limits and normalises emails", () => {
+      const buildWhere = getAdminWhereBuilder();
+      const result = buildWhere({
+        page: 1,
+        pageSize: 25,
+        format: "json",
+        includeStats: true,
+        userEmail: "CUSTOMER@EXAMPLE.COM",
+        minTotal: "500",
+        maxTotal: "900",
+      } as unknown as AdminOrderListQuery);
+
+      expect(result.user).toEqual({ email: "customer@example.com" });
+      expect(result.totalAmount).toEqual({
+        gte: new Prisma.Decimal("500"),
+        lte: new Prisma.Decimal("900"),
+      });
+    });
   });
 });

@@ -21,7 +21,7 @@ const createController = () => {
       },
     })),
     getUserOrder: jest.fn(),
-    cancelOrder: jest.fn(),
+    cancelOrder: jest.fn(async () => ({ status: "CANCELLED" })),
     trackOrder: jest.fn(),
     listAdminOrders: jest.fn(async () => ({
       items: [],
@@ -42,7 +42,7 @@ const createController = () => {
     getAdminOrder: jest.fn(),
     updateOrderStatus: jest.fn(),
     addInternalNote: jest.fn(),
-    processRefund: jest.fn(),
+    processRefund: jest.fn(async () => ({ status: "CANCELLED" })),
     getOrderStats: jest.fn(async () => ({
       totalOrders: {
         PENDING: 0,
@@ -252,5 +252,171 @@ describe("OrderController", () => {
       };
     };
     expect(payload.meta?.summary?.totalOrders).toBe(0);
+  });
+
+  it("validates identifiers when retrieving orders", async () => {
+    const { controller } = createController();
+    const handler = controller.getOrder;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      {
+        user: { id: "user-1", email: "user@example.com", sessionId: "sess-1" },
+        params: {},
+      } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it("validates identifiers when admins attempt to add notes", async () => {
+    const { controller } = createController();
+    const handler = controller.adminAddNote;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      { params: {}, body: { message: "Note" }, user: { id: "admin" } } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it("validates identifiers when admins fetch order details", async () => {
+    const { controller } = createController();
+    const handler = controller.adminGetOrder;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler({ params: {} } as unknown as Request, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it("requires authentication when admins add internal notes", async () => {
+    const { controller } = createController();
+    const handler = controller.adminAddNote;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      {
+        params: { id: "ckorder0000000000000000001" },
+        body: { message: "Limited" },
+      } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+  });
+
+  it("processes admin refunds and records audit entries", async () => {
+    const { controller, service } = createController();
+    const handler = controller.adminProcessRefund;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      {
+        params: { id: "ckorder0000000000000000001" },
+        body: { type: "full" },
+      } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(service.processRefund).toHaveBeenCalledWith(
+      "ckorder0000000000000000001",
+      expect.objectContaining({ type: "full" }),
+    );
+    expect(res.locals.audit).toMatchObject({ action: "orders.refund" });
+  });
+
+  it("validates identifiers when updating order status", async () => {
+    const { controller } = createController();
+    const handler = controller.adminUpdateStatus;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler({ params: {} } as unknown as Request, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it("validates identifiers when admins process refunds", async () => {
+    const { controller } = createController();
+    const handler = controller.adminProcessRefund;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler({ params: {}, body: {} } as unknown as Request, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it("cancels orders using parsed request payloads", async () => {
+    const { controller, service } = createController();
+    const handler = controller.cancelOrder;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      {
+        user: { id: "user-1", email: "user@example.com", sessionId: "sess-1" },
+        params: { id: "ckorder0000000000000000001" },
+        body: { reason: "Changed mind" },
+      } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(service.cancelOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1" }),
+      "ckorder0000000000000000001",
+      expect.objectContaining({ reason: "Changed mind" }),
+    );
+    expect(res.locals.audit).toMatchObject({ action: "orders.cancel" });
+  });
+
+  it("omits summary metadata when admin listings lack aggregates", async () => {
+    const { controller, service } = createController();
+    service.listAdminOrders.mockResolvedValueOnce({
+      items: [],
+      meta: {
+        page: 1,
+        pageSize: 25,
+        totalItems: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    } as never);
+    const handler = controller.adminListOrders;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler({ query: { page: "1", pageSize: "25" } } as unknown as Request, res, next);
+
+    const payload = res.json.mock.calls[0]?.[0] as { meta?: { summary?: unknown } };
+    expect(payload.meta?.summary).toBeUndefined();
+  });
+
+  it("parses stats queries even when the request lacks query parameters", async () => {
+    const { controller, service } = createController();
+    const handler = controller.adminStats;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler({ query: undefined } as unknown as Request, res, next);
+
+    expect(service.getOrderStats).toHaveBeenCalledWith(
+      expect.objectContaining({ range: expect.any(String) }),
+    );
   });
 });

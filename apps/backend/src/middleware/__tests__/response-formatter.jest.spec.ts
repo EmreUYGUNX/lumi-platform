@@ -137,6 +137,22 @@ describe("response formatter middleware", () => {
     expect(body.error.message).toBe("An unexpected error occurred");
   });
 
+  it("wraps primitive error payloads with the fallback error handler", async () => {
+    const app = express();
+    app.use(responseFormatter);
+    app.get("/string-error", (_req, res) => {
+      res.status(500).json("catastrophic failure");
+    });
+
+    const api = createApiClient(app);
+    const response = await api.get("/string-error").expect(500);
+    const body = response.body as ErrorResponse;
+
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("UNHANDLED_ERROR");
+    expect(body.error.message).toBe("An unexpected error occurred");
+  });
+
   it("honours explicit error payloads without full response envelopes", async () => {
     const app = express();
     app.use(responseFormatter);
@@ -154,6 +170,42 @@ describe("response formatter middleware", () => {
 
     expect(body.error.code).toBe("INPUT_INVALID");
     expect(body.error.details?.[0]?.message).toBe("Email address invalid");
+  });
+
+  it("normalises complex error detail inputs when formatting errors", () => {
+    const error = formatError({
+      code: "COMPLEX",
+      message: "invalid",
+      details: [
+        { field: 123, message: "", hint: "alpha" },
+        "plain issue",
+        // eslint-disable-next-line unicorn/no-null -- null inputs should be ignored
+        null,
+        { field: "email", extras: "value" },
+        42,
+      ],
+    });
+
+    expect(error.error.details).toEqual([
+      { message: "Validation error", hint: "alpha" },
+      { message: "plain issue" },
+      { field: "email", message: "Validation error", extras: "value" },
+      { message: "42" },
+    ]);
+  });
+
+  it("omits error details when provided values normalise to nothing", () => {
+    const error = formatError({
+      code: "EMPTY",
+      message: "noop",
+      details: [
+        // eslint-disable-next-line unicorn/no-null -- null inputs should be ignored
+        null,
+        undefined,
+      ],
+    });
+
+    expect(error.error.details).toBeUndefined();
   });
 
   it("preserves formatted success payloads that already include metadata", async () => {
