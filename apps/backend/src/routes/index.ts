@@ -152,7 +152,6 @@ export const createV1Router = (
       ...options.orderOptions,
     }),
   );
-
   return router;
 };
 
