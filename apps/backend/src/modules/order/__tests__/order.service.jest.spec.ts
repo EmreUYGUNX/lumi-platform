@@ -439,14 +439,14 @@ describe("OrderService", () => {
         loadCart: (...args: unknown[]) => Promise<CartWithRelations>;
       },
       "loadCart",
-    ) as jest.MockedFunction<(...args: unknown[]) => Promise<CartWithRelations>>;
+    ) as unknown as jest.MockedFunction<(...args: unknown[]) => Promise<CartWithRelations>>;
     loadCartSpy.mockResolvedValue(createCartFixture());
     const decrementSpy = jest.spyOn(
       OrderService as unknown as {
         decrementInventory: (...args: unknown[]) => Promise<void>;
       },
       "decrementInventory",
-    ) as jest.MockedFunction<(...args: unknown[]) => Promise<void>>;
+    ) as unknown as jest.MockedFunction<(...args: unknown[]) => Promise<void>>;
     decrementSpy.mockResolvedValue();
 
     tx.order.create.mockResolvedValue({ id: ORDER_ID });
