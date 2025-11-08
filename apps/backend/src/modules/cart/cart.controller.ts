@@ -129,8 +129,8 @@ export class CartController {
 
   private async handleValidateCart(req: Request, res: Response): Promise<void> {
     const context = ensureUserContext(req);
-    validateCartQuerySchema.parse(req.query);
-    const report = await this.service.validateCart(context);
+    const query = validateCartQuerySchema.parse(req.query);
+    const report = await this.service.validateCart(context, query);
     res.json(successResponse(report));
   }
 }

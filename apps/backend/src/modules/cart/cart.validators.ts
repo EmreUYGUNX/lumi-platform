@@ -43,6 +43,10 @@ export const validateCartQuerySchema = z
       .union([z.boolean(), z.string().transform((value) => value === "true")])
       .optional()
       .default(true),
+    reserveInventory: z
+      .union([z.boolean(), z.string().transform((value) => value === "true")])
+      .optional()
+      .default(false),
   })
   .strict();
 

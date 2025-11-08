@@ -205,11 +205,39 @@ describe("CartController", () => {
       next,
     );
 
-    expect(service.validateCart).toHaveBeenCalledWith({
-      userId: "user-validate",
-      sessionId: "session-validate",
-    });
+    expect(service.validateCart).toHaveBeenCalledWith(
+      {
+        userId: "user-validate",
+        sessionId: "session-validate",
+      },
+      expect.objectContaining({
+        includeTotals: false,
+        reserveInventory: false,
+      }),
+    );
     expect(res.json).toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("requests inventory reservation when flag is provided", async () => {
+    const { controller, service } = createController();
+    const handler = controller.validateCart;
+    const res = createResponse();
+    const next = jest.fn();
+
+    await handler(
+      {
+        user: { id: "user-reserve", sessionId: "session-reserve" },
+        query: { reserveInventory: "true" },
+      } as unknown as Request,
+      res,
+      next,
+    );
+
+    expect(service.validateCart).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-reserve" }),
+      expect.objectContaining({ reserveInventory: true }),
+    );
     expect(next).not.toHaveBeenCalled();
   });
 });

@@ -93,6 +93,14 @@ export type CartValidationIssue =
       actualUnitPrice: MoneyDTO;
     });
 
+export interface CartReservationInfo {
+  id: string;
+  cartId: string;
+  status: "pending" | "active";
+  expiresAt: string;
+  itemCount: number;
+}
+
 export interface CartValidationReport {
   cartId: string;
   valid: boolean;
@@ -100,4 +108,5 @@ export interface CartValidationReport {
   stock: CartStockStatus;
   totals: CartSummaryDTO["totals"];
   checkedAt: string;
+  reservation?: CartReservationInfo;
 }

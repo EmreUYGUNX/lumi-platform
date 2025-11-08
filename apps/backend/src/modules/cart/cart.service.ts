@@ -1,7 +1,7 @@
 /* eslint-disable max-lines, unicorn/no-null */
 import { setInterval as scheduleInterval } from "node:timers";
 
-import { InventoryPolicy, Prisma, ProductStatus } from "@prisma/client";
+import { InventoryPolicy, InventoryReservationStatus, Prisma, ProductStatus } from "@prisma/client";
 import type { CartStatus, PrismaClient } from "@prisma/client";
 
 import { getConfig } from "@/config/index.js";
@@ -25,6 +25,7 @@ import { CART_DEFAULT_INCLUDE, CartRepository, type CartWithRelations } from "./
 import type {
   CartDeliveryEstimate,
   CartItemWithProduct,
+  CartReservationInfo,
   CartStockIssue,
   CartStockStatus,
   CartSummaryView,
@@ -37,10 +38,16 @@ import {
   CART_ITEM_MAX_QUANTITY,
   type MergeCartInput,
   type UpdateCartItemInput,
+  type ValidateCartQueryInput,
 } from "./cart.validators.js";
 
 const CART_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const DEFAULT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const DEFAULT_RESERVATION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const ACTIVE_RESERVATION_STATUSES: InventoryReservationStatus[] = [
+  InventoryReservationStatus.PENDING,
+  InventoryReservationStatus.ACTIVE,
+];
 
 const PRODUCT_INACTIVE_MESSAGE = "This product is no longer available.";
 const VARIANT_UNAVAILABLE_MESSAGE = "The selected product variant is no longer available.";
@@ -58,6 +65,12 @@ interface CartProductVariant {
   isPrimary: boolean;
   createdAt: Date;
   updatedAt: Date;
+  inventory: {
+    quantityAvailable: number;
+    quantityReserved: number;
+    quantityOnHand: number;
+    lowStockThreshold: number | null;
+  } | null;
   product: {
     id: string;
     title: string;
@@ -128,6 +141,7 @@ export interface CartServiceOptions {
   cleanupIntervalMs?: number;
   disableCleanupJob?: boolean;
   emailService?: EmailService;
+  reservationTtlMs?: number;
 }
 
 export interface CartContext {
@@ -147,6 +161,8 @@ interface CartMutationResult {
   targetCartId?: string;
 }
 
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient;
+
 export class CartService {
   private readonly prisma: PrismaClient;
 
@@ -159,6 +175,8 @@ export class CartService {
   private readonly now: () => Date;
 
   private readonly cleanupIntervalMs: number;
+
+  private readonly reservationTtlMs: number;
 
   private readonly emailService: EmailService;
 
@@ -173,6 +191,10 @@ export class CartService {
     this.cleanupIntervalMs = Math.max(
       60 * 1000,
       options.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS,
+    );
+    this.reservationTtlMs = Math.max(
+      60 * 1000,
+      options.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS,
     );
     this.emailService =
       options.emailService ??
@@ -385,19 +407,47 @@ export class CartService {
     return view;
   }
 
-  async validateCart(context: CartContext): Promise<CartValidationReport> {
+  async validateCart(
+    context: CartContext,
+    options: ValidateCartQueryInput = {},
+  ): Promise<CartValidationReport> {
     const cart = await this.ensureActiveCartForUser(context);
-    const report = this.evaluateCart(cart);
+    const baseReport = this.evaluateCart(cart);
     recordCartOperationMetric("validate_cart");
+
+    if (options.reserveInventory) {
+      if (!baseReport.valid) {
+        throw new ConflictError("Unable to reserve inventory for an invalid cart.", {
+          details: {
+            issues: baseReport.issues,
+          },
+        });
+      }
+
+      const reservation = await this.reserveInventory(cart, context);
+      const reportWithReservation: CartValidationReport = {
+        ...baseReport,
+        reservation,
+      };
+
+      emitCartEvent("cart.validated", {
+        cartId: cart.id,
+        userId: context.userId,
+        sessionId: context.sessionId,
+        report: reportWithReservation,
+      });
+
+      return reportWithReservation;
+    }
 
     emitCartEvent("cart.validated", {
       cartId: cart.id,
       userId: context.userId,
       sessionId: context.sessionId,
-      report,
+      report: baseReport,
     });
 
-    return report;
+    return baseReport;
   }
 
   async cleanupExpiredCarts(): Promise<void> {
@@ -437,6 +487,7 @@ export class CartService {
             updatedAt: now,
           },
         });
+        await this.invalidateActiveReservations(this.prisma, cart.id);
         await this.cache.invalidateByCartId(cart.id);
 
         if (cart.user?.email) {
@@ -813,7 +864,7 @@ export class CartService {
     });
 
     if (!variant || !variant.product) {
-      throw new ValidationError("Selected product variant is unavailable.", {
+      throw new ValidationError(VARIANT_UNAVAILABLE_MESSAGE, {
         issues: [
           {
             path: "productVariantId",
@@ -857,18 +908,7 @@ export class CartService {
       });
     }
 
-    if (
-      variant.stock < nextQuantity &&
-      variant.product.inventoryPolicy !== InventoryPolicy.CONTINUE
-    ) {
-      throw new ConflictError("Insufficient inventory to add this item.", {
-        details: {
-          available: variant.stock,
-          requested: nextQuantity,
-          variantId: variant.id,
-        },
-      });
-    }
+    await this.ensureInventoryCapacity(tx, cart.id, variant, nextQuantity);
 
     const item = await tx.cartItem.upsert({
       where: {
@@ -898,6 +938,8 @@ export class CartService {
         sessionId: context.sessionId ?? cart.sessionId,
       },
     });
+
+    await this.invalidateActiveReservations(tx, cart.id);
 
     return {
       itemId: item.id,
@@ -932,7 +974,7 @@ export class CartService {
 
     const variant = item.productVariant;
     if (!variant || !variant.product) {
-      throw new ValidationError("Selected product variant is unavailable.", {
+      throw new ValidationError(VARIANT_UNAVAILABLE_MESSAGE, {
         issues: [
           {
             path: "itemId",
@@ -953,18 +995,8 @@ export class CartService {
       });
     }
 
-    if (
-      quantity > 0 &&
-      variant.stock < quantity &&
-      variant.product.inventoryPolicy !== InventoryPolicy.CONTINUE
-    ) {
-      throw new ConflictError("Insufficient inventory to adjust this item.", {
-        details: {
-          available: variant.stock,
-          requested: quantity,
-          variantId: variant.id,
-        },
-      });
+    if (quantity > 0) {
+      await this.ensureInventoryCapacity(tx, cart.id, variant, quantity);
     }
 
     const cartItemUpdateData =
@@ -992,6 +1024,8 @@ export class CartService {
       },
     });
 
+    await this.invalidateActiveReservations(tx, cart.id);
+
     return {
       itemId,
       variantId: variant.id,
@@ -1015,6 +1049,8 @@ export class CartService {
         updatedAt: this.now(),
       },
     });
+
+    await this.invalidateActiveReservations(tx, cart.id);
 
     return result.count;
   }
@@ -1051,12 +1087,44 @@ export class CartService {
       });
     });
 
-    const operations = [...desiredQuantities.entries()].map(async ([variantId, details]) => {
-      const variant = await tx.productVariant.findUnique({
-        where: { id: variantId },
-        include: { product: true },
-      });
+    const variantIds = [...desiredQuantities.keys()];
+    const reservedTotals = await this.getReservedQuantities(tx, variantIds, {
+      excludeCartIds: [userCart.id, guestCart.id],
+    });
+    const variants = await tx.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      include: { product: true },
+    });
+    const variantLookup = new Map(variants.map((variant) => [variant.id, variant]));
 
+    variantIds.forEach((variantId) => {
+      const variant = variantLookup.get(variantId);
+      if (!variant || !variant.product) {
+        return;
+      }
+
+      if (variant.product.inventoryPolicy === InventoryPolicy.CONTINUE) {
+        return;
+      }
+
+      const reserved = reservedTotals.get(variantId) ?? 0;
+      const desiredQuantity = desiredQuantities.get(variantId)?.desiredQuantity ?? 0;
+      const available = variant.stock - reserved;
+
+      if (available < desiredQuantity) {
+        throw new ConflictError("Insufficient inventory to merge cart item.", {
+          details: {
+            variantId,
+            available,
+            reserved,
+            requested: desiredQuantity,
+          },
+        });
+      }
+    });
+
+    const operations = [...desiredQuantities.entries()].map(async ([variantId, details]) => {
+      const variant = variantLookup.get(variantId);
       if (!variant || !variant.product) {
         return 0;
       }
@@ -1098,6 +1166,7 @@ export class CartService {
         updatedAt: this.now(),
       },
     });
+    await this.invalidateActiveReservations(tx, guestCart.id);
 
     await tx.cartItem.deleteMany({
       where: { cartId: guestCart.id },
@@ -1110,8 +1179,203 @@ export class CartService {
         updatedAt: this.now(),
       },
     });
+    await this.invalidateActiveReservations(tx, userCart.id);
 
     return { mergedItems: mergedCount };
+  }
+
+  private async reserveInventory(
+    cart: CartWithRelations,
+    context: CartContext,
+  ): Promise<CartReservationInfo> {
+    const reservation = await this.repository.withTransaction(async (repo, tx) => {
+      const refreshed = (await repo.findById(cart.id, {
+        include: CART_DEFAULT_INCLUDE,
+      })) as CartWithRelations | null;
+
+      if (!refreshed) {
+        throw new NotFoundError("Cart not found while reserving inventory.");
+      }
+
+      if (refreshed.items.length === 0) {
+        throw new ConflictError("Cannot reserve inventory for an empty cart.");
+      }
+
+      await this.invalidateActiveReservations(tx, refreshed.id);
+
+      const variantIds = refreshed.items.map((item) => item.productVariantId);
+      const reservedTotals = await this.getReservedQuantities(tx, variantIds, {
+        excludeCartIds: [refreshed.id],
+      });
+
+      refreshed.items.forEach((item) => {
+        CartService.ensureItemReservable(item, reservedTotals);
+      });
+
+      return tx.inventoryReservation.create({
+        data: {
+          cartId: refreshed.id,
+          userId: context.userId,
+          status: InventoryReservationStatus.ACTIVE,
+          expiresAt: this.computeReservationExpiryDate(),
+          items: {
+            create: refreshed.items.map((item) => ({
+              productVariantId: item.productVariantId,
+              quantity: item.quantity,
+            })),
+          },
+        },
+        include: {
+          items: true,
+        },
+      });
+    });
+
+    return {
+      id: reservation.id,
+      cartId: reservation.cartId,
+      status: reservation.status === InventoryReservationStatus.PENDING ? "pending" : "active",
+      expiresAt: reservation.expiresAt.toISOString(),
+      itemCount: reservation.items.length,
+    };
+  }
+
+  private computeReservationExpiryDate(baseDate = this.now()): Date {
+    return new Date(baseDate.getTime() + this.reservationTtlMs);
+  }
+
+  private async ensureInventoryCapacity(
+    tx: Prisma.TransactionClient,
+    cartId: string,
+    variant: CartProductVariant,
+    desiredQuantity: number,
+  ): Promise<void> {
+    if (variant.product.inventoryPolicy === InventoryPolicy.CONTINUE) {
+      return;
+    }
+
+    const reservedQuantity = await this.getReservedQuantityForVariant(tx, variant.id, [cartId]);
+    const available = variant.stock - reservedQuantity;
+
+    if (available < desiredQuantity) {
+      throw new ConflictError("Insufficient inventory to fulfil this item.", {
+        details: {
+          variantId: variant.id,
+          available,
+          reserved: reservedQuantity,
+          requested: desiredQuantity,
+        },
+      });
+    }
+  }
+
+  private async invalidateActiveReservations(
+    client: PrismaClientLike,
+    cartId: string,
+  ): Promise<void> {
+    await client.inventoryReservation.updateMany({
+      where: {
+        cartId,
+        status: { in: ACTIVE_RESERVATION_STATUSES },
+      },
+      data: {
+        status: InventoryReservationStatus.EXPIRED,
+        updatedAt: this.now(),
+      },
+    });
+  }
+
+  private async getReservedQuantities(
+    client: Prisma.TransactionClient,
+    variantIds: string[],
+    options: { excludeCartIds?: string[] } = {},
+  ): Promise<Map<string, number>> {
+    if (variantIds.length === 0) {
+      return new Map();
+    }
+
+    const groups = await client.inventoryReservationItem.groupBy({
+      by: ["productVariantId"],
+      where: {
+        productVariantId: { in: variantIds },
+        reservation: {
+          status: { in: ACTIVE_RESERVATION_STATUSES },
+          expiresAt: { gt: this.now() },
+          ...(options.excludeCartIds && options.excludeCartIds.length > 0
+            ? { cartId: { notIn: options.excludeCartIds } }
+            : {}),
+        },
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    return new Map(
+      groups.map((group) => {
+        // eslint-disable-next-line dot-notation -- Prisma aggregate helpers expose underscored fields.
+        const totalQuantity = group["_sum"]?.quantity ?? 0;
+        return [group.productVariantId, totalQuantity];
+      }),
+    );
+  }
+
+  private async getReservedQuantityForVariant(
+    client: Prisma.TransactionClient,
+    variantId: string,
+    excludeCartIds: string[] = [],
+  ): Promise<number> {
+    const aggregate = await client.inventoryReservationItem.aggregate({
+      where: {
+        productVariantId: variantId,
+        reservation: {
+          status: { in: ACTIVE_RESERVATION_STATUSES },
+          expiresAt: { gt: this.now() },
+          ...(excludeCartIds.length > 0 ? { cartId: { notIn: excludeCartIds } } : {}),
+        },
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    // eslint-disable-next-line dot-notation -- Prisma aggregate helpers expose underscored fields.
+    return aggregate["_sum"]?.quantity ?? 0;
+  }
+
+  private static ensureItemReservable(
+    item: CartWithRelations["items"][number],
+    reservedTotals: Map<string, number>,
+  ): void {
+    const variant = item.productVariant;
+    if (!variant || !variant.product) {
+      throw new ValidationError(VARIANT_UNAVAILABLE_MESSAGE, {
+        issues: [
+          {
+            path: "productVariantId",
+            message: VARIANT_UNAVAILABLE_MESSAGE,
+          },
+        ],
+      });
+    }
+
+    if (variant.product.inventoryPolicy === InventoryPolicy.CONTINUE) {
+      return;
+    }
+
+    const reserved = reservedTotals.get(item.productVariantId) ?? 0;
+    const available = variant.stock - reserved;
+
+    if (available < item.quantity) {
+      throw new ConflictError("Insufficient inventory to reserve this cart.", {
+        details: {
+          variantId: variant.id,
+          available,
+          reserved,
+          requested: item.quantity,
+        },
+      });
+    }
   }
 
   private async triggerCartRecoveryEmail(cart: CartWithRelations): Promise<void> {

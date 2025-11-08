@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null */
 import { describe, expect, it, jest } from "@jest/globals";
-import { InventoryPolicy, Prisma, ProductStatus } from "@prisma/client";
+import { InventoryPolicy, InventoryReservationStatus, Prisma, ProductStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import type { EmailService } from "@/lib/email/email.service.js";
@@ -155,8 +155,17 @@ const spyOnCartInternal = <Method extends keyof CartServiceInternals>(
 ): jest.SpiedFunction<CartServiceInternals[Method]> =>
   jest.spyOn(internals, method) as jest.SpiedFunction<CartServiceInternals[Method]>;
 
-const createTransactionClientMock = (): Prisma.TransactionClient =>
-  ({
+const createTransactionClientMock = (): Prisma.TransactionClient => {
+  const reservation = {
+    id: ensureCuid("reservation"),
+    cartId: ensureCuid("cart"),
+    userId: DEFAULT_USER_ID,
+    status: InventoryReservationStatus.ACTIVE,
+    expiresAt: new Date("2025-03-01T11:00:00.000Z"),
+    items: [],
+  };
+
+  return {
     cart: {
       update: jest.fn(async () => ({})),
     },
@@ -164,11 +173,22 @@ const createTransactionClientMock = (): Prisma.TransactionClient =>
       create: jest.fn(async () => ({})),
       update: jest.fn(async () => ({})),
       deleteMany: jest.fn(async () => ({})),
+      findUnique: jest.fn(async () => null),
     },
     productVariant: {
       findUnique: jest.fn(async () => null),
+      findMany: jest.fn(async () => []),
     },
-  }) as unknown as Prisma.TransactionClient;
+    inventoryReservation: {
+      updateMany: jest.fn(async () => ({})),
+      create: jest.fn(async () => reservation),
+    },
+    inventoryReservationItem: {
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      groupBy: jest.fn(async () => []),
+    },
+  } as unknown as Prisma.TransactionClient;
+};
 
 const createService = (overrides: ServiceOverrides = {}) => {
   const cart = overrides.cart ?? createCartFixture();
@@ -339,6 +359,13 @@ const createMergeTransaction = (
       findUnique: jest.fn(
         async ({ where: { id } }: { where: { id: string } }) => variantMap.get(id) ?? null,
       ),
+      findMany: jest.fn(
+        async ({
+          where: {
+            id: { in: variantIds },
+          },
+        }) => variants.filter((variant) => variantIds.includes(variant.id)),
+      ),
     },
     cartItem: {
       update: jest.fn(async () => {}),
@@ -347,6 +374,13 @@ const createMergeTransaction = (
     },
     cart: {
       update: jest.fn(async () => {}),
+    },
+    inventoryReservation: {
+      updateMany: jest.fn(async () => ({})),
+    },
+    inventoryReservationItem: {
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      groupBy: jest.fn(async () => []),
     },
   };
 };
@@ -415,6 +449,9 @@ const createMaintenanceService = (options: MaintenanceServiceOptions = {}) => {
     cart: {
       findMany: jest.fn(async () => options.staleCarts ?? []),
       update: jest.fn(async () => {}),
+    },
+    inventoryReservation: {
+      updateMany: jest.fn(async () => ({})),
     },
   };
 
@@ -500,6 +537,13 @@ const createAddItemTransaction = ({
     cart: {
       update: jest.fn(async () => {}),
     },
+    inventoryReservation: {
+      updateMany: jest.fn(async () => ({})),
+    },
+    inventoryReservationItem: {
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      groupBy: jest.fn(async () => []),
+    },
   } as unknown as Prisma.TransactionClient;
 };
 
@@ -554,6 +598,13 @@ const createUpdateTransaction = (
     cart: {
       update: jest.fn(async () => {}),
     },
+    inventoryReservation: {
+      updateMany: jest.fn(async () => ({})),
+    },
+    inventoryReservationItem: {
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      groupBy: jest.fn(async () => []),
+    },
   }) as unknown as Prisma.TransactionClient;
 
 describe("CartService", () => {
@@ -590,6 +641,51 @@ describe("CartService", () => {
     });
     expect(cacheGet).toHaveBeenCalled();
     expect(second).toBe(first);
+  });
+
+  it("creates an inventory reservation when requested during validation", async () => {
+    const variant = createVariant({ id: "variant-reserve", stock: 10 });
+    const reservableCart = createCartWithItems({
+      id: "cart-reserve",
+      variant,
+      quantity: 2,
+    });
+    const { service, repository } = createService({ cart: reservableCart });
+    const tx = createTransactionClientMock();
+    const expiresAt = new Date("2025-03-01T12:00:00.000Z");
+    const reservationId = ensureCuid("reservation-ctx");
+    (tx.inventoryReservation.create as jest.Mock).mockResolvedValue({
+      id: reservationId,
+      cartId: reservableCart.id,
+      userId: reservableCart.userId ?? DEFAULT_USER_ID,
+      status: InventoryReservationStatus.ACTIVE,
+      expiresAt,
+      items: [
+        {
+          id: ensureCuid("reservation-item"),
+          reservationId,
+          productVariantId: reservableCart.items[0]!.productVariantId,
+          quantity: reservableCart.items[0]!.quantity,
+          createdAt: expiresAt,
+          updatedAt: expiresAt,
+        },
+      ],
+    });
+
+    repository.withTransaction.mockImplementation(async (callback) =>
+      callback(repository as unknown as CartRepository, tx),
+    );
+
+    const report = await service.validateCart(createContext(), { reserveInventory: true });
+
+    expect(report.reservation).toEqual(
+      expect.objectContaining({
+        id: reservationId,
+        cartId: reservableCart.id,
+        status: "active",
+      }),
+    );
+    expect(tx.inventoryReservation.create).toHaveBeenCalled();
   });
 
   it("creates a cart when no active cart exists for the user", async () => {

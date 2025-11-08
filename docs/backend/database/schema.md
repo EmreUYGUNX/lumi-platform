@@ -126,6 +126,14 @@ Fields include `productId` (`@@index` with `onDelete: Cascade`), `title`, `sku @
 
 Maintains per-variant stock: `quantityAvailable`, `quantityReserved`, `quantityOnHand`, `lowStockThreshold`. `productVariantId` has unique index and cascades on delete.
 
+### `InventoryReservation`
+
+Captures per-cart inventory holds during checkout. Fields: `cartId`, `userId`, `status` (`PENDING`, `ACTIVE`, `RELEASED`, `EXPIRED`), `expiresAt`, timestamps. Indexed by `cartId`, `userId`, and `status` for cleanup jobs. Cascades on cart/user deletion.
+
+### `InventoryReservationItem`
+
+Child records that store reserved `quantity` per `productVariantId`. Unique constraint on `(reservationId, productVariantId)` plus indexes on `productVariantId`/`reservationId` allow quick aggregation when validating stock. Foreign keys cascade on reservation delete and restrict variant removal while reservations exist.
+
 ### `Media`
 
 Stores media asset metadata (`assetId @unique`, `url`, `type`, `provider`, MIME, dimensions). Indexed by `assetId`. Relations to product/variant/review media junctions with cascade deletes.

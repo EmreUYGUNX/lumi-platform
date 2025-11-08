@@ -14,6 +14,7 @@ const CART_ITEM_INCLUDE = Prisma.validator<Prisma.CartItemInclude>()({
   productVariant: {
     include: {
       product: true,
+      inventory: true,
     },
   },
 });

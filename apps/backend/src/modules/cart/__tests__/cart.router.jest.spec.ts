@@ -195,7 +195,22 @@ describe("cart router", () => {
     const response = await request(app).get("/api/cart/validate").expect(200);
 
     expect(service.validateCart).toHaveBeenCalledTimes(1);
+    expect(service.validateCart).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_test" }),
+      expect.objectContaining({ reserveInventory: false }),
+    );
     expect(response.body.data.valid).toBe(true);
+  });
+
+  it("forwards reservation flag to the service", async () => {
+    const { app, service } = createTestApp();
+
+    await request(app).get("/api/cart/validate?reserveInventory=true").expect(200);
+
+    expect(service.validateCart).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_test" }),
+      expect.objectContaining({ reserveInventory: true }),
+    );
   });
 
   it("clears the cart when requested", async () => {

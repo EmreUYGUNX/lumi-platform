@@ -153,6 +153,14 @@ const createCartServiceStub = () => {
     checkedAt: nowIso,
   };
 
+  const reservation = {
+    id: "reservation_test",
+    cartId: emptyCart.cart.id,
+    status: "active" as const,
+    expiresAt: nowIso,
+    itemCount: 0,
+  };
+
   return {
     getCart: async () => emptyCart,
     addItem: async () => emptyCart,
@@ -160,7 +168,8 @@ const createCartServiceStub = () => {
     removeItem: async () => emptyCart,
     clearCart: async () => emptyCart,
     mergeCart: async () => emptyCart,
-    validateCart: async () => validationReport,
+    validateCart: async (_context: unknown, options?: { reserveInventory?: boolean }) =>
+      options?.reserveInventory ? { ...validationReport, reservation } : validationReport,
     cleanupExpiredCarts: async () => {},
     shutdown: async () => {},
   } as unknown as CartService;
