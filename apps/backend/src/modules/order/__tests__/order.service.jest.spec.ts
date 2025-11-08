@@ -808,6 +808,122 @@ describe("OrderService", () => {
     expect(summary.estimatedDelivery).toBe("2025-01-12T10:00:00.000Z");
   });
 
+  it("requires authentication when cancelling orders", async () => {
+    const { service } = createService();
+
+    await expect(service.cancelOrder({ userId: "" } as OrderContext, ORDER_ID)).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it("prevents cancelling orders owned by other users", async () => {
+    const repository = createOrderRepositoryMock();
+    repository.findById.mockResolvedValue(
+      createOrderFixture({
+        userId: ensureCuid("another-user"),
+        status: OrderStatus.PENDING,
+      }),
+    );
+
+    const { service } = createService({ repository });
+
+    await expect(service.cancelOrder({ userId: USER_ID }, ORDER_ID)).rejects.toThrow(NotFoundError);
+  });
+
+  it("rejects cancellation for non-cancellable statuses", async () => {
+    const repository = createOrderRepositoryMock();
+    repository.findById.mockResolvedValue(
+      createOrderFixture({
+        status: OrderStatus.SHIPPED,
+      }),
+    );
+
+    const { service } = createService({ repository });
+
+    await expect(service.cancelOrder({ userId: USER_ID }, ORDER_ID)).rejects.toThrow(ConflictError);
+  });
+
+  it("rejects cancellation attempts after the allowed window", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2025-01-05T12:30:00.000Z"));
+
+    const repository = createOrderRepositoryMock();
+    repository.findById.mockResolvedValue(
+      createOrderFixture({
+        status: OrderStatus.PENDING,
+        createdAt: new Date("2025-01-05T10:00:00.000Z"),
+      }),
+    );
+
+    const { service } = createService({ repository });
+
+    await expect(
+      service.cancelOrder({ userId: USER_ID }, ORDER_ID, { reason: "Late" }),
+    ).rejects.toThrow(ConflictError);
+
+    jest.useRealTimers();
+  });
+
+  it("cancels paid orders within the deadline and issues refunds", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2025-01-05T11:00:00.000Z"));
+
+    const payment = createPaymentFixture({ status: PaymentStatus.SETTLED });
+    const cancellableOrder = createOrderFixture({
+      status: OrderStatus.PAID,
+      createdAt: new Date("2025-01-05T10:30:00.000Z"),
+      payments: [payment],
+    });
+
+    const repository = createOrderRepositoryMock();
+    repository.findById.mockResolvedValue(cancellableOrder);
+
+    const updatedOrder = createOrderFixture({
+      status: OrderStatus.CANCELLED,
+      cancelledAt: new Date("2025-01-05T11:05:00.000Z"),
+      payments: [payment],
+    });
+
+    const { service, paymentGateway, tx, emailService } = createService({ repository });
+    tx.order.findFirst.mockResolvedValue(updatedOrder);
+    tx.orderItem.findMany.mockResolvedValue([{ productVariantId: VARIANT_ID, quantity: 2 }]);
+
+    const result = await service.cancelOrder(
+      { userId: USER_ID, email: "user@example.com" },
+      ORDER_ID,
+      { reason: "Customer changed mind" },
+    );
+
+    expect(paymentGateway.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ id: payment.id }),
+      expect.objectContaining({
+        amount: expect.any(Prisma.Decimal),
+        reason: "Customer changed mind",
+      }),
+    );
+    expect(tx.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: PaymentStatus.REFUNDED }),
+      }),
+    );
+    expect(tx.paymentRefund.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentId: payment.id,
+          reason: "Customer changed mind",
+        }),
+      }),
+    );
+    expect(tx.productVariant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: VARIANT_ID },
+        data: { stock: { increment: 2 } },
+      }),
+    );
+    expect(emailService.sendOrderRefundEmail).toHaveBeenCalled();
+    expect(result.status).toBe(OrderStatus.CANCELLED);
+
+    jest.useRealTimers();
+  });
+
   it("rejects invalid admin status transitions", async () => {
     const repository = createOrderRepositoryMock();
     repository.findById.mockResolvedValue(
