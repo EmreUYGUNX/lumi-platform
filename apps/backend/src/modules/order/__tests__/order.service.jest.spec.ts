@@ -17,12 +17,16 @@ import { ConflictError } from "@/lib/errors.js";
 import type { OrderWithRelations } from "@lumi/shared/dto";
 
 import type { AddressRepository } from "../../address/address.repository.js";
+import type { CartWithRelations } from "../../cart/cart.repository.js";
 import type { CartService } from "../../cart/cart.service.js";
 import type { PaymentRepository } from "../../payment/payment.repository.js";
 import type { OrderRepository } from "../order.repository.js";
 import { OrderService } from "../order.service.js";
+import type { CreateOrderInput } from "../order.validators.js";
 
 type AsyncRepositoryMock = jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+type CartServiceContract = Pick<CartService, "validateCart">;
+type AddressRepositoryContract = Pick<AddressRepository, "getDefaultAddress">;
 
 interface OrderRepositoryMock {
   listForUser: AsyncRepositoryMock;
@@ -40,9 +44,12 @@ interface EmailServiceContract {
 const createTransactionMock = () => ({
   order: {
     update: jest.fn(async () => ({})),
+    create: jest.fn(async () => ({})),
+    findFirst: jest.fn(async () => null),
   },
   orderItem: {
     findMany: jest.fn(async () => [] as { productVariantId: string; quantity: number }[]),
+    createMany: jest.fn(async () => ({})),
   },
   productVariant: {
     update: jest.fn(async () => ({})),
@@ -50,6 +57,7 @@ const createTransactionMock = () => ({
   payment: {
     update: jest.fn(async () => ({})),
     updateMany: jest.fn(async () => ({})),
+    create: jest.fn(async () => ({})),
   },
   paymentRefund: {
     create: jest.fn(async () => ({})),
@@ -62,6 +70,9 @@ const createTransactionMock = () => ({
   },
   inventoryReservation: {
     updateMany: jest.fn(async () => ({})),
+  },
+  address: {
+    findFirst: jest.fn(async () => null),
   },
 });
 
@@ -151,6 +162,8 @@ const createService = (
     prismaFactory?: () => PrismaFactoryResult;
     emailService?: jest.Mocked<EmailServiceContract>;
     paymentGateway?: ReturnType<typeof createPaymentGatewayMock>;
+    cartService?: CartServiceContract;
+    addressRepository?: AddressRepositoryContract;
   } = {},
 ) => {
   const repository = overrides.repository ?? createOrderRepositoryMock();
@@ -158,12 +171,10 @@ const createService = (
   const emailService = overrides.emailService ?? createEmailServiceMock();
   const paymentGateway = overrides.paymentGateway ?? createPaymentGatewayMock();
 
-  const cartService = {
-    validateCart: jest.fn(),
-  } as unknown as CartService;
-  const addressRepository = {
-    getDefaultAddress: jest.fn(),
-  } as unknown as AddressRepository;
+  const cartServiceImpl = overrides.cartService ?? { validateCart: jest.fn() };
+  const addressRepositoryImpl = overrides.addressRepository ?? { getDefaultAddress: jest.fn() };
+  const cartService = cartServiceImpl as CartService;
+  const addressRepository = addressRepositoryImpl as AddressRepository;
   const paymentRepository = {} as unknown as PaymentRepository;
 
   const service = new OrderService({
@@ -176,7 +187,16 @@ const createService = (
     paymentGateway,
   });
 
-  return { service, repository, emailService, paymentGateway, prisma, tx };
+  return {
+    service,
+    repository,
+    emailService,
+    paymentGateway,
+    prisma,
+    tx,
+    cartService: cartServiceImpl,
+    addressRepository: addressRepositoryImpl,
+  };
 };
 
 const createProductFixture = () => ({
@@ -336,6 +356,38 @@ const createOrderFixture = (overrides: Partial<OrderWithRelations> = {}): OrderW
   return { ...base, ...overrides } as OrderWithRelations;
 };
 
+const createCartFixture = (): CartWithRelations =>
+  ({
+    id: CART_ID,
+    userId: USER_ID,
+    sessionId: "session-fixture",
+    status: "ACTIVE",
+    expiresAt: null,
+    createdAt: FIXTURE_TIMESTAMP,
+    updatedAt: FIXTURE_TIMESTAMP,
+    items: [
+      {
+        id: ensureCuid("cart-item"),
+        cartId: CART_ID,
+        productVariantId: VARIANT_ID,
+        quantity: 1,
+        unitPrice: new Prisma.Decimal("140.00"),
+        createdAt: FIXTURE_TIMESTAMP,
+        updatedAt: FIXTURE_TIMESTAMP,
+        productVariant: {
+          ...createVariantFixture(),
+          product: createProductFixture(),
+        },
+      },
+    ],
+    user: {
+      id: USER_ID,
+      email: "user@example.com",
+      firstName: "Test",
+      lastName: "User",
+    },
+  }) as unknown as CartWithRelations;
+
 const expectMetadataToContainNote = (repository: OrderRepositoryMock, message: string) => {
   const updateArgs = repository.update.mock.calls[0]?.[0] as
     | { data?: { metadata?: { internalNotes?: { message: string; authorId: string }[] } } }
@@ -346,6 +398,102 @@ const expectMetadataToContainNote = (repository: OrderRepositoryMock, message: s
 };
 
 describe("OrderService", () => {
+  it("creates orders from valid carts using checkout flow", async () => {
+    const cartService = { validateCart: jest.fn() };
+    const addressRepository = { getDefaultAddress: jest.fn() };
+    const { service, tx, emailService } = createService({
+      cartService: cartService as CartServiceContract,
+      addressRepository: addressRepository as AddressRepositoryContract,
+    });
+
+    const validateCartMock = cartService.validateCart as jest.MockedFunction<
+      CartServiceContract["validateCart"]
+    >;
+    validateCartMock.mockResolvedValue({
+      valid: true,
+      cartId: CART_ID,
+      totals: {
+        subtotal: { amount: "120.00", currency: "TRY" },
+        tax: { amount: "20.00", currency: "TRY" },
+        discount: { amount: "0.00", currency: "TRY" },
+        total: { amount: "140.00", currency: "TRY" },
+      },
+      issues: [],
+      stock: {
+        status: "ok",
+        issues: [],
+        checkedAt: new Date("2025-01-05T10:00:00.000Z").toISOString(),
+      },
+      checkedAt: new Date("2025-01-05T10:00:00.000Z").toISOString(),
+    });
+
+    const addressLookup = tx.address.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    addressLookup
+      .mockResolvedValueOnce({ id: SHIPPING_ADDRESS_ID, userId: USER_ID })
+      .mockResolvedValueOnce({ id: BILLING_ADDRESS_ID, userId: USER_ID });
+
+    const loadCartSpy = jest.spyOn(
+      OrderService as unknown as {
+        loadCart: (...args: unknown[]) => Promise<CartWithRelations>;
+      },
+      "loadCart",
+    ) as jest.MockedFunction<(...args: unknown[]) => Promise<CartWithRelations>>;
+    loadCartSpy.mockResolvedValue(createCartFixture());
+    const decrementSpy = jest.spyOn(
+      OrderService as unknown as {
+        decrementInventory: (...args: unknown[]) => Promise<void>;
+      },
+      "decrementInventory",
+    ) as jest.MockedFunction<(...args: unknown[]) => Promise<void>>;
+    decrementSpy.mockResolvedValue();
+
+    tx.order.create.mockResolvedValue({ id: ORDER_ID });
+    const orderFindFirst = tx.order.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    orderFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(createOrderFixture({ payments: [createPaymentFixture()] }));
+    const paymentCreateMock = tx.payment.create as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    paymentCreateMock.mockResolvedValue(createPaymentFixture());
+
+    const input = {
+      cartId: CART_ID,
+      shippingAddressId: SHIPPING_ADDRESS_ID,
+      payment: { provider: PaymentProvider.MANUAL },
+      notes: "Leave at door",
+    } as CreateOrderInput;
+
+    const result = await service.createOrder(
+      { userId: USER_ID, email: "user@example.com", sessionId: "sess-1" },
+      input,
+    );
+
+    expect(cartService.validateCart).toHaveBeenCalledWith(
+      { userId: USER_ID, sessionId: "sess-1" },
+      { reserveInventory: true },
+    );
+    expect(tx.order.create).toHaveBeenCalled();
+    expect(tx.cart.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CART_ID },
+        data: expect.objectContaining({ status: "CHECKED_OUT" }),
+      }),
+    );
+    expect(result.order.reference).toBe("LM-ORDER-1");
+    expect(result.payment?.provider).toBe(PaymentProvider.MANUAL);
+    expect(emailService.sendOrderConfirmationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "confirmed", orderReference: "LM-ORDER-1" }),
+    );
+
+    loadCartSpy.mockRestore();
+    decrementSpy.mockRestore();
+  });
+
   it("filters user orders with metadata sanitisation", async () => {
     const repository = createOrderRepositoryMock();
     repository.listForUser.mockResolvedValue({
@@ -567,5 +715,63 @@ describe("OrderService", () => {
     expect(tx.productVariant.update).toHaveBeenCalled();
     expect(emailService.sendOrderRefundEmail).toHaveBeenCalled();
     expect(result.status).toBe(OrderStatus.CANCELLED);
+  });
+
+  it("computes order statistics for recent activity", async () => {
+    const { service, prisma } = createService();
+    jest.useFakeTimers().setSystemTime(new Date("2025-02-01T00:00:00.000Z"));
+
+    const prismaOrderGroupBy = prisma.order.groupBy as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    prismaOrderGroupBy.mockResolvedValue([
+      { status: OrderStatus.PAID, _count: { _all: 3 } },
+      { status: OrderStatus.CANCELLED, _count: { _all: 1 } },
+    ]);
+    const prismaOrderAggregate = prisma.order.aggregate as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    prismaOrderAggregate.mockResolvedValue({
+      _avg: { totalAmount: new Prisma.Decimal("150.00") },
+      _sum: { totalAmount: new Prisma.Decimal("450.00") },
+    });
+    const prismaOrderFindMany = prisma.order.findMany as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    prismaOrderFindMany.mockResolvedValue([
+      {
+        createdAt: new Date("2025-01-30T00:00:00.000Z"),
+        totalAmount: new Prisma.Decimal("200.00"),
+      },
+      {
+        createdAt: new Date("2025-01-31T00:00:00.000Z"),
+        totalAmount: new Prisma.Decimal("250.00"),
+      },
+    ]);
+    const prismaOrderItemGroupBy = prisma.orderItem.groupBy as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    prismaOrderItemGroupBy.mockResolvedValue([{ productId: PRODUCT_ID, _sum: { quantity: 4 } }]);
+    const prismaProductFindMany = prisma.product.findMany as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    prismaProductFindMany.mockResolvedValue([{ id: PRODUCT_ID, title: "Fixture Lamp" }]);
+
+    const stats = await service.getOrderStats({ range: "7d" });
+
+    expect(stats.revenue.total).toBe("450.00");
+    expect(stats.averageOrderValue).toBe("150.00");
+    expect(stats.revenueSeries).toHaveLength(2);
+    expect(stats.topProducts[0]).toMatchObject({ productId: PRODUCT_ID, quantity: 4 });
+    expect(stats.conversionRate).toBeGreaterThan(0);
+    expect(prisma.order.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+      }),
+    );
+
+    jest.useRealTimers();
   });
 });
