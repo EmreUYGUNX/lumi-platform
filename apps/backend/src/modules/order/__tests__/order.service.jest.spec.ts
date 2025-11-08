@@ -13,20 +13,24 @@ import {
 } from "@prisma/client";
 
 import type { EmailService } from "@/lib/email/email.service.js";
-import { ConflictError } from "@/lib/errors.js";
+import { ConflictError, NotFoundError, UnauthorizedError } from "@/lib/errors.js";
 import type { OrderWithRelations } from "@lumi/shared/dto";
 
 import type { AddressRepository } from "../../address/address.repository.js";
 import type { CartWithRelations } from "../../cart/cart.repository.js";
 import type { CartService } from "../../cart/cart.service.js";
+import type { CartValidationReport } from "../../cart/cart.types.js";
 import type { PaymentRepository } from "../../payment/payment.repository.js";
 import type { OrderRepository } from "../order.repository.js";
 import { OrderService } from "../order.service.js";
+import type { OrderContext } from "../order.service.js";
 import type { CreateOrderInput } from "../order.validators.js";
 
 type AsyncRepositoryMock = jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
 type CartServiceContract = Pick<CartService, "validateCart">;
 type AddressRepositoryContract = Pick<AddressRepository, "getDefaultAddress">;
+type ValidateCartMock = jest.MockedFunction<CartServiceContract["validateCart"]>;
+type GetDefaultAddressMock = jest.MockedFunction<AddressRepositoryContract["getDefaultAddress"]>;
 
 interface OrderRepositoryMock {
   listForUser: AsyncRepositoryMock;
@@ -41,11 +45,23 @@ interface EmailServiceContract {
   sendOrderRefundEmail: EmailService["sendOrderRefundEmail"];
 }
 
+const createCartServiceMock = (): CartServiceContract & { validateCart: ValidateCartMock } => ({
+  validateCart: jest.fn() as ValidateCartMock,
+});
+
+const createAddressRepositoryMock = (): AddressRepositoryContract & {
+  getDefaultAddress: GetDefaultAddressMock;
+} => ({
+  getDefaultAddress: jest.fn() as GetDefaultAddressMock,
+});
+
 const createTransactionMock = () => ({
   order: {
     update: jest.fn(async () => ({})),
     create: jest.fn(async () => ({})),
-    findFirst: jest.fn(async () => null),
+    findFirst: jest.fn(async () => null) as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >,
   },
   orderItem: {
     findMany: jest.fn(async () => [] as { productVariantId: string; quantity: number }[]),
@@ -72,7 +88,9 @@ const createTransactionMock = () => ({
     updateMany: jest.fn(async () => ({})),
   },
   address: {
-    findFirst: jest.fn(async () => null),
+    findFirst: jest.fn(async () => null) as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >,
   },
 });
 
@@ -171,8 +189,8 @@ const createService = (
   const emailService = overrides.emailService ?? createEmailServiceMock();
   const paymentGateway = overrides.paymentGateway ?? createPaymentGatewayMock();
 
-  const cartServiceImpl = overrides.cartService ?? { validateCart: jest.fn() };
-  const addressRepositoryImpl = overrides.addressRepository ?? { getDefaultAddress: jest.fn() };
+  const cartServiceImpl = overrides.cartService ?? createCartServiceMock();
+  const addressRepositoryImpl = overrides.addressRepository ?? createAddressRepositoryMock();
   const cartService = cartServiceImpl as CartService;
   const addressRepository = addressRepositoryImpl as AddressRepository;
   const paymentRepository = {} as unknown as PaymentRepository;
@@ -356,8 +374,8 @@ const createOrderFixture = (overrides: Partial<OrderWithRelations> = {}): OrderW
   return { ...base, ...overrides } as OrderWithRelations;
 };
 
-const createCartFixture = (): CartWithRelations =>
-  ({
+const createCartFixture = (overrides: Partial<CartWithRelations> = {}): CartWithRelations => {
+  const base = {
     id: CART_ID,
     userId: USER_ID,
     sessionId: "session-fixture",
@@ -386,7 +404,46 @@ const createCartFixture = (): CartWithRelations =>
       firstName: "Test",
       lastName: "User",
     },
-  }) as unknown as CartWithRelations;
+  } as unknown as CartWithRelations;
+
+  return {
+    ...base,
+    ...overrides,
+    items: overrides.items ?? base.items,
+  };
+};
+
+const createValidationReport = (
+  overrides: Partial<CartValidationReport> = {},
+): CartValidationReport => ({
+  valid: overrides.valid ?? true,
+  cartId: overrides.cartId ?? CART_ID,
+  issues: overrides.issues ?? [],
+  stock: {
+    status: overrides.stock?.status ?? "ok",
+    issues: overrides.stock?.issues ?? [],
+    checkedAt: overrides.stock?.checkedAt ?? FIXTURE_TIMESTAMP.toISOString(),
+  },
+  totals: {
+    subtotal: overrides.totals?.subtotal ?? { amount: "120.00", currency: "TRY" },
+    tax: overrides.totals?.tax ?? { amount: "20.00", currency: "TRY" },
+    discount: overrides.totals?.discount ?? { amount: "0.00", currency: "TRY" },
+    total: overrides.totals?.total ?? { amount: "140.00", currency: "TRY" },
+  },
+  checkedAt: overrides.checkedAt ?? FIXTURE_TIMESTAMP.toISOString(),
+  reservation: overrides.reservation,
+});
+
+const spyOnLoadCart = (cart: CartWithRelations) => {
+  const spy = jest.spyOn(
+    OrderService as unknown as {
+      loadCart: (...args: unknown[]) => Promise<CartWithRelations>;
+    },
+    "loadCart",
+  ) as jest.MockedFunction<(...args: unknown[]) => Promise<CartWithRelations>>;
+  spy.mockResolvedValue(cart);
+  return spy;
+};
 
 const expectMetadataToContainNote = (repository: OrderRepositoryMock, message: string) => {
   const updateArgs = repository.update.mock.calls[0]?.[0] as
@@ -398,9 +455,187 @@ const expectMetadataToContainNote = (repository: OrderRepositoryMock, message: s
 };
 
 describe("OrderService", () => {
+  it("requires authentication when creating orders", async () => {
+    const { service } = createService();
+
+    await expect(
+      service.createOrder({ userId: "" } as OrderContext, { cartId: CART_ID } as CreateOrderInput),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("rejects invalid cart validation reports", async () => {
+    const cartService = createCartServiceMock();
+    const { service } = createService({ cartService: cartService as CartServiceContract });
+    cartService.validateCart.mockResolvedValueOnce(
+      createValidationReport({
+        valid: false,
+        issues: [
+          {
+            type: "price_mismatch",
+            itemId: "item",
+            variantId: VARIANT_ID,
+            productId: PRODUCT_ID,
+            message: "Price changed",
+            expectedUnitPrice: { amount: "199.00", currency: "TRY" },
+            actualUnitPrice: { amount: "109.00", currency: "TRY" },
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.createOrder({ userId: USER_ID }, { cartId: CART_ID } as CreateOrderInput),
+    ).rejects.toThrow(ConflictError);
+  });
+
+  it("prevents checking out carts owned by other users", async () => {
+    const cartService = createCartServiceMock();
+    const { service, tx } = createService({ cartService: cartService as CartServiceContract });
+    cartService.validateCart.mockResolvedValue(createValidationReport());
+
+    const addressLookup = tx.address.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    addressLookup.mockResolvedValue(createAddressFixture(SHIPPING_ADDRESS_ID));
+
+    const loadCartSpy = spyOnLoadCart(
+      createCartFixture({
+        userId: ensureCuid("other-user"),
+      }),
+    );
+
+    await expect(
+      service.createOrder({ userId: USER_ID, email: "user@example.com", sessionId: "sess-1" }, {
+        cartId: CART_ID,
+        shippingAddressId: SHIPPING_ADDRESS_ID,
+      } as CreateOrderInput),
+    ).rejects.toThrow(UnauthorizedError);
+
+    loadCartSpy.mockRestore();
+  });
+
+  it("rejects orders created from empty carts", async () => {
+    const cartService = createCartServiceMock();
+    const { service, tx } = createService({ cartService: cartService as CartServiceContract });
+    cartService.validateCart.mockResolvedValue(createValidationReport());
+    const addressLookup = tx.address.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    addressLookup.mockResolvedValue(createAddressFixture(SHIPPING_ADDRESS_ID));
+
+    const loadCartSpy = spyOnLoadCart(
+      createCartFixture({
+        items: [],
+      }),
+    );
+
+    await expect(
+      service.createOrder({ userId: USER_ID, email: "user@example.com" }, {
+        cartId: CART_ID,
+        shippingAddressId: SHIPPING_ADDRESS_ID,
+      } as CreateOrderInput),
+    ).rejects.toThrow(ConflictError);
+    loadCartSpy.mockRestore();
+  });
+
+  it("falls back to default addresses when none are provided", async () => {
+    const cartService = createCartServiceMock();
+    const addressRepository = createAddressRepositoryMock();
+    cartService.validateCart.mockResolvedValue(createValidationReport());
+    const { service, tx } = createService({
+      cartService: cartService as CartServiceContract,
+      addressRepository: addressRepository as AddressRepositoryContract,
+    });
+
+    const loadCartSpy = spyOnLoadCart(createCartFixture());
+    const addressLookup = tx.address.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    addressLookup.mockResolvedValue(null);
+    addressRepository.getDefaultAddress
+      .mockResolvedValueOnce(createAddressFixture(SHIPPING_ADDRESS_ID))
+      .mockResolvedValueOnce(createAddressFixture(BILLING_ADDRESS_ID));
+
+    tx.order.create.mockResolvedValue({ id: ORDER_ID });
+    const orderFindFirst = tx.order.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    orderFindFirst
+      .mockImplementationOnce(async () => null)
+      .mockImplementationOnce(async () =>
+        createOrderFixture({ payments: [createPaymentFixture()] }),
+      );
+
+    await service.createOrder({ userId: USER_ID, email: "user@example.com", sessionId: "sess-1" }, {
+      cartId: CART_ID,
+    } as CreateOrderInput);
+
+    expect(addressRepository.getDefaultAddress).toHaveBeenCalledTimes(2);
+    loadCartSpy.mockRestore();
+  });
+
+  it("throws when default addresses cannot be resolved", async () => {
+    const cartService = createCartServiceMock();
+    const addressRepository = createAddressRepositoryMock();
+    cartService.validateCart.mockResolvedValue(createValidationReport());
+    addressRepository.getDefaultAddress.mockResolvedValue(null);
+
+    const { service } = createService({
+      cartService: cartService as CartServiceContract,
+      addressRepository: addressRepository as AddressRepositoryContract,
+    });
+
+    await expect(
+      service.createOrder({ userId: USER_ID, email: "user@example.com" }, {
+        cartId: CART_ID,
+      } as CreateOrderInput),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  it("rejects carts when tracked inventory is insufficient", async () => {
+    const cartService = createCartServiceMock();
+    cartService.validateCart.mockResolvedValue(createValidationReport());
+    const { service, tx } = createService({ cartService: cartService as CartServiceContract });
+
+    const addressLookup = tx.address.findFirst as jest.MockedFunction<
+      (args?: unknown) => Promise<unknown>
+    >;
+    addressLookup.mockResolvedValue(createAddressFixture(SHIPPING_ADDRESS_ID));
+    const loadCartSpy = spyOnLoadCart(
+      createCartFixture({
+        items: [
+          {
+            id: ensureCuid("cart-low-stock"),
+            cartId: CART_ID,
+            productVariantId: VARIANT_ID,
+            quantity: 5,
+            unitPrice: new Prisma.Decimal("140.00"),
+            createdAt: FIXTURE_TIMESTAMP,
+            updatedAt: FIXTURE_TIMESTAMP,
+            productVariant: {
+              ...createVariantFixture(),
+              stock: 0,
+              inventory: null,
+              product: createProductFixture(),
+            },
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.createOrder({ userId: USER_ID, email: "user@example.com" }, {
+        cartId: CART_ID,
+        shippingAddressId: SHIPPING_ADDRESS_ID,
+      } as CreateOrderInput),
+    ).rejects.toThrow(ConflictError);
+
+    loadCartSpy.mockRestore();
+  });
+
   it("creates orders from valid carts using checkout flow", async () => {
-    const cartService = { validateCart: jest.fn() };
-    const addressRepository = { getDefaultAddress: jest.fn() };
+    const cartService = createCartServiceMock();
+    const addressRepository = createAddressRepositoryMock();
     const { service, tx, emailService } = createService({
       cartService: cartService as CartServiceContract,
       addressRepository: addressRepository as AddressRepositoryContract,
@@ -431,16 +666,10 @@ describe("OrderService", () => {
       (args?: unknown) => Promise<unknown>
     >;
     addressLookup
-      .mockResolvedValueOnce({ id: SHIPPING_ADDRESS_ID, userId: USER_ID })
-      .mockResolvedValueOnce({ id: BILLING_ADDRESS_ID, userId: USER_ID });
+      .mockResolvedValueOnce(createAddressFixture(SHIPPING_ADDRESS_ID))
+      .mockResolvedValueOnce(createAddressFixture(BILLING_ADDRESS_ID));
 
-    const loadCartSpy = jest.spyOn(
-      OrderService as unknown as {
-        loadCart: (...args: unknown[]) => Promise<CartWithRelations>;
-      },
-      "loadCart",
-    ) as unknown as jest.MockedFunction<(...args: unknown[]) => Promise<CartWithRelations>>;
-    loadCartSpy.mockResolvedValue(createCartFixture());
+    const loadCartSpy = spyOnLoadCart(createCartFixture());
     const decrementSpy = jest.spyOn(
       OrderService as unknown as {
         decrementInventory: (...args: unknown[]) => Promise<void>;
