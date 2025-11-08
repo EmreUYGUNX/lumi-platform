@@ -1,4 +1,5 @@
-import type { CartItem, Prisma, PrismaClient } from "@prisma/client";
+import type { CartItem, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { NotFoundError } from "@/lib/errors.js";
 import { BaseRepository, type RepositoryContext } from "@/lib/repository/base.repository.js";
@@ -9,28 +10,23 @@ type CartRepositoryContext = RepositoryContext<
   Prisma.CartOrderByWithRelationInput
 >;
 
-const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
-  items: {
+const CART_ITEM_INCLUDE = Prisma.validator<Prisma.CartItemInclude>()({
+  productVariant: {
     include: {
-      productVariant: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          compareAtPrice: true,
-          stock: true,
-          product: {
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-              price: true,
-              currency: true,
-            },
-          },
-        },
+      product: true,
+      inventory: true,
+    },
+  },
+});
+
+export const CART_DEFAULT_INCLUDE = Prisma.validator<Prisma.CartInclude>()({
+  items: {
+    where: {
+      quantity: {
+        gt: 0,
       },
     },
+    include: CART_ITEM_INCLUDE,
   },
   user: {
     select: {
@@ -40,9 +36,9 @@ const CART_DEFAULT_INCLUDE: Prisma.CartInclude = {
       lastName: true,
     },
   },
-};
+});
 
-type CartWithRelations = Prisma.CartGetPayload<{ include: typeof CART_DEFAULT_INCLUDE }>;
+export type CartWithRelations = Prisma.CartGetPayload<{ include: typeof CART_DEFAULT_INCLUDE }>;
 
 const buildActiveCartCondition = (): Prisma.CartWhereInput => ({
   status: "ACTIVE",
@@ -78,24 +74,30 @@ export class CartRepository extends BaseRepository<
     return new CartRepository(this.prisma, context) as this;
   }
 
-  async findActiveCartByUser(userId: string, options: { include?: Prisma.CartInclude } = {}) {
-    return this.findFirst({
+  async findActiveCartByUser(
+    userId: string,
+    options: { include?: Prisma.CartInclude } = {},
+  ): Promise<CartWithRelations | null> {
+    return (await this.findFirst({
       where: {
         ...buildActiveCartCondition(),
         userId,
       },
       include: options.include ?? CART_DEFAULT_INCLUDE,
-    });
+    })) as CartWithRelations | null;
   }
 
-  async findActiveCartBySession(sessionId: string, options: { include?: Prisma.CartInclude } = {}) {
-    return this.findFirst({
+  async findActiveCartBySession(
+    sessionId: string,
+    options: { include?: Prisma.CartInclude } = {},
+  ): Promise<CartWithRelations | null> {
+    return (await this.findFirst({
       where: {
         ...buildActiveCartCondition(),
         sessionId,
       },
       include: options.include ?? CART_DEFAULT_INCLUDE,
-    });
+    })) as CartWithRelations | null;
   }
 
   async ensureActiveCart(cartId: string): Promise<CartWithRelations> {

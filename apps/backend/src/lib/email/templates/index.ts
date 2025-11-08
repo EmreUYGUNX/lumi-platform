@@ -7,6 +7,7 @@ import type {
   EmailTemplatePayloads,
 } from "../types.js";
 import { accountLockedTemplate } from "./account-locked.template.js";
+import { cartRecoveryTemplate } from "./cart-recovery.template.js";
 import { newDeviceTemplate } from "./new-device.template.js";
 import { passwordChangedTemplate } from "./password-changed.template.js";
 import { passwordResetTemplate } from "./password-reset.template.js";
@@ -24,6 +25,7 @@ const templateMap: Record<EmailTemplateId, EmailTemplateDefinition<EmailTemplate
   "auth.new-device": newDeviceTemplate as EmailTemplateDefinition<EmailTemplateId>,
   "auth.session-revoked": sessionRevokedTemplate as EmailTemplateDefinition<EmailTemplateId>,
   "auth.two-factor-setup": twoFactorSetupTemplate as EmailTemplateDefinition<EmailTemplateId>,
+  "commerce.cart-recovery": cartRecoveryTemplate as EmailTemplateDefinition<EmailTemplateId>,
 };
 
 export const listEmailTemplates = (): EmailTemplateId[] =>

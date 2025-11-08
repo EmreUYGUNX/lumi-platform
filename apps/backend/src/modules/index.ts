@@ -4,6 +4,7 @@ export * from "./product/product.service.js";
 export * from "./category/category.repository.js";
 export * from "./order/order.repository.js";
 export * from "./cart/cart.repository.js";
+export * from "./cart/cart.service.js";
 export * from "./payment/payment.repository.js";
 export * from "./review/review.repository.js";
 export * from "./media/media.repository.js";

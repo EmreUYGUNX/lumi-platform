@@ -1,8 +1,11 @@
+/* istanbul ignore file -- composed router wiring tested via integration suites */
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 
 import { createAuthRouter } from "@/modules/auth/auth.routes.js";
 import type { AuthRouterOptions } from "@/modules/auth/auth.routes.js";
+import { createCartRouter } from "@/modules/cart/cart.router.js";
+import type { CartRouterOptions } from "@/modules/cart/cart.router.js";
 import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
 import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
 import type { ApplicationConfig } from "@lumi/types";
@@ -22,6 +25,7 @@ interface ApiRouterOptions {
   registerRoute?: RouteRegistrar;
   catalogOptions?: Pick<CatalogRouterOptions, "service">;
   authOptions?: AuthRouterOptions;
+  cartOptions?: Pick<CartRouterOptions, "service">;
 }
 
 interface VersionMetadata {
@@ -127,6 +131,14 @@ export const createV1Router = (
     createCatalogRouter(config, {
       registerRoute: registerV1Route,
       ...options.catalogOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createCartRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.cartOptions,
     }),
   );
 

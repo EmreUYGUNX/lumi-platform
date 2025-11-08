@@ -1,3 +1,4 @@
+import type { MoneyDTO } from "@lumi/shared/dto";
 import type { EmailConfig } from "@lumi/types";
 
 export type EmailTemplateId =
@@ -8,7 +9,8 @@ export type EmailTemplateId =
   | "auth.account-locked"
   | "auth.new-device"
   | "auth.session-revoked"
-  | "auth.two-factor-setup";
+  | "auth.two-factor-setup"
+  | "commerce.cart-recovery";
 
 export interface EmailContent {
   subject: string;
@@ -76,6 +78,13 @@ export interface EmailTemplatePayloads {
     setupUrl: string;
     backupCodesUrl?: string;
   };
+  "commerce.cart-recovery": {
+    firstName?: string | null;
+    cartId: string;
+    resumeUrl: string;
+    itemCount: number;
+    total: MoneyDTO;
+  };
 }
 
 export type EmailTemplatePayload<TTemplateId extends EmailTemplateId> =
@@ -103,6 +112,10 @@ export interface EmailTemplateRegistry {
     context: EmailTemplateContext,
   ): EmailContent;
 }
+
+export type CartRecoveryEmailPayload = EmailTemplatePayload<"commerce.cart-recovery"> & {
+  to: string;
+};
 
 export const buildTemplateContext = (config: EmailConfig): EmailTemplateContext => ({
   brand: {

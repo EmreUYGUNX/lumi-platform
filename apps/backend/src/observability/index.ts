@@ -27,6 +27,12 @@ export {
 } from "./database-metrics.js";
 
 export {
+  recordCartOperationMetric,
+  cartMetricsInternals,
+  type CartMetricOperation,
+} from "./cart-metrics.js";
+
+export {
   evaluateHealth,
   registerHealthCheck,
   unregisterHealthCheck,

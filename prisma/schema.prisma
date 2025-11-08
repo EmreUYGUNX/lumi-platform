@@ -95,6 +95,13 @@ enum CouponType {
   FREE_SHIPPING
 }
 
+enum InventoryReservationStatus {
+  PENDING
+  ACTIVE
+  RELEASED
+  EXPIRED
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Core Domain Models
 
@@ -120,6 +127,7 @@ model User {
   permissions    UserPermission[]
   securityEvents SecurityEvent[]
   carts          Cart[]
+  reservations   InventoryReservation[]
   orders         Order[]
   addresses      Address[]
   reviews        Review[]
@@ -311,6 +319,7 @@ model ProductVariant {
   cartItems    CartItem[]
   variantMedia VariantMedia[]
   orderItems   OrderItem[]
+  reservationItems InventoryReservationItem[]
 
   @@index([productId])
 }
@@ -400,6 +409,40 @@ model Inventory {
   @@unique([productVariantId])
 }
 
+model InventoryReservation {
+  id        String                       @id @default(cuid())
+  cartId    String
+  userId    String
+  status    InventoryReservationStatus   @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  cart  Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items InventoryReservationItem[]
+
+  @@index([cartId])
+  @@index([userId])
+  @@index([status])
+}
+
+model InventoryReservationItem {
+  id               String   @id @default(cuid())
+  reservationId    String
+  productVariantId String
+  quantity         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  reservation    InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant       @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, productVariantId])
+  @@index([productVariantId])
+  @@index([reservationId])
+}
+
 model Media {
   id        String        @id @default(cuid())
   assetId   String        @unique
@@ -466,6 +509,7 @@ model Cart {
   user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   items CartItem[]
   order Order?     @relation("CartOrder")
+  reservations InventoryReservation[]
 
   @@index([userId])
   @@index([sessionId])
