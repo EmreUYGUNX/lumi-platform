@@ -1087,6 +1087,7 @@ components:
             - discountAmount
             - currency
             - items
+            - itemsCount
           properties:
             id:
               type: string
@@ -1154,6 +1155,9 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/OrderItem"
+            itemsCount:
+              type: integer
+              minimum: 0
             shippingAddressId:
               type: string
               format: cuid

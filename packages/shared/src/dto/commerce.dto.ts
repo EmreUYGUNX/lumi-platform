@@ -12,6 +12,7 @@ import {
   auditTimestampsSchema,
   cuidSchema,
   currencyCodeSchema,
+  emailSchema,
   isoDateTimeSchema,
   localeStringSchema,
   moneySchema,
@@ -78,6 +79,17 @@ export const cartSummarySchema = z
   .merge(auditTimestampsSchema)
   .strict();
 
+export const orderCustomerSchema = z
+  .object({
+    id: cuidSchema,
+    email: emailSchema,
+    firstName: nullableLocaleStringSchema,
+    lastName: nullableLocaleStringSchema,
+    phone: nullableLocaleStringSchema,
+  })
+  .merge(auditTimestampsSchema)
+  .strict();
+
 export const cartUpsertItemSchema = z
   .object({
     productVariantId: cuidSchema,
@@ -120,17 +132,28 @@ export const orderSummarySchema = z
     notes: nullableLocaleStringSchema,
     metadata: optionalJsonSchema,
     items: z.array(orderItemSchema),
+    itemsCount: z.number().int().nonnegative(),
     shippingAddressId: cuidSchema.nullable(),
     billingAddressId: cuidSchema.nullable(),
   })
   .merge(auditTimestampsSchema)
   .strict();
 
-export const orderDetailSchema = orderSummarySchema.extend({
-  shippingAddress: addressSchema.nullable(),
-  billingAddress: addressSchema.nullable(),
-  version: z.number().int().positive(),
-});
+export const orderStatusTimelineEntrySchema = z
+  .object({
+    status: orderStatusSchema,
+    timestamp: isoDateTimeSchema,
+  })
+  .strict();
+
+export const orderTrackingSummarySchema = z
+  .object({
+    trackingNumber: nullableLocaleStringSchema,
+    trackingUrl: nullableLocaleStringSchema,
+    carrier: nullableLocaleStringSchema,
+    estimatedDelivery: isoDateTimeSchema.nullable(),
+  })
+  .strict();
 
 export const paymentSummarySchema = z
   .object({
@@ -168,6 +191,16 @@ export const paymentSummarySchema = z
   })
   .merge(auditTimestampsSchema)
   .strict();
+
+export const orderDetailSchema = orderSummarySchema.extend({
+  shippingAddress: addressSchema.nullable(),
+  billingAddress: addressSchema.nullable(),
+  customer: orderCustomerSchema.nullable(),
+  payments: z.array(paymentSummarySchema).default([]),
+  timeline: z.array(orderStatusTimelineEntrySchema),
+  tracking: orderTrackingSummarySchema,
+  version: z.number().int().positive(),
+});
 
 export const reviewSummarySchema = z
   .object({
@@ -231,6 +264,9 @@ export type CartUpsertItemDTO = z.infer<typeof cartUpsertItemSchema>;
 export type OrderItemDTO = z.infer<typeof orderItemSchema>;
 export type OrderSummaryDTO = z.infer<typeof orderSummarySchema>;
 export type OrderDetailDTO = z.infer<typeof orderDetailSchema>;
+export type OrderCustomerSummaryDTO = z.infer<typeof orderCustomerSchema>;
+export type OrderStatusTimelineEntryDTO = z.infer<typeof orderStatusTimelineEntrySchema>;
+export type OrderTrackingSummaryDTO = z.infer<typeof orderTrackingSummarySchema>;
 export type PaymentSummaryDTO = z.infer<typeof paymentSummarySchema>;
 export type ReviewSummaryDTO = z.infer<typeof reviewSummarySchema>;
 export type CouponSummaryDTO = z.infer<typeof couponSummarySchema>;

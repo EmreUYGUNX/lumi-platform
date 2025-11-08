@@ -1452,6 +1452,7 @@ const standardComponents = {
             "discountAmount",
             "currency",
             "items",
+            "itemsCount",
           ],
           properties: {
             id: {
@@ -1532,6 +1533,10 @@ const standardComponents = {
               items: {
                 $ref: "#/components/schemas/OrderItem",
               },
+            },
+            itemsCount: {
+              type: "integer",
+              minimum: 0,
             },
             shippingAddressId: {
               type: "string",

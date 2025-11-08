@@ -10,7 +10,8 @@ export type EmailTemplateId =
   | "auth.new-device"
   | "auth.session-revoked"
   | "auth.two-factor-setup"
-  | "commerce.cart-recovery";
+  | "commerce.cart-recovery"
+  | "commerce.order-confirmation";
 
 export interface EmailContent {
   subject: string;
@@ -85,6 +86,19 @@ export interface EmailTemplatePayloads {
     itemCount: number;
     total: MoneyDTO;
   };
+  "commerce.order-confirmation": {
+    firstName?: string | null;
+    orderReference: string;
+    orderUrl?: string;
+    status: "confirmed" | "updated" | "refunded";
+    total: MoneyDTO;
+    estimatedDelivery?: string | null;
+    items: {
+      title: string;
+      quantity: number;
+      total: MoneyDTO;
+    }[];
+  };
 }
 
 export type EmailTemplatePayload<TTemplateId extends EmailTemplateId> =
@@ -114,6 +128,10 @@ export interface EmailTemplateRegistry {
 }
 
 export type CartRecoveryEmailPayload = EmailTemplatePayload<"commerce.cart-recovery"> & {
+  to: string;
+};
+
+export type OrderNotificationEmailPayload = EmailTemplatePayload<"commerce.order-confirmation"> & {
   to: string;
 };
 

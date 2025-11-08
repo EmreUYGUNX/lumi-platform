@@ -33,6 +33,15 @@ export {
 } from "./cart-metrics.js";
 
 export {
+  recordOrderCreatedMetric,
+  recordOrderStatusTransitionMetric,
+  recordOrderRefundMetric,
+  orderMetricsInternals,
+  type OrderRefundLabel,
+  type OrderStatusTransitionLabel,
+} from "./order-metrics.js";
+
+export {
   evaluateHealth,
   registerHealthCheck,
   unregisterHealthCheck,

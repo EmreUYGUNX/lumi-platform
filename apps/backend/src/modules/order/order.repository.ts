@@ -1,4 +1,5 @@
-import type { Order, OrderStatus, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Order, OrderStatus, PrismaClient } from "@prisma/client";
 
 import { ConflictError, NotFoundError } from "@/lib/errors.js";
 import {
@@ -15,7 +16,7 @@ type OrderRepositoryContext = RepositoryContext<
   Prisma.OrderOrderByWithRelationInput
 >;
 
-const ORDER_DEFAULT_INCLUDE: Prisma.OrderInclude = {
+const ORDER_DEFAULT_INCLUDE = Prisma.validator<Prisma.OrderInclude>()({
   items: {
     include: {
       product: true,
@@ -25,7 +26,8 @@ const ORDER_DEFAULT_INCLUDE: Prisma.OrderInclude = {
   payments: true,
   shippingAddress: true,
   billingAddress: true,
-};
+  user: true,
+});
 
 const ORDER_DEFAULT_SORT: Prisma.OrderOrderByWithRelationInput[] = [{ createdAt: "desc" }];
 
@@ -171,10 +173,16 @@ export class OrderRepository extends BaseRepository<
       >,
       "where"
     > = {},
+    filters: Prisma.OrderWhereInput = {},
   ): Promise<PaginatedResult<Prisma.OrderGetPayload<{ include: Prisma.OrderInclude }>>> {
+    const where: Prisma.OrderWhereInput = {
+      ...filters,
+      userId,
+    };
+
     return this.paginate({
       ...pagination,
-      where: { userId },
+      where,
       include: pagination.include ?? ORDER_DEFAULT_INCLUDE,
       orderBy: pagination.orderBy ?? ORDER_DEFAULT_SORT,
     }) as Promise<PaginatedResult<Prisma.OrderGetPayload<{ include: Prisma.OrderInclude }>>>;

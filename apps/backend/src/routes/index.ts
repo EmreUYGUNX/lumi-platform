@@ -8,6 +8,8 @@ import { createCartRouter } from "@/modules/cart/cart.router.js";
 import type { CartRouterOptions } from "@/modules/cart/cart.router.js";
 import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
 import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
+import { createOrderRouter } from "@/modules/order/order.router.js";
+import type { OrderRouterOptions } from "@/modules/order/order.router.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
@@ -26,6 +28,7 @@ interface ApiRouterOptions {
   catalogOptions?: Pick<CatalogRouterOptions, "service">;
   authOptions?: AuthRouterOptions;
   cartOptions?: Pick<CartRouterOptions, "service">;
+  orderOptions?: Pick<OrderRouterOptions, "service">;
 }
 
 interface VersionMetadata {
@@ -139,6 +142,14 @@ export const createV1Router = (
     createCartRouter(config, {
       registerRoute: registerV1Route,
       ...options.cartOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createOrderRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.orderOptions,
     }),
   );
 

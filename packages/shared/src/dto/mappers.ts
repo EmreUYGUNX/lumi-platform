@@ -1,4 +1,4 @@
-import { Prisma, UserStatus } from "@prisma/client";
+import { OrderStatus, Prisma, UserStatus } from "@prisma/client";
 
 import {
   categorySummarySchema,
@@ -13,8 +13,11 @@ import {
   cartItemSchema,
   cartSummarySchema,
   couponSummarySchema,
+  orderCustomerSchema,
   orderDetailSchema,
+  orderStatusTimelineEntrySchema,
   orderSummarySchema,
+  orderTrackingSummarySchema,
   paymentSummarySchema,
 } from "./commerce.dto.js";
 import type {
@@ -103,6 +106,76 @@ const toNullableString = (value: string | null | undefined): string | null => {
 const buildFullName = (firstName?: string | null, lastName?: string | null): string | null => {
   const parts = [firstName, lastName].map((part) => toNullableString(part)).filter(Boolean);
   return parts.length > 0 ? (parts as string[]).join(" ") : null;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const buildOrderTimeline = (order: OrderWithRelations) => {
+  const checkpoints: ({ status: OrderStatus; timestamp: Date } | null)[] = [
+    { status: OrderStatus.PENDING, timestamp: order.createdAt },
+    order.placedAt ? { status: OrderStatus.PAID, timestamp: order.placedAt } : null,
+    order.fulfilledAt ? { status: OrderStatus.FULFILLED, timestamp: order.fulfilledAt } : null,
+    order.shippedAt ? { status: OrderStatus.SHIPPED, timestamp: order.shippedAt } : null,
+    order.deliveredAt ? { status: OrderStatus.DELIVERED, timestamp: order.deliveredAt } : null,
+    order.cancelledAt ? { status: OrderStatus.CANCELLED, timestamp: order.cancelledAt } : null,
+  ];
+
+  return checkpoints.filter(Boolean).map((entry) =>
+    orderStatusTimelineEntrySchema.parse({
+      status: entry!.status,
+      timestamp: entry!.timestamp.toISOString(),
+    }),
+  );
+};
+
+const resolveTrackingMetadata = (metadata: unknown): Record<string, unknown> | null => {
+  if (!isPlainObject(metadata)) {
+    return null;
+  }
+
+  const maybeTracking = metadata.tracking ?? metadata.shipment;
+  if (isPlainObject(maybeTracking)) {
+    return maybeTracking;
+  }
+
+  return null;
+};
+
+const buildTrackingSummary = (order: OrderWithRelations) => {
+  const trackingMetadata = resolveTrackingMetadata(order.metadata ?? null);
+  const fallbackEstimatedDelivery =
+    order.deliveredAt ?? order.shippedAt ?? order.fulfilledAt ?? null;
+
+  return orderTrackingSummarySchema.parse({
+    trackingNumber: toNullableString(
+      (trackingMetadata?.trackingNumber as string | null | undefined) ?? null,
+    ),
+    trackingUrl: toNullableString(
+      (trackingMetadata?.trackingUrl as string | null | undefined) ?? null,
+    ),
+    carrier: toNullableString((trackingMetadata?.carrier as string | null | undefined) ?? null),
+    estimatedDelivery:
+      toIsoString(
+        (trackingMetadata?.estimatedDelivery as string | Date | null | undefined) ?? null,
+      ) ?? toIsoString(fallbackEstimatedDelivery),
+  });
+};
+
+const mapOrderCustomer = (order: OrderWithRelations) => {
+  if (!order.user) {
+    return null;
+  }
+
+  return orderCustomerSchema.parse({
+    id: order.user.id,
+    email: order.user.email,
+    firstName: toNullableString(order.user.firstName),
+    lastName: toNullableString(order.user.lastName),
+    phone: toNullableString(order.user.phone),
+    createdAt: order.user.createdAt.toISOString(),
+    updatedAt: order.user.updatedAt.toISOString(),
+  });
 };
 
 export const mapUserEntityToSummary = (user: UserWithRoleEntities): UserSummaryDTO => {
@@ -386,21 +459,11 @@ export const mapOrderToSummary = (
     notes: toNullableString(order.notes ?? null),
     metadata: order.metadata ?? null,
     items: mapOrderItems(order, resolvedCurrency),
+    itemsCount: order.items.length,
     shippingAddressId: order.shippingAddressId ?? null,
     billingAddressId: order.billingAddressId ?? null,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
-  });
-};
-
-export const mapOrderToDetail = (order: OrderWithRelations): OrderDetailDTO => {
-  const summary = mapOrderToSummary(order);
-
-  return orderDetailSchema.parse({
-    ...summary,
-    version: order.version,
-    shippingAddress: mapAddress(order.shippingAddress),
-    billingAddress: mapAddress(order.billingAddress),
   });
 };
 
@@ -442,6 +505,21 @@ export const mapPaymentToSummary = (payment: PaymentEntity, currency?: string): 
     createdAt: payment.createdAt.toISOString(),
     updatedAt: payment.updatedAt.toISOString(),
   });
+
+export const mapOrderToDetail = (order: OrderWithRelations): OrderDetailDTO => {
+  const summary = mapOrderToSummary(order);
+
+  return orderDetailSchema.parse({
+    ...summary,
+    customer: mapOrderCustomer(order),
+    version: order.version,
+    shippingAddress: mapAddress(order.shippingAddress),
+    billingAddress: mapAddress(order.billingAddress),
+    payments: order.payments?.map((payment) => mapPaymentToSummary(payment)) ?? [],
+    timeline: buildOrderTimeline(order),
+    tracking: buildTrackingSummary(order),
+  });
+};
 
 export const mapCouponToSummary = (coupon: CouponEntity, currency?: string): CouponSummaryDTO =>
   couponSummarySchema.parse({

@@ -22,6 +22,7 @@ import type {
   EmailTemplateContext,
   EmailTemplateId,
   EmailTemplatePayload,
+  OrderNotificationEmailPayload,
 } from "./types.js";
 
 const EMAIL_LOGGER_COMPONENT = "email:service";
@@ -504,6 +505,29 @@ export class EmailService {
       text: email.text,
       previewText: email.previewText,
     });
+  }
+
+  private async sendOrderNotificationEmail(
+    payload: Omit<OrderNotificationEmailPayload, "status">,
+    status: OrderNotificationEmailPayload["status"],
+  ): Promise<void> {
+    await this.sendTemplate(payload.to, "commerce.order-confirmation", {
+      ...payload,
+      status,
+      firstName: payload.firstName ?? undefined,
+    });
+  }
+
+  async sendOrderConfirmationEmail(payload: OrderNotificationEmailPayload): Promise<void> {
+    await this.sendOrderNotificationEmail(payload, "confirmed");
+  }
+
+  async sendOrderUpdateEmail(payload: OrderNotificationEmailPayload): Promise<void> {
+    await this.sendOrderNotificationEmail(payload, "updated");
+  }
+
+  async sendOrderRefundEmail(payload: OrderNotificationEmailPayload): Promise<void> {
+    await this.sendOrderNotificationEmail(payload, "refunded");
   }
 
   async sendCartRecoveryEmail(payload: CartRecoveryEmailPayload): Promise<void> {
