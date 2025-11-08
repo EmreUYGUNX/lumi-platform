@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import { logger } from "../../lib/logger.js";
 import { cartMetricsInternals, recordCartOperationMetric } from "../cart-metrics.js";
 
 const incrementMock = jest.fn();
@@ -8,21 +9,17 @@ const createCounterMock = jest.fn(() => ({
   labels: labelsMock,
 }));
 const isMetricsEnabledMock = jest.fn(() => true);
-let loggerDebugMock: jest.Mock;
 
 jest.mock("../metrics.js", () => ({
   createCounter: createCounterMock,
   isMetricsCollectionEnabled: isMetricsEnabledMock,
 }));
 
-jest.mock("../../lib/logger.js", () => {
-  loggerDebugMock = jest.fn();
-  return {
-    logger: {
-      debug: loggerDebugMock,
-    },
-  };
-});
+jest.mock("../../lib/logger.js", () => ({
+  logger: {
+    debug: jest.fn(),
+  },
+}));
 
 describe("cart metrics", () => {
   beforeEach(() => {
@@ -54,7 +51,7 @@ describe("cart metrics", () => {
 
     recordCartOperationMetric("validate_cart");
 
-    expect(loggerDebugMock).toHaveBeenCalledWith(
+    expect(logger.debug).toHaveBeenCalledWith(
       "Failed to increment cart operation metric",
       expect.objectContaining({ operation: "validate_cart" }),
     );
