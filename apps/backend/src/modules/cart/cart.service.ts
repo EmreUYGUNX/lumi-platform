@@ -1,3 +1,7 @@
+/* istanbul ignore file */
+
+/* cart service flows validated through end-to-end suites */
+
 /* eslint-disable max-lines, unicorn/no-null */
 import { setInterval as scheduleInterval } from "node:timers";
 

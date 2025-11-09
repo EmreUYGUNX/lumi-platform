@@ -51,4 +51,22 @@ describe("orderConfirmationTemplate", () => {
     expect(content.text).not.toContain("View order details");
     expect(content.subject).toContain("refunded");
   });
+
+  it("falls back to default copy and omits the items table when no items are provided", () => {
+    const payload: Parameters<typeof orderConfirmationTemplate.render>[0] = {
+      firstName: "Alex",
+      orderReference: "LM-000000",
+      status: "confirmed",
+      estimatedDelivery: "2024-01-10T10:00:00.000Z",
+      total: { amount: "0.00", currency: "TRY" },
+      items: [],
+    };
+    (payload as Record<string, unknown>).status = "processing";
+
+    const content = orderConfirmationTemplate.render(payload, context);
+
+    expect(content.subject).toContain("Order confirmed");
+    expect(content.html).not.toContain("<table");
+    expect(content.text).toContain("Estimated delivery:");
+  });
 });

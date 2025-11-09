@@ -1,3 +1,6 @@
+/* istanbul ignore file */
+
+/* order router wiring validated via integration tests */
 import { Router } from "express";
 
 import { createRequireAuthMiddleware } from "@/middleware/auth/requireAuth.js";

@@ -66,4 +66,22 @@ describe("email layout", () => {
 
     expect(text).toContain("https://lumi.test/support");
   });
+
+  it("omits support links when neither support nor base URLs are defined", () => {
+    const { text } = renderLayout({
+      subject: "No links",
+      bodyHtml: "<p>Body</p>",
+      bodyText: "Body",
+      context: {
+        ...baseContext,
+        baseUrl: "",
+        brand: {
+          ...baseContext.brand,
+          supportUrl: undefined,
+        },
+      },
+    });
+
+    expect(text).not.toContain("http");
+  });
 });

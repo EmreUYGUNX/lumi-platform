@@ -1,4 +1,6 @@
-/* istanbul ignore file -- composed router wiring tested via integration suites */
+/* istanbul ignore file */
+
+/* composed router wiring tested via integration suites */
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 

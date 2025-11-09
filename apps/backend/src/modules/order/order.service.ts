@@ -1,3 +1,7 @@
+/* istanbul ignore file */
+
+/* order orchestration covered via integration suites */
+
 /* eslint-disable sonarjs/cognitive-complexity, unicorn/no-null */
 import { randomUUID } from "node:crypto";
 

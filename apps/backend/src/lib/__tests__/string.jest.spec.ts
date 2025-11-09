@@ -22,4 +22,10 @@ describe("string helpers", () => {
     expect(keywords).not.toContain("");
     expect(new Set(keywords).size).toBe(keywords.length);
   });
+
+  it("ignores short fragments and tolerates missing summaries", () => {
+    const keywords = deriveSearchKeywords("Go", undefined, ["AR", "XR", "Ops ++"]);
+
+    expect(keywords).toEqual(["ops"]);
+  });
 });

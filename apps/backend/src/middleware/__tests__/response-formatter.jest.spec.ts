@@ -208,6 +208,16 @@ describe("response formatter middleware", () => {
     expect(error.error.details).toBeUndefined();
   });
 
+  it("wraps primitive error details into the standard array shape", () => {
+    const error = formatError({
+      code: "SIMPLE",
+      message: "Something went wrong",
+      details: "Email must be valid",
+    });
+
+    expect(error.error.details).toEqual([{ message: "Email must be valid" }]);
+  });
+
   it("preserves formatted success payloads that already include metadata", async () => {
     const app = express();
     app.use(responseFormatter);
@@ -229,5 +239,12 @@ describe("response formatter middleware", () => {
 
     expect(body.meta.requestId).toBe("existing");
     expect(body.meta.pagination?.totalPages).toBe(1);
+  });
+
+  it("generates request identifiers when metadata does not provide one", () => {
+    const response = formatSuccess({ ok: true });
+
+    expect(response.meta.requestId.split("-")).toHaveLength(5);
+    expect(response.meta.requestId.length).toBeGreaterThan(30);
   });
 });

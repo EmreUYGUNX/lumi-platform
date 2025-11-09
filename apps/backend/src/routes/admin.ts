@@ -1,4 +1,6 @@
-/* istanbul ignore file -- placeholder admin router exercised via end-to-end suites */
+/* istanbul ignore file */
+
+/* placeholder admin router exercised via end-to-end suites */
 import { Router } from "express";
 import type { Request } from "express";
 import { z } from "zod";

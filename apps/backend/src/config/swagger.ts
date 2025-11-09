@@ -1,4 +1,6 @@
-/* istanbul ignore file -- Swagger config exercised through documentation smoke tests */
+/* istanbul ignore file */
+
+/* Swagger config exercised through documentation smoke tests */
 import path from "node:path";
 
 import type { OpenAPIV3_1 as OpenApi31 } from "openapi-types";

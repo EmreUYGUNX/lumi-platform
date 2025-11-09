@@ -1,4 +1,6 @@
-/* istanbul ignore file -- audit router exercised via integration and supertest suites */
+/* istanbul ignore file */
+
+/* audit router exercised via integration and supertest suites */
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 

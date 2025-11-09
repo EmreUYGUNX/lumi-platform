@@ -200,4 +200,57 @@ describe("paginatedResponse", () => {
       }),
     ).toThrow(RangeError);
   });
+
+  it("requires integer inputs for pagination parameters", () => {
+    expect(() =>
+      paginatedResponse([], {
+        totalItems: 1.5,
+        page: 1,
+        pageSize: 10,
+      }),
+    ).toThrow(TypeError);
+
+    expect(() =>
+      paginatedResponse([], {
+        totalItems: 10,
+        page: 1,
+        pageSize: 5.5,
+      }),
+    ).toThrow(TypeError);
+  });
+
+  it("rejects inconsistent totalPages values including negative inputs", () => {
+    expect(() =>
+      paginatedResponse([], {
+        totalItems: 0,
+        page: 1,
+        pageSize: 10,
+        totalPages: -1,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("prevents requesting pages beyond the computed total", () => {
+    expect(() =>
+      paginatedResponse([], {
+        totalItems: 2,
+        page: 3,
+        pageSize: 1,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("handles datasets without pages by disabling navigation flags", () => {
+    const payload = paginatedResponse([], {
+      totalItems: 0,
+      page: 1,
+      pageSize: 5,
+    });
+
+    expect(payload.meta?.pagination).toMatchObject({
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    });
+  });
 });
