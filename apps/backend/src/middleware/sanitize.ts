@@ -21,16 +21,29 @@ const sanitiseUrlValue = (value: string): string => {
     return trimmed;
   }
 
-  if (!validator.isURL(trimmed, { require_protocol: true, protocols: ["http", "https"] })) {
-    return "";
+  const toUrlString = (candidate: string): string | undefined => {
+    if (!validator.isURL(candidate, { require_protocol: true, protocols: ["http", "https"] })) {
+      return undefined;
+    }
+    try {
+      return new URL(candidate).toString();
+    } catch {
+      return undefined;
+    }
+  };
+
+  const direct = toUrlString(trimmed);
+  if (direct) {
+    return direct;
   }
 
-  try {
-    const normalized = new URL(trimmed);
-    return normalized.toString();
-  } catch {
-    return "";
+  const encoded = encodeURI(trimmed);
+  const encodedResult = toUrlString(encoded);
+  if (encodedResult) {
+    return encodedResult;
   }
+
+  return "";
 };
 
 const escapeQueryValue = (value: string): string =>
