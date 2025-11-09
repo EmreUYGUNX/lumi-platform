@@ -51,6 +51,7 @@ const allowedPatterns = [
   /^doctrine$/,
   /^dom-accessibility-api$/,
   /^emoji-regex$/,
+  /^entities$/,
   /^encodeurl$/,
   /^esbuild$/,
   /^escape-string-regexp$/,

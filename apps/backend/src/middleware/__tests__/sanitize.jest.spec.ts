@@ -58,4 +58,41 @@ describe("createSanitizationMiddleware", () => {
     );
     warnSpy.mockRestore();
   });
+
+  it("strips HTML, normalises URLs, and mitigates injection attempts", () => {
+    const config = createTestConfig().security.validation;
+    const middlewares = createSanitizationMiddleware(config);
+    const payloadSanitize = middlewares[2];
+    if (!payloadSanitize) {
+      throw new Error("Sanitization middleware initialisation failed");
+    }
+
+    const request = {
+      body: {
+        description: "<strong>Welcome</strong><script>alert('owned')</script> to Lumi ",
+        mediaUrl: "https://example.com/path?utm_source=<script>",
+        nested: {
+          contentSummary: "<p>safe</p>",
+        },
+      },
+      query: {
+        search: "'; DROP TABLE users; -- price<0",
+      },
+      params: {
+        redirectUrl: "ftp://malicious.test/path",
+      },
+    } as unknown as Request;
+
+    const response = {} as Response;
+    const next: NextFunction = jest.fn();
+
+    payloadSanitize(request, response, next);
+
+    expect(request.body.description).toBe("Welcome to Lumi");
+    expect(request.body.mediaUrl).toBe("https://example.com/path?utm_source=%3Cscript%3E");
+    expect(request.body.nested.contentSummary).toBe("safe");
+    expect(request.query.search).toBe("DROP TABLE users price 0");
+    expect(request.params.redirectUrl).toBe("");
+    expect(next).toHaveBeenCalledTimes(1);
+  });
 });

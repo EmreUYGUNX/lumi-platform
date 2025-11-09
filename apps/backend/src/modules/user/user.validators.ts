@@ -57,6 +57,8 @@ export const addressIdParamSchema = z.object({
 });
 
 export const userPreferencePatchSchema = userPreferenceUpdateSchema;
+export const updatePreferencesSchema = userPreferencePatchSchema;
+export const updateProfileSchema = userProfileUpdateSchema;
 
 export const adminUserListQuerySchema = paginationRequestSchema
   .extend({

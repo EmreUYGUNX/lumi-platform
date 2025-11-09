@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { createAccountSecurityService } from "@/modules/auth/account-security.service.js";
 import type { AccountSecurityService } from "@/modules/auth/account-security.service.js";
+import { PERMISSIONS } from "@/modules/auth/permissions.js";
 import { createSecurityEventService } from "@/modules/auth/security-event.service.js";
 import type { SecurityEventService } from "@/modules/auth/security-event.service.js";
 import type { ApplicationConfig } from "@lumi/types";
@@ -195,7 +196,7 @@ export const createAdminRouter = (
 
   const requireAuth = createRequireAuthMiddleware();
   const requireAdminRole = createRequireRoleMiddleware(["admin"], { securityEvents });
-  const requireAuditPermission = createRequirePermissionMiddleware(["report:read"], {
+  const requireAuditPermission = createRequirePermissionMiddleware([PERMISSIONS.REPORTS.READ], {
     securityEvents,
   });
   const authorizeAdminResource = createAuthorizeResourceMiddleware({
