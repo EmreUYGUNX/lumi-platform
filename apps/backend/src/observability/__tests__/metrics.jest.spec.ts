@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 import { resetEnvironmentCache } from "../../config/env.js";
 import { withTemporaryEnvironment } from "../../config/testing.js";
+import type * as MetricsModule from "../metrics.js";
 
 const BASE_ENV = {
   NODE_ENV: "test",
@@ -29,11 +30,10 @@ const BASE_ENV = {
 
 const loadConfigModule = async () => import("../../config/index.js");
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-let activeMetricsModule: Awaited<ReturnType<typeof import("../metrics.js")>> | undefined;
+let activeMetricsModule: typeof MetricsModule | undefined;
 
-const importMetricsModule = async () => {
-  const module = await import("../metrics.js");
+const importMetricsModule = async (): Promise<typeof MetricsModule> => {
+  const module = (await import("../metrics.js")) as typeof MetricsModule;
   activeMetricsModule = module;
   return module;
 };
