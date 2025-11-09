@@ -320,6 +320,7 @@ const createOrderFixture = (product: ProductWithRelations): OrderWithRelations =
     isDefault: true,
     createdAt: timestamp,
     updatedAt: timestamp,
+    deletedAt: null,
   };
 
   const billingAddress = {
