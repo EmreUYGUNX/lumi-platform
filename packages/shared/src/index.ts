@@ -4,6 +4,7 @@ export const sharedConstants = {
 
 export const isProduction = () => process.env.NODE_ENV === "production";
 
+export { getCoreApiOpenApiDocument } from "./api-schemas/index.js";
 export { normalizeCorsConfig, isOriginAllowed } from "./security/cors.js";
 export {
   buildSecurityHeaders,

@@ -13,6 +13,12 @@ info:
 servers:
   - url: http://localhost:4100/api
     description: Primary API entrypoint
+  - url: https://api.lumi-commerce.com/api
+    description: Production
+  - url: https://staging-api.lumi-commerce.com/api
+    description: Staging
+  - url: http://localhost:4000/api
+    description: Local development
 tags:
   - name: Health
     description: Service health and readiness checks.
@@ -25,6 +31,12 @@ tags:
     description: Product catalogue browsing endpoints.
   - name: Auth
     description: Authentication, session management, and RBAC-protected endpoints.
+  - name: Cart
+    description: Persistent shopping cart operations.
+  - name: Orders
+    description: Order lifecycle, payments, and tracking endpoints.
+  - name: Users
+    description: Customer self-service profile, address, and preference APIs.
 components:
   securitySchemes:
     bearerAuth:
@@ -32,16 +44,191 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Reserved for authenticated endpoints. Full RBAC enforcement will arrive in Phase 3.
-    basicAuth:
-      type: http
-      scheme: basic
-      description: Used for internal-only endpoints such as metrics collection.
     serviceToken:
       type: apiKey
       in: header
       name: X-Service-Token
       description: Service-to-service authentication placeholder. Exact contract will be finalised in Phase 2.
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Used for internal-only endpoints such as metrics collection.
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum number of requests allowed within the active window.
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Remaining requests before throttling begins.
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: UNIX epoch (seconds) when the bucket resets.
+      schema:
+        type: integer
+        format: int64
+    Retry-After:
+      description: Seconds until the client may safely retry.
+      schema:
+        type: integer
+  parameters:
+    RequestIdHeader:
+      name: X-Request-Id
+      in: header
+      description: Optional idempotency token supplied by clients.
+      schema:
+        type: string
+        format: uuid
+    ProductSlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    ProductId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    VariantId:
+      name: variantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    CategorySlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    CategoryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    OrderReference:
+      name: reference
+      in: path
+      required: true
+      schema:
+        type: string
+    CartItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    AddressId:
+      name: addressId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
+  examples:
+    StandardSuccess:
+      summary: Success envelope
+      value:
+        success: true
+        data: {}
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: 5a8f4ec3-5c58-4f08-8200-0b2fd299e9e0
+    ValidationError:
+      summary: Validation failure
+      value:
+        success: false
+        error:
+          code: VALIDATION_ERROR
+          message: Invalid request parameters
+          details:
+            - field: title
+              message: Title must be at least 3 characters long.
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: 0c1eaa62-df05-4cf3-8f42-5d3fd20f27d1
+  responses:
+    UnauthorizedError:
+      description: Caller is not authenticated.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StandardErrorResponse"
+          examples:
+            default:
+              value:
+                success: false
+                error:
+                  code: UNAUTHORIZED
+                  message: Authentication token missing or expired.
+                meta:
+                  timestamp: 2025-10-01T12:00:00Z
+                  requestId: 3b379a4b-7ab4-48b0-9eae-2ca8c59dbb53
+    ForbiddenError:
+      description: Caller lacks sufficient privileges (RBAC failure).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StandardErrorResponse"
+          examples:
+            default:
+              value:
+                success: false
+                error:
+                  code: FORBIDDEN
+                  message: Administrator privileges required.
+                meta:
+                  timestamp: 2025-10-01T12:00:00Z
+                  requestId: f631c7be-e876-4d6b-9b9f-4de9128010a9
   schemas:
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        perPage:
+          type: integer
+          minimum: 1
+          maximum: 200
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
     StandardSuccessResponse:
       type: object
       required:
@@ -59,10 +246,6 @@ components:
           type: object
           additionalProperties: true
           description: Optional metadata contextualising the response.
-    ErrorDetails:
-      type: object
-      additionalProperties: true
-      description: Additional information to help diagnose the failure.
     StandardError:
       type: object
       required:
@@ -99,6 +282,924 @@ components:
           type: object
           additionalProperties: true
           description: Optional metadata contextualising the error.
+    Money:
+      type: object
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: string
+          pattern: ^-?\d+(?:\.\d{1,2})?$
+          description: Decimal amount represented as a string with up to two fractional digits.
+          examples:
+            - "199.99"
+            - "0.00"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: ^[A-Z]{3}$
+          description: ISO-4217 currency code.
+          examples:
+            - TRY
+            - USD
+    AuditTimestamps:
+      type: object
+      required:
+        - createdAt
+        - updatedAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp in ISO-8601 format.
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp in ISO-8601 format.
+    SoftDelete:
+      type: object
+      properties:
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    Category:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - name
+            - slug
+          properties:
+            id:
+              type: string
+              format: cuid
+            name:
+              type: string
+            slug:
+              type: string
+            description:
+              type: string
+              nullable: true
+            parentId:
+              type: string
+              format: cuid
+              nullable: true
+            path:
+              type: string
+            level:
+              type: integer
+            imageUrl:
+              type: string
+              format: uri
+              nullable: true
+            displayOrder:
+              type: integer
+              nullable: true
+    ProductVariant:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - title
+            - price
+            - stock
+            - isPrimary
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            sku:
+              type: string
+              nullable: true
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+              nullable: true
+            stock:
+              type: integer
+              minimum: 0
+            attributes:
+              type: object
+              nullable: true
+              additionalProperties: true
+            weightGrams:
+              type: integer
+              nullable: true
+            isPrimary:
+              type: boolean
+    MediaAsset:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - assetId
+            - url
+            - type
+            - provider
+            - mimeType
+            - sizeBytes
+          properties:
+            id:
+              type: string
+              format: cuid
+            assetId:
+              type: string
+              maxLength: 120
+            url:
+              type: string
+              format: uri
+            type:
+              type: string
+              enum:
+                - IMAGE
+                - VIDEO
+                - DOCUMENT
+            provider:
+              type: string
+              enum:
+                - CLOUDINARY
+                - S3
+            mimeType:
+              type: string
+            sizeBytes:
+              type: integer
+              minimum: 0
+            width:
+              type: integer
+              nullable: true
+            height:
+              type: integer
+              nullable: true
+            alt:
+              type: string
+              nullable: true
+            caption:
+              type: string
+              nullable: true
+    Product:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - $ref: "#/components/schemas/SoftDelete"
+        - type: object
+          required:
+            - id
+            - title
+            - slug
+            - status
+            - price
+            - inventoryPolicy
+          properties:
+            id:
+              type: string
+              format: cuid
+            title:
+              type: string
+            slug:
+              type: string
+            status:
+              type: string
+              enum:
+                - DRAFT
+                - ACTIVE
+                - ARCHIVED
+            summary:
+              type: string
+              nullable: true
+            description:
+              type: string
+              nullable: true
+            price:
+              $ref: "#/components/schemas/Money"
+            compareAtPrice:
+              $ref: "#/components/schemas/Money"
+            inventoryPolicy:
+              type: string
+              enum:
+                - TRACK
+                - CONTINUE
+                - DENY
+            currency:
+              type: string
+            variants:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductVariant"
+            categories:
+              type: array
+              items:
+                $ref: "#/components/schemas/Category"
+            media:
+              type: array
+              items:
+                $ref: "#/components/schemas/MediaAsset"
+    CartItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - cartId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            cartId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            productVariant:
+              $ref: "#/components/schemas/ProductVariant"
+              nullable: true
+    CartTotals:
+      type: object
+      required:
+        - subtotal
+        - tax
+        - discount
+        - total
+      properties:
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        tax:
+          $ref: "#/components/schemas/Money"
+        discount:
+          $ref: "#/components/schemas/Money"
+        total:
+          $ref: "#/components/schemas/Money"
+    Cart:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - status
+            - items
+            - totals
+          properties:
+            id:
+              type: string
+              format: cuid
+            userId:
+              type: string
+              format: cuid
+              nullable: true
+            sessionId:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - CHECKED_OUT
+                - ABANDONED
+            expiresAt:
+              type: string
+              format: date-time
+              nullable: true
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CartItem"
+            totals:
+              $ref: "#/components/schemas/CartTotals"
+    Address:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - fullName
+            - line1
+            - city
+            - country
+          properties:
+            id:
+              type: string
+              format: cuid
+            label:
+              type: string
+            fullName:
+              type: string
+            phone:
+              type: string
+              nullable: true
+            line1:
+              type: string
+            line2:
+              type: string
+              nullable: true
+            city:
+              type: string
+            state:
+              type: string
+              nullable: true
+            postalCode:
+              type: string
+            country:
+              type: string
+            isDefault:
+              type: boolean
+    OrderItem:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - orderId
+            - productId
+            - productVariantId
+            - quantity
+            - unitPrice
+          properties:
+            id:
+              type: string
+              format: cuid
+            orderId:
+              type: string
+              format: cuid
+            productId:
+              type: string
+              format: cuid
+            productVariantId:
+              type: string
+              format: cuid
+            quantity:
+              type: integer
+              minimum: 1
+            unitPrice:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+              minLength: 3
+              maxLength: 3
+              pattern: ^[A-Z]{3}$
+            titleSnapshot:
+              type: string
+            variantSnapshot:
+              type: object
+              additionalProperties: true
+              nullable: true
+    Order:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - reference
+            - status
+            - totalAmount
+          properties:
+            id:
+              type: string
+              format: cuid
+            reference:
+              type: string
+            status:
+              type: string
+              enum:
+                - PENDING
+                - PAID
+                - FULFILLED
+                - SHIPPED
+                - DELIVERED
+                - CANCELLED
+            totalAmount:
+              $ref: "#/components/schemas/Money"
+            subtotalAmount:
+              $ref: "#/components/schemas/Money"
+            taxAmount:
+              $ref: "#/components/schemas/Money"
+            discountAmount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+            itemsCount:
+              type: integer
+            shippingAddressId:
+              type: string
+              nullable: true
+            billingAddressId:
+              type: string
+              nullable: true
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            shippingAddress:
+              $ref: "#/components/schemas/Address"
+            billingAddress:
+              $ref: "#/components/schemas/Address"
+            payments:
+              type: array
+              items:
+                $ref: "#/components/schemas/Payment"
+            timeline:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderStatusEvent"
+            tracking:
+              $ref: "#/components/schemas/Tracking"
+    Payment:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - provider
+            - status
+            - amount
+          properties:
+            id:
+              type: string
+              format: cuid
+            provider:
+              type: string
+              enum:
+                - IYZICO
+                - STRIPE
+                - PAYPAL
+                - MANUAL
+            status:
+              type: string
+              enum:
+                - INITIATED
+                - AUTHORIZED
+                - SETTLED
+                - FAILED
+                - REFUNDED
+            transactionId:
+              type: string
+            amount:
+              $ref: "#/components/schemas/Money"
+            currency:
+              type: string
+            failureReason:
+              type: string
+              nullable: true
+    OrderStatusEvent:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PAID
+            - FULFILLED
+            - SHIPPED
+            - DELIVERED
+            - CANCELLED
+        timestamp:
+          type: string
+          format: date-time
+    Tracking:
+      type: object
+      properties:
+        trackingNumber:
+          type: string
+          nullable: true
+        trackingUrl:
+          type: string
+          format: uri
+          nullable: true
+        carrier:
+          type: string
+          nullable: true
+        estimatedDelivery:
+          type: string
+          format: date-time
+          nullable: true
+    UserProfile:
+      type: object
+      required:
+        - user
+        - addresses
+        - preferences
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+    User:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - id
+            - email
+            - status
+          properties:
+            id:
+              type: string
+              format: cuid
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+              nullable: true
+            lastName:
+              type: string
+              nullable: true
+            status:
+              type: string
+              enum:
+                - ACTIVE
+                - SUSPENDED
+                - DELETED
+            roles:
+              type: array
+              items:
+                type: string
+            permissions:
+              type: array
+              items:
+                type: string
+            emailVerified:
+              type: boolean
+    UserPreferences:
+      allOf:
+        - $ref: "#/components/schemas/AuditTimestamps"
+        - type: object
+          required:
+            - language
+            - currency
+            - marketingOptIn
+            - notifications
+          properties:
+            language:
+              type: string
+            currency:
+              type: string
+            marketingOptIn:
+              type: boolean
+            notifications:
+              type: object
+              properties:
+                email:
+                  type: boolean
+                sms:
+                  type: boolean
+                push:
+                  type: boolean
+            privacy:
+              type: object
+              properties:
+                personalisedRecommendations:
+                  type: boolean
+                dataSharing:
+                  type: boolean
+                profileVisibility:
+                  type: string
+                  enum:
+                    - private
+                    - customers
+                    - public
+    ProductCreateInput:
+      type: object
+      required:
+        - title
+        - price
+        - variants
+        - categoryIds
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+        price:
+          $ref: "#/components/schemas/Money"
+        compareAtPrice:
+          $ref: "#/components/schemas/Money"
+        currency:
+          type: string
+        inventoryPolicy:
+          type: string
+        searchKeywords:
+          type: array
+          items:
+            type: string
+        variants:
+          type: array
+          items:
+            type: object
+            required:
+              - title
+              - price
+            properties:
+              title:
+                type: string
+              sku:
+                type: string
+              price:
+                $ref: "#/components/schemas/Money"
+              stock:
+                type: integer
+                minimum: 0
+              isPrimary:
+                type: boolean
+        categoryIds:
+          type: array
+          items:
+            type: string
+            format: cuid
+        media:
+          type: array
+          items:
+            type: object
+            properties:
+              mediaId:
+                type: string
+                format: cuid
+              sortOrder:
+                type: integer
+                nullable: true
+              isPrimary:
+                type: boolean
+    ProductUpdateInput:
+      allOf:
+        - $ref: "#/components/schemas/ProductCreateInput"
+      description: |
+        Partial update payload; unspecified fields remain unchanged.
+    CategoryInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        parentId:
+          type: string
+          format: cuid
+        imageUrl:
+          type: string
+          format: uri
+        displayOrder:
+          type: integer
+          nullable: true
+    CartItemInput:
+      type: object
+      required:
+        - productVariantId
+        - quantity
+      properties:
+        productVariantId:
+          type: string
+          format: cuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 20
+    CartMergeInput:
+      type: object
+      required:
+        - guestCartId
+      properties:
+        guestCartId:
+          type: string
+          format: cuid
+        overrideStrategy:
+          type: string
+          enum:
+            - MERGE
+            - REPLACE
+          default: MERGE
+    OrderCreateInput:
+      type: object
+      properties:
+        cartId:
+          type: string
+          format: cuid
+        shippingAddressId:
+          type: string
+          format: cuid
+        billingAddressId:
+          type: string
+          format: cuid
+        couponCode:
+          type: string
+        notes:
+          type: string
+          nullable: true
+    OrderStatusUpdateInput:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PAID
+            - FULFILLED
+            - SHIPPED
+            - DELIVERED
+            - CANCELLED
+        reason:
+          type: string
+          nullable: true
+    OrderNoteInput:
+      type: object
+      required:
+        - note
+      properties:
+        note:
+          type: string
+    RefundRequestInput:
+      type: object
+      required:
+        - amount
+        - reason
+      properties:
+        amount:
+          $ref: "#/components/schemas/Money"
+        reason:
+          type: string
+    UserProfileUpdateInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+    ChangePasswordInput:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+    AddressInput:
+      type: object
+      required:
+        - label
+        - fullName
+        - line1
+        - city
+        - country
+        - postalCode
+      properties:
+        label:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: string
+        line1:
+          type: string
+        line2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+        isDefault:
+          type: boolean
+    UserPreferencesInput:
+      type: object
+      properties:
+        language:
+          type: string
+        currency:
+          type: string
+        marketingOptIn:
+          type: boolean
+        notifications:
+          type: object
+          properties:
+            email:
+              type: boolean
+            sms:
+              type: boolean
+            push:
+              type: boolean
+        privacy:
+          type: object
+          properties:
+            personalisedRecommendations:
+              type: boolean
+            dataSharing:
+              type: boolean
+            profileVisibility:
+              type: string
+              enum:
+                - private
+                - customers
+                - public
+    CartValidationIssue:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        itemId:
+          type: string
+          format: cuid
+          nullable: true
+    CartValidationResult:
+      type: object
+      required:
+        - cart
+        - issues
+      properties:
+        cart:
+          $ref: "#/components/schemas/Cart"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartValidationIssue"
+    OrderStats:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        revenue:
+          $ref: "#/components/schemas/Money"
+        pending:
+          type: integer
+        paid:
+          type: integer
+        cancelled:
+          type: integer
+        fulfillmentLatencyP95:
+          type: integer
+          description: Milliseconds between placement and fulfillment.
+    UserStatusUpdateInput:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - SUSPENDED
+            - DELETED
+    AdminUnlockUserInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+    ErrorDetails:
+      type: object
+      additionalProperties: true
+      description: Additional information to help diagnose the failure.
     AuthUserProfile:
       type: object
       description: Canonical representation of an authenticated user.
@@ -591,42 +1692,6 @@ components:
                       type: string
                       enum:
                         - liveness
-    Money:
-      type: object
-      required:
-        - amount
-        - currency
-      properties:
-        amount:
-          type: string
-          pattern: ^-?\d+(?:\.\d{1,2})?$
-          description: Decimal amount represented as a string with up to two fractional digits.
-          examples:
-            - "199.99"
-            - "0.00"
-        currency:
-          type: string
-          minLength: 3
-          maxLength: 3
-          pattern: ^[A-Z]{3}$
-          description: ISO-4217 currency code.
-          examples:
-            - TRY
-            - USD
-    AuditTimestamps:
-      type: object
-      required:
-        - createdAt
-        - updatedAt
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp in ISO-8601 format.
-        updatedAt:
-          type: string
-          format: date-time
-          description: Last update timestamp in ISO-8601 format.
     SoftDeleteMetadata:
       type: object
       properties:
@@ -715,56 +1780,6 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/UserPermissionSummary"
-    MediaAsset:
-      allOf:
-        - $ref: "#/components/schemas/AuditTimestamps"
-        - type: object
-          required:
-            - id
-            - assetId
-            - url
-            - type
-            - provider
-            - mimeType
-            - sizeBytes
-          properties:
-            id:
-              type: string
-              format: cuid
-            assetId:
-              type: string
-              maxLength: 120
-            url:
-              type: string
-              format: uri
-            type:
-              type: string
-              enum:
-                - IMAGE
-                - VIDEO
-                - DOCUMENT
-            provider:
-              type: string
-              enum:
-                - CLOUDINARY
-                - S3
-            mimeType:
-              type: string
-            sizeBytes:
-              type: integer
-              minimum: 0
-            width:
-              type: integer
-              nullable: true
-            height:
-              type: integer
-              nullable: true
-            alt:
-              type: string
-              nullable: true
-            caption:
-              type: string
-              nullable: true
     CategorySummary:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -807,42 +1822,6 @@ components:
             displayOrder:
               type: integer
               nullable: true
-    ProductVariant:
-      allOf:
-        - $ref: "#/components/schemas/AuditTimestamps"
-        - type: object
-          required:
-            - id
-            - title
-            - price
-            - stock
-            - isPrimary
-          properties:
-            id:
-              type: string
-              format: cuid
-            title:
-              type: string
-            sku:
-              type: string
-              nullable: true
-            price:
-              $ref: "#/components/schemas/Money"
-            compareAtPrice:
-              $ref: "#/components/schemas/Money"
-              nullable: true
-            stock:
-              type: integer
-              minimum: 0
-            attributes:
-              type: object
-              nullable: true
-              additionalProperties: true
-            weightGrams:
-              type: integer
-              nullable: true
-            isPrimary:
-              type: boolean
     ProductMedia:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -953,50 +1932,6 @@ components:
                 $ref: "#/components/schemas/ProductSummary"
             meta:
               $ref: "#/components/schemas/PaginationMeta"
-    CartItem:
-      allOf:
-        - $ref: "#/components/schemas/AuditTimestamps"
-        - type: object
-          required:
-            - id
-            - cartId
-            - productVariantId
-            - quantity
-            - unitPrice
-          properties:
-            id:
-              type: string
-              format: cuid
-            cartId:
-              type: string
-              format: cuid
-            productVariantId:
-              type: string
-              format: cuid
-            quantity:
-              type: integer
-              minimum: 1
-            unitPrice:
-              $ref: "#/components/schemas/Money"
-            productVariant:
-              $ref: "#/components/schemas/ProductVariant"
-              nullable: true
-    CartTotals:
-      type: object
-      required:
-        - subtotal
-        - tax
-        - discount
-        - total
-      properties:
-        subtotal:
-          $ref: "#/components/schemas/Money"
-        tax:
-          $ref: "#/components/schemas/Money"
-        discount:
-          $ref: "#/components/schemas/Money"
-        total:
-          $ref: "#/components/schemas/Money"
     CartSummary:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -1033,46 +1968,6 @@ components:
                 $ref: "#/components/schemas/CartItem"
             totals:
               $ref: "#/components/schemas/CartTotals"
-    OrderItem:
-      allOf:
-        - $ref: "#/components/schemas/AuditTimestamps"
-        - type: object
-          required:
-            - id
-            - orderId
-            - productId
-            - productVariantId
-            - quantity
-            - unitPrice
-          properties:
-            id:
-              type: string
-              format: cuid
-            orderId:
-              type: string
-              format: cuid
-            productId:
-              type: string
-              format: cuid
-            productVariantId:
-              type: string
-              format: cuid
-            quantity:
-              type: integer
-              minimum: 1
-            unitPrice:
-              $ref: "#/components/schemas/Money"
-            currency:
-              type: string
-              minLength: 3
-              maxLength: 3
-              pattern: ^[A-Z]{3}$
-            titleSnapshot:
-              type: string
-            variantSnapshot:
-              type: object
-              additionalProperties: true
-              nullable: true
     OrderSummary:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -1727,6 +2622,1032 @@ components:
         hasPreviousPage:
           type: boolean
 paths:
+  /api/v1/products:
+    get:
+      tags:
+        - Catalog
+      summary: List products
+      description: >
+        Returns a paginated product catalogue with filtering, sorting, and full-text search capabilities. Public
+        endpoint with per-IP rate limiting (120 requests / 5 minutes).
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 24
+        - name: sort
+          in: query
+          description: Sort key (`-createdAt`, `price`, `popularity`).
+          schema:
+            type: string
+        - name: filter[category]
+          in: query
+          schema:
+            type: string
+        - name: filter[status]
+          in: query
+          schema:
+            type: string
+            enum:
+              - ACTIVE
+              - DRAFT
+              - ARCHIVED
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/RequestIdHeader"
+      responses:
+        "200":
+          description: Paginated products
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Product"
+        "429":
+          description: Rate limit exceeded.
+  /api/v1/products/popular:
+    get:
+      tags:
+        - Catalog
+      summary: List popular products
+      description: Cached (60s TTL) curated list based on conversions and view metrics.
+      responses:
+        "200":
+          description: Highlighted products
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Product"
+  /api/v1/products/{slug}:
+    get:
+      tags:
+        - Catalog
+      summary: Get product by slug
+      parameters:
+        - $ref: "#/components/parameters/ProductSlug"
+      responses:
+        "200":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product:
+                            $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+  /api/v1/products/{id}/variants:
+    get:
+      tags:
+        - Catalog
+      summary: List variants
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Product variants
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/ProductVariant"
+        "404":
+          description: Product not found
+  /api/v1/categories:
+    get:
+      tags:
+        - Catalog
+      summary: List categories
+      description: Returns the category tree ordered by display priority.
+      responses:
+        "200":
+          description: Categories fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Category"
+  /api/v1/categories/{slug}:
+    get:
+      tags:
+        - Catalog
+      summary: Get category by slug
+      parameters:
+        - $ref: "#/components/parameters/CategorySlug"
+      responses:
+        "200":
+          description: Category found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          category:
+                            $ref: "#/components/schemas/Category"
+        "404":
+          description: Category not found
+  /api/v1/admin/products:
+    post:
+      tags:
+        - Catalog
+        - Admin
+      summary: Create product
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreateInput"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product:
+                            $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+  /api/v1/admin/products/{id}:
+    put:
+      tags:
+        - Catalog
+        - Admin
+      summary: Update product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdateInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          product:
+                            $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+    delete:
+      tags:
+        - Catalog
+        - Admin
+      summary: Soft delete product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Deleted
+  /api/v1/admin/products/{id}/variants:
+    post:
+      tags:
+        - Catalog
+        - Admin
+      summary: Add variant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariant"
+      responses:
+        "201":
+          description: Variant created
+    put:
+      tags:
+        - Catalog
+        - Admin
+      summary: Update variant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+        - $ref: "#/components/parameters/VariantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariant"
+      responses:
+        "200":
+          description: Variant updated
+    delete:
+      tags:
+        - Catalog
+        - Admin
+      summary: Remove variant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+        - $ref: "#/components/parameters/VariantId"
+      responses:
+        "204":
+          description: Variant deleted
+  /api/v1/admin/categories:
+    post:
+      tags:
+        - Catalog
+        - Admin
+      summary: Create category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          category:
+                            $ref: "#/components/schemas/Category"
+  /api/v1/admin/categories/{id}:
+    put:
+      tags:
+        - Catalog
+        - Admin
+      summary: Update category
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: Category updated
+    delete:
+      tags:
+        - Catalog
+        - Admin
+      summary: Delete category
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      responses:
+        "204":
+          description: Category deleted
+  /api/v1/cart:
+    get:
+      tags:
+        - Cart
+      summary: Retrieve current user's cart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active cart
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cart:
+                            $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+    delete:
+      tags:
+        - Cart
+      summary: Clear cart
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Cart cleared
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Cart
+      summary: Add or update line item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemInput"
+      responses:
+        "201":
+          description: Item added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cart:
+                            $ref: "#/components/schemas/Cart"
+  /api/v1/cart/items/{itemId}:
+    put:
+      tags:
+        - Cart
+      summary: Update quantity
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CartItemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quantity
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+      responses:
+        "200":
+          description: Updated
+    delete:
+      tags:
+        - Cart
+      summary: Remove item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CartItemId"
+      responses:
+        "204":
+          description: Removed
+  /api/v1/cart/merge:
+    post:
+      tags:
+        - Cart
+      summary: Merge guest cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartMergeInput"
+      responses:
+        "200":
+          description: Merged cart
+  /api/v1/cart/validate:
+    get:
+      tags:
+        - Cart
+      summary: Validate cart before checkout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Validation report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CartValidationResult"
+  /api/v1/orders:
+    post:
+      tags:
+        - Orders
+      summary: Create order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreateInput"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          order:
+                            $ref: "#/components/schemas/OrderDetail"
+    get:
+      tags:
+        - Orders
+      summary: List customer orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Order"
+  /api/v1/orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          order:
+                            $ref: "#/components/schemas/OrderDetail"
+        "404":
+          description: Not found
+  /api/v1/orders/{id}/cancel:
+    put:
+      tags:
+        - Orders
+      summary: Cancel order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Cancelled
+  /api/v1/orders/{reference}/track:
+    get:
+      tags:
+        - Orders
+      summary: Track order status via reference
+      parameters:
+        - $ref: "#/components/parameters/OrderReference"
+      responses:
+        "200":
+          description: Tracking details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tracking:
+                            $ref: "#/components/schemas/Tracking"
+        "404":
+          description: Not found
+  /api/v1/admin/orders:
+    get:
+      tags:
+        - Orders
+        - Admin
+      summary: List orders (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: customerEmail
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders
+  /api/v1/admin/orders/stats:
+    get:
+      tags:
+        - Orders
+        - Admin
+      summary: Order KPIs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: KPI snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OrderStats"
+  /api/v1/admin/orders/{id}:
+    get:
+      tags:
+        - Orders
+        - Admin
+      summary: Get order (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          order:
+                            $ref: "#/components/schemas/OrderDetail"
+  /api/v1/admin/orders/{id}/status:
+    put:
+      tags:
+        - Orders
+        - Admin
+      summary: Update order status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated
+  /api/v1/admin/orders/{id}/notes:
+    post:
+      tags:
+        - Orders
+        - Admin
+      summary: Add order note
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderNoteInput"
+      responses:
+        "201":
+          description: Note created
+  /api/v1/admin/orders/{id}/refund:
+    post:
+      tags:
+        - Orders
+        - Admin
+      summary: Process refund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequestInput"
+      responses:
+        "202":
+          description: Refund initiated
+  /api/v1/users/me:
+    get:
+      tags:
+        - Users
+      summary: Get authenticated profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/UserProfile"
+    put:
+      tags:
+        - Users
+      summary: Update profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdateInput"
+      responses:
+        "200":
+          description: Updated profile
+  /api/v1/users/me/password:
+    put:
+      tags:
+        - Users
+      summary: Change password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "204":
+          description: Password updated
+  /api/v1/users/me/addresses:
+    get:
+      tags:
+        - Users
+      summary: List addresses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Addresses
+    post:
+      tags:
+        - Users
+      summary: Create address
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "201":
+          description: Address created
+  /api/v1/users/me/addresses/{addressId}:
+    put:
+      tags:
+        - Users
+      summary: Update address
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "200":
+          description: Address updated
+    delete:
+      tags:
+        - Users
+      summary: Delete address
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      responses:
+        "204":
+          description: Address deleted
+  /api/v1/users/me/addresses/{addressId}/default:
+    put:
+      tags:
+        - Users
+      summary: Set default address
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      responses:
+        "204":
+          description: Default updated
+  /api/v1/users/me/preferences:
+    get:
+      tags:
+        - Users
+      summary: Get preferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Preferences
+    put:
+      tags:
+        - Users
+      summary: Update preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPreferencesInput"
+      responses:
+        "200":
+          description: Preferences updated
+  /api/v1/admin/users:
+    get:
+      summary: List platform users (placeholder)
+      description: >
+        Administrative endpoints are guarded by RBAC. Until full implementations land, a placeholder payload is returned
+        for authorised administrators.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "200":
+          description: Successful placeholder payload for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges are required or the requester lacks a valid role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+    post:
+      summary: Create a platform user (placeholder)
+      description: >
+        Placeholder endpoint for administrative user creation. Returns an informational message for authorised
+        administrators.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+        - serviceToken: []
+      responses:
+        "202":
+          description: Request acknowledged for authorised administrators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardSuccessResponse"
+        "403":
+          description: Administrator privileges are required or the requester lacks a valid role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/users/{id}:
+    get:
+      tags:
+        - Users
+        - Admin
+      summary: Inspect user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/UserProfile"
+  /api/v1/admin/users/{id}/status:
+    put:
+      tags:
+        - Users
+        - Admin
+      summary: Update user status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusUpdateInput"
+      responses:
+        "200":
+          description: Status updated
+  /api/v1/admin/users/{id}/unlock:
+    post:
+      tags:
+        - Users
+        - Admin
+      summary: Unlock user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUnlockUserInput"
+      responses:
+        "202":
+          description: Unlock request accepted
   /api/v1/auth/register:
     post:
       tags:
@@ -2111,53 +4032,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StandardErrorResponse"
-  /api/v1/admin/users:
-    get:
-      summary: List platform users (placeholder)
-      description: >
-        Administrative endpoints are guarded by RBAC. Until full implementations land, a placeholder payload is returned
-        for authorised administrators.
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-        - serviceToken: []
-      responses:
-        "200":
-          description: Successful placeholder payload for authorised administrators.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardSuccessResponse"
-        "403":
-          description: Administrator privileges are required or the requester lacks a valid role.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardErrorResponse"
-    post:
-      summary: Create a platform user (placeholder)
-      description: >
-        Placeholder endpoint for administrative user creation. Returns an informational message for authorised
-        administrators.
-      tags:
-        - Admin
-      security:
-        - bearerAuth: []
-        - serviceToken: []
-      responses:
-        "202":
-          description: Request acknowledged for authorised administrators.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardSuccessResponse"
-        "403":
-          description: Administrator privileges are required or the requester lacks a valid role.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/admin/audit-log:
     get:
       summary: Retrieve audit log entries (placeholder)
@@ -2202,122 +4076,6 @@ paths:
                 $ref: "#/components/schemas/StandardSuccessResponse"
         "403":
           description: Administrator privileges or reporting permissions are missing.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardErrorResponse"
-  /api/v1/catalog/products:
-    get:
-      summary: Search catalog products
-      description: Retrieve a paginated list of products using shared DTO contracts.
-      tags:
-        - Catalog
-      parameters:
-        - in: query
-          name: search
-          schema:
-            type: string
-          description: Free text query matching title, slug, or keywords.
-        - in: query
-          name: statuses
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - DRAFT
-                - ACTIVE
-                - ARCHIVED
-          description: Optional product statuses to include.
-        - in: query
-          name: categoryIds
-          schema:
-            type: array
-            items:
-              type: string
-          description: Filter by category identifiers.
-        - in: query
-          name: collectionIds
-          schema:
-            type: array
-            items:
-              type: string
-          description: Filter by collection identifiers.
-        - in: query
-          name: priceMin
-          schema:
-            type: string
-          description: Minimum price boundary.
-        - in: query
-          name: priceMax
-          schema:
-            type: string
-          description: Maximum price boundary.
-        - in: query
-          name: page
-          schema:
-            type: integer
-            minimum: 1
-          description: Pagination page number.
-        - in: query
-          name: pageSize
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 200
-          description: Number of items per page.
-        - in: query
-          name: sort
-          schema:
-            type: string
-            enum:
-              - newest
-              - oldest
-              - price_asc
-              - price_desc
-              - title_asc
-              - title_desc
-          description: Optional sort strategy.
-      responses:
-        "200":
-          description: Product search results.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProductCollectionResponse"
-        "400":
-          description: Invalid search parameters.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StandardErrorResponse"
-  /api/v1/catalog/products/{slug}:
-    get:
-      summary: Retrieve product details by slug
-      description: Fetches a single product using the shared DTO mapping pipeline.
-      tags:
-        - Catalog
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-          description: Product slug identifier.
-      responses:
-        "200":
-          description: Product found.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/StandardSuccessResponse"
-                  - type: object
-                    properties:
-                      data:
-                        $ref: "#/components/schemas/ProductSummary"
-        "404":
-          description: Product not found.
           content:
             application/json:
               schema:
