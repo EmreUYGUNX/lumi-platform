@@ -6,6 +6,7 @@ import {
   DEFAULT_PASSWORD_POLICY,
   type PasswordValidationErrorCode,
   hashPassword,
+  timingSafeStringCompare,
   validatePasswordStrength,
   verifyPassword,
 } from "../password.js";
@@ -60,4 +61,10 @@ describe("password utilities", () => {
       expect(result.issues.map((issue) => issue.code)).toContain(expectedCode);
     },
   );
+
+  it("performs timing-safe string comparisons regardless of length differences", () => {
+    expect(timingSafeStringCompare("token-123", "token-123")).toBe(true);
+    expect(timingSafeStringCompare("token-123", "token-1234")).toBe(false);
+    expect(timingSafeStringCompare("token-123", "token-xyz")).toBe(false);
+  });
 });
