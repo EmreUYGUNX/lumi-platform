@@ -60,6 +60,10 @@
     "lint-staged": "lint-staged --concurrent false",
     "commitlint": "commitlint"
   },
+  "dependencies": {
+    "@prisma/client": "^6.17.1",
+    "@types/bcryptjs": "^2.4.6"
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@commitlint/cli": "^19.3.0",

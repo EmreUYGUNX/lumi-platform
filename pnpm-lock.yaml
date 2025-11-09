@@ -24,6 +24,13 @@ packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
 importers:
   .:
+    dependencies:
+      "@prisma/client":
+        specifier: ^6.17.1
+        version: 6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.5.4))(typescript@5.5.4)
+      "@types/bcryptjs":
+        specifier: ^2.4.6
+        version: 2.4.6
     devDependencies:
       "@commitlint/cli":
         specifier: ^19.3.0

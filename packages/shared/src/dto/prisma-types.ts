@@ -14,6 +14,7 @@ import type {
   Review,
   User,
   UserPermission,
+  UserPreference,
   UserRole,
 } from "@prisma/client";
 
@@ -46,6 +47,23 @@ export type UserWithRoleEntities = PrismaNamespace.UserGetPayload<{
         permission: true;
       };
     };
+  };
+}>;
+
+export type UserProfileEntity = PrismaNamespace.UserGetPayload<{
+  include: {
+    roles: {
+      include: {
+        role: true;
+      };
+    };
+    permissions: {
+      include: {
+        permission: true;
+      };
+    };
+    addresses: true;
+    preferences: true;
   };
 }>;
 
@@ -129,6 +147,7 @@ export type CouponEntity = Coupon;
 export type UserRoleEntity = UserRole;
 
 export type UserPermissionEntity = UserPermission;
+export type UserPreferenceEntity = UserPreference;
 
 export type OrderItemEntity = OrderItem;
 

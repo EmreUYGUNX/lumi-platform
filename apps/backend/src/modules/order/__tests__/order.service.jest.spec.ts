@@ -273,6 +273,7 @@ const createAddressFixture = (id: string) => ({
   isDefault: true,
   createdAt: FIXTURE_TIMESTAMP,
   updatedAt: FIXTURE_TIMESTAMP,
+  deletedAt: null,
 });
 
 const createUserFixture = () => ({
