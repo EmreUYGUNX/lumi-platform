@@ -233,6 +233,78 @@ describe("EmailService", () => {
     expect(html).not.toContain("Detected");
   });
 
+  it("sends order confirmation emails with line items", async () => {
+    const { transport, sendMail } = createTransportStub();
+    const queue = createQueueStub();
+    const rateLimiter = { allow: jest.fn(() => true) };
+    const logger = createLoggerStub();
+
+    const service = new EmailService({
+      config,
+      transport: transport as never,
+      queue,
+      rateLimiter: rateLimiter as never,
+      logger: logger as never,
+    });
+
+    await service.sendOrderConfirmationEmail({
+      to: "order@example.com",
+      firstName: "Nova",
+      orderReference: "LM-ORDER-1",
+      status: "confirmed",
+      total: { amount: "249.00", currency: "TRY" },
+      items: [
+        { title: "Aurora Lamp", quantity: 1, total: { amount: "199.00", currency: "TRY" } },
+        { title: "Nimbus Shade", quantity: 1, total: { amount: "50.00", currency: "TRY" } },
+      ],
+      orderUrl: "https://example.com/orders/LM-ORDER-1",
+    });
+
+    const mailCall = sendMail.mock.calls[0];
+    if (!mailCall) {
+      throw new Error("Expected sendMail to receive mail options.");
+    }
+    const mailOptions = mailCall[0] as Mail.Options;
+    expect(mailOptions.subject).toContain("LM-ORDER-1");
+    expect(String(mailOptions.html)).toContain("Aurora Lamp");
+    expect(String(mailOptions.html)).toContain("View order details");
+    const headers = mailOptions.headers as Record<string, unknown>;
+    expect(headers?.["X-Lumi-Template"]).toBe("commerce.order-confirmation");
+  });
+
+  it("sends order refund notifications", async () => {
+    const { transport, sendMail } = createTransportStub();
+    const queue = createQueueStub();
+    const rateLimiter = { allow: jest.fn(() => true) };
+    const logger = createLoggerStub();
+
+    const service = new EmailService({
+      config,
+      transport: transport as never,
+      queue,
+      rateLimiter: rateLimiter as never,
+      logger: logger as never,
+    });
+
+    await service.sendOrderRefundEmail({
+      to: "refund@example.com",
+      orderReference: "LM-REFUND-1",
+      status: "refunded",
+      total: { amount: "120.00", currency: "TRY" },
+      items: [{ title: "Desk Mat", quantity: 1, total: { amount: "120.00", currency: "TRY" } }],
+    });
+
+    const mailCall = sendMail.mock.calls[0];
+    if (!mailCall) {
+      throw new Error("Expected sendMail to receive mail options.");
+    }
+    const mailOptions = mailCall[0] as Mail.Options;
+    expect(mailOptions.subject).toContain("LM-REFUND-1");
+    expect(String(mailOptions.html)).toContain("Desk Mat");
+    const headers = mailOptions.headers as Record<string, unknown>;
+    expect(headers?.["X-Lumi-Template"]).toBe("commerce.order-confirmation");
+  });
+
   it("uses memory queue driver when configured", async () => {
     const memoryConfig = createTestConfig({
       email: {

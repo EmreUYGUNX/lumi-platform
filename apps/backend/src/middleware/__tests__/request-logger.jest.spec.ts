@@ -190,4 +190,97 @@ describe("request logger middleware", () => {
       }),
     );
   });
+
+  it("logs informational responses without attaching diagnostic payloads", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(responseFormatter);
+    app.use(createTestRateLimiter());
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "user-3",
+        roles: [{ id: "role_customer", name: "customer" }],
+      });
+      next();
+    });
+    app.use(requestLogger);
+    app.get("/api/v1/profile", (_req, res) => {
+      res.status(200).json({ success: true });
+    });
+
+    const api = createApiClient(app);
+    await api.get("/api/v1/profile?expand=1").expect(200);
+
+    const infoCall = (logger.log as jest.Mock).mock.calls.find((call) => call[0] === "info");
+    expect(infoCall).toBeDefined();
+    const metadata = infoCall?.[2] as Record<string, unknown>;
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata).not.toHaveProperty("query");
+  });
+
+  it("skips audit logging for read-only admin routes and failing mutations", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(responseFormatter);
+    app.use(createTestRateLimiter());
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "admin-3",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
+      next();
+    });
+    app.use(requestLogger);
+    app.get("/api/v1/admin/products", (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+    app.patch("/api/v1/admin/settings", (_req, res) => {
+      res.status(503).json({ success: false });
+    });
+
+    const api = createApiClient(app);
+    await api.get("/api/v1/admin/products").expect(200);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(recordAuditLog).not.toHaveBeenCalled();
+
+    recordAuditLog.mockClear();
+    await api.patch("/api/v1/admin/settings").expect(503);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(recordAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("falls back to admin root entity metadata when no path segments exist", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(responseFormatter);
+    app.use(createTestRateLimiter());
+    app.use((req, _res, next) => {
+      req.user = createAuthenticatedUser({
+        id: "admin-4",
+        roles: [{ id: "role_admin", name: "admin" }],
+      });
+      next();
+    });
+    app.use(requestLogger);
+    app.post("/api/v1/admin", (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+
+    const api = createApiClient(app);
+    await api.post("/api/v1/admin").send({ ping: true }).expect(200);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(recordAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: "admin",
+        entityId: "root",
+      }),
+    );
+  });
 });

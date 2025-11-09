@@ -12,6 +12,16 @@ describe("ApiError", () => {
     expect(new ApiError("service down", { status: 503 }).code).toBe("SERVICE_UNAVAILABLE");
   });
 
+  it("covers extended HTTP status mappings and default fallback", () => {
+    expect(new ApiError("gone", { status: 410 }).code).toBe("GONE");
+    expect(new ApiError("precondition", { status: 412 }).code).toBe("PRECONDITION_FAILED");
+    expect(new ApiError("large payload", { status: 413 }).code).toBe("PAYLOAD_TOO_LARGE");
+    expect(new ApiError("unsupported media", { status: 415 }).code).toBe("UNSUPPORTED_MEDIA_TYPE");
+    expect(new ApiError("proxy failure", { status: 502 }).code).toBe("BAD_GATEWAY");
+    expect(new ApiError("gateway timeout", { status: 504 }).code).toBe("GATEWAY_TIMEOUT");
+    expect(new ApiError("default", { status: 499 }).code).toBe("INTERNAL_SERVER_ERROR");
+  });
+
   it("uppercases explicit error identifiers and respects custom log levels", () => {
     const error = new ApiError("custom", {
       status: 422,

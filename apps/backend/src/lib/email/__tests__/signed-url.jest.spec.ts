@@ -69,4 +69,63 @@ describe("createSignedUrl", () => {
     expect(verification.valid).toBe(false);
     expect(verification.reason).toBe("invalid_signature");
   });
+
+  it("omits parameters that are nullish when building URLs", () => {
+    const { url } = createSignedUrl({
+      baseUrl: "https://app.example.com",
+      path: "/verify-email",
+      params: {
+        token: "token-111",
+        debug: undefined,
+        // eslint-disable-next-line unicorn/no-null -- null params should be ignored
+        extra: null,
+      },
+      secret: "signed-secret-placeholder-value-32!!",
+      nonce: "nonce-fixture",
+    });
+
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("token")).toBe("token-111");
+    expect(parsed.searchParams.has("debug")).toBe(false);
+    expect(parsed.searchParams.has("extra")).toBe(false);
+  });
+
+  it("rejects URLs that are missing signatures altogether", () => {
+    const { url } = createSignedUrl({
+      baseUrl: "https://app.example.com",
+      path: "/verify-email",
+      params: { token: "token-222" },
+      secret: "signed-secret-placeholder-value-32!!",
+    });
+
+    const tampered = new URL(url);
+    tampered.searchParams.delete("signature");
+
+    const verification = verifySignedUrl({
+      url: tampered,
+      secret: "signed-secret-placeholder-value-32!!",
+    });
+
+    expect(verification.valid).toBe(false);
+    expect(verification.reason).toBe("missing_signature");
+  });
+
+  it("treats malformed expiry timestamps as expired", () => {
+    const { url } = createSignedUrl({
+      baseUrl: "https://app.example.com",
+      path: "/verify-email",
+      secret: "signed-secret-placeholder-value-32!!",
+    });
+
+    const tampered = new URL(url);
+    tampered.searchParams.set("expires", "not-a-date");
+
+    const verification = verifySignedUrl({
+      url: tampered,
+      secret: "signed-secret-placeholder-value-32!!",
+    });
+
+    expect(verification.valid).toBe(false);
+    expect(verification.reason).toBe("expired");
+  });
 });

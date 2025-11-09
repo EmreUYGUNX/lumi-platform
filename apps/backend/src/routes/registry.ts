@@ -1,4 +1,6 @@
-/* istanbul ignore file -- registry utilities exercised indirectly via integration tests */
+/* istanbul ignore file */
+
+/* registry utilities exercised indirectly via integration tests */
 import type { Application, Express } from "express";
 
 export type RouteRegistry = Map<string, Set<string>>;

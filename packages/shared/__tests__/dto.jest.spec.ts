@@ -287,6 +287,23 @@ const createCartFixture = (product: ProductWithRelations): CartWithItems => {
 const createOrderFixture = (product: ProductWithRelations): OrderWithRelations => {
   const timestamp = new Date("2024-07-01T12:00:00.000Z");
   const cart = createCartFixture(product);
+  const user = {
+    id: cart.userId!,
+    email: "customer@example.com",
+    passwordHash: "hashed",
+    firstName: "Jane",
+    lastName: "Doe",
+    phone: "+905551112233",
+    emailVerified: true,
+    emailVerifiedAt: timestamp,
+    failedLoginCount: 0,
+    lockoutUntil: null,
+    twoFactorSecret: null,
+    twoFactorEnabled: false,
+    status: UserStatus.ACTIVE,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
 
   const shippingAddress = {
     id: "ckaddressfixture000000000000",
@@ -335,7 +352,7 @@ const createOrderFixture = (product: ProductWithRelations): OrderWithRelations =
     version: 1,
     createdAt: timestamp,
     updatedAt: timestamp,
-    user: null,
+    user,
     shippingAddress,
     billingAddress,
     items: [
@@ -546,7 +563,9 @@ describe("DTO mappers", () => {
 
   it("maps order and payment structures", () => {
     const orderDto = mapOrderToSummary({ ...order, payments: [payment] });
-    expect(orderSummarySchema.parse(orderDto).status).toBe(OrderStatus.PAID);
+    const parsedOrder = orderSummarySchema.parse(orderDto);
+    expect(parsedOrder.status).toBe(OrderStatus.PAID);
+    expect(parsedOrder.itemsCount).toBe(parsedOrder.items.length);
 
     const paymentDto = mapPaymentToSummary(payment);
     const paymentParsed = paymentSummarySchema.parse(paymentDto);
@@ -616,6 +635,10 @@ describe("DTO type guards", () => {
     const orderDetail: OrderDetailDTO = mapOrderToDetail({ ...order, payments: [payment] });
     expect(isOrderDetailDTO(orderDetail)).toBe(true);
     expect(orderDetail.shippingAddress && isAddressDTO(orderDetail.shippingAddress)).toBe(true);
+    expect(orderDetail.customer?.email).toBe("customer@example.com");
+    expect(orderDetail.timeline.length).toBeGreaterThan(0);
+    expect(orderDetail.tracking).toHaveProperty("estimatedDelivery");
+    expect(orderDetail.payments.length).toBeGreaterThanOrEqual(0);
     expect(isOrderDetailDTO({})).toBe(false);
     expect(isAddressDTO(null)).toBe(false);
 

@@ -102,6 +102,19 @@ describe("BaseRepository", () => {
     });
   });
 
+  it("falls back to the default primary key when none is provided", async () => {
+    const delegate = createDelegate();
+    delegate.findFirst.mockResolvedValue({ id: "xyz" });
+
+    const repo = new TestRepository(createRepositoryContext("TestModel", delegate));
+
+    await repo.findById("xyz");
+
+    expect(delegate.findFirst).toHaveBeenCalledWith({
+      where: { id: "xyz" },
+    });
+  });
+
   it("applies soft delete filters when configured", async () => {
     const delegate = createDelegate();
     delegate.findMany.mockResolvedValue([]);
@@ -303,6 +316,30 @@ describe("BaseRepository", () => {
     await repo.findMany();
 
     expect(debugSpy).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
+  });
+
+  it("logs repository operations when logging is enabled", async () => {
+    const delegate = createDelegate();
+    delegate.findMany.mockResolvedValue([]);
+    const debugSpy = jest.spyOn(logger, "debug").mockImplementation(() => {});
+
+    const repo = new TestRepository(
+      createRepositoryContext("TestModel", delegate, {
+        logOperations: true,
+      }),
+    );
+
+    await repo.findMany();
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      "Repository operation executed",
+      expect.objectContaining({
+        model: "TestModel",
+        operation: "findMany",
+      }),
+    );
+
     debugSpy.mockRestore();
   });
 

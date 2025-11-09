@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import express from "express";
+import express, { type Request } from "express";
 import request from "supertest";
 
 import { resetEnvironmentCache } from "../../config/env.js";
@@ -65,5 +65,140 @@ describe("metrics middleware", () => {
       expect(snapshot).toContain('route="/users/:id"');
       expect(snapshot).toContain('status="200"');
     });
+  });
+
+  it("returns a passthrough middleware when metrics collection is disabled", async () => {
+    const observeHttpRequest = jest.fn();
+    const isMetricsCollectionEnabled = jest.fn(() => false);
+
+    jest.doMock("../../observability/index.js", () => ({
+      __esModule: true,
+      isMetricsCollectionEnabled,
+      observeHttpRequest,
+    }));
+
+    const { createMetricsMiddleware } = await import("../metrics.js");
+    const middleware = createMetricsMiddleware();
+
+    const next = jest.fn();
+    middleware({} as express.Request, {} as express.Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(observeHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it("re-checks the runtime toggle before instrumenting each request", async () => {
+    const observeHttpRequest = jest.fn();
+    const isMetricsCollectionEnabled = jest
+      .fn()
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    jest.doMock("../../observability/index.js", () => ({
+      __esModule: true,
+      isMetricsCollectionEnabled,
+      observeHttpRequest,
+    }));
+
+    const { createMetricsMiddleware } = await import("../metrics.js");
+    const middleware = createMetricsMiddleware();
+
+    const next = jest.fn();
+    const res = {
+      once: jest.fn(),
+    } as unknown as express.Response;
+
+    middleware({} as express.Request, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.once).not.toHaveBeenCalled();
+    expect(observeHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it("normalises metadata and records each request only once", async () => {
+    const observeHttpRequest = jest.fn();
+    const isMetricsCollectionEnabled = jest.fn(() => true);
+
+    jest.doMock("../../observability/index.js", () => ({
+      __esModule: true,
+      isMetricsCollectionEnabled,
+      observeHttpRequest,
+    }));
+
+    const { createMetricsMiddleware } = await import("../metrics.js");
+    const middleware = createMetricsMiddleware();
+
+    const next = jest.fn();
+    const invoke = (req: Partial<express.Request>, statusCode: number) => {
+      const localHandlers: Record<string, (() => void)[]> = {};
+      const res: Partial<express.Response> = {
+        statusCode,
+      };
+      const typedRes = res as express.Response;
+      res.once = jest.fn((event: string, handler: () => void) => {
+        localHandlers[event] ??= [];
+        localHandlers[event]!.push(handler);
+        return typedRes;
+      });
+      res.setHeader = jest.fn(() => typedRes);
+      res.status = jest.fn(() => typedRes);
+
+      middleware(req as express.Request, typedRes, next);
+      localHandlers.finish?.forEach((handler) => handler());
+      // Trigger the same handlers again to ensure idempotency
+      localHandlers.finish?.forEach((handler) => handler());
+      localHandlers.error?.forEach((handler) => handler());
+    };
+
+    invoke(
+      {
+        method: "",
+        baseUrl: "/api",
+        route: { path: "/orders/:id" } as Request["route"],
+      },
+      201,
+    );
+
+    invoke(
+      {
+        method: "get",
+        path: "/health",
+      },
+      404,
+    );
+
+    invoke(
+      {
+        method: "post",
+        originalUrl: "/status?verbose=1",
+      },
+      0,
+    );
+
+    invoke(
+      {
+        method: "delete",
+        originalUrl: "",
+      },
+      503,
+    );
+
+    expect(observeHttpRequest).toHaveBeenCalledTimes(4);
+    expect(
+      observeHttpRequest.mock.calls.map(([labels]) => (labels as { route: string }).route),
+    ).toEqual(["/api/orders/:id", "/health", "/status", "unmatched"]);
+    const [firstCall] = observeHttpRequest.mock.calls;
+    expect(firstCall?.[0]).toEqual(
+      expect.objectContaining({
+        method: "UNKNOWN",
+        status: "201",
+      }),
+    );
+    const thirdCall = observeHttpRequest.mock.calls[2];
+    expect(thirdCall?.[0]).toEqual(
+      expect.objectContaining({
+        status: "0",
+      }),
+    );
   });
 });

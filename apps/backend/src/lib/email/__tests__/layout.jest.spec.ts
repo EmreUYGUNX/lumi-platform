@@ -24,6 +24,19 @@ describe("email layout", () => {
     expect(html).not.toContain('<span class="preheader">');
   });
 
+  it("renders the preheader when preview text is provided", () => {
+    const { html } = renderLayout({
+      subject: "With preview",
+      bodyHtml: "<p>Hello</p>",
+      bodyText: "Hello",
+      context: baseContext,
+      previewText: "Important summary",
+    });
+
+    expect(html).toContain("Important summary");
+    expect(html).toContain('class="preheader"');
+  });
+
   it("builds a support footer that falls back to base URL when support URL is missing", () => {
     const { text } = renderLayout({
       subject: "Support fallback",
@@ -41,5 +54,34 @@ describe("email layout", () => {
 
     expect(text).toContain("support@lumi.test");
     expect(text).not.toContain("support centre");
+  });
+
+  it("includes support links when explicit URLs are available", () => {
+    const { text } = renderLayout({
+      subject: "Support available",
+      bodyHtml: "<p>Body</p>",
+      bodyText: "Body",
+      context: baseContext,
+    });
+
+    expect(text).toContain("https://lumi.test/support");
+  });
+
+  it("omits support links when neither support nor base URLs are defined", () => {
+    const { text } = renderLayout({
+      subject: "No links",
+      bodyHtml: "<p>Body</p>",
+      bodyText: "Body",
+      context: {
+        ...baseContext,
+        baseUrl: "",
+        brand: {
+          ...baseContext.brand,
+          supportUrl: undefined,
+        },
+      },
+    });
+
+    expect(text).not.toContain("http");
   });
 });

@@ -1,6 +1,8 @@
-/* eslint-disable import/order */
+/* istanbul ignore file */
 
-/* istanbul ignore file -- complex product service covered via higher-level integration suites */
+/* complex product service covered via higher-level integration suites */
+
+/* eslint-disable import/order */
 import { Prisma } from "@prisma/client";
 import type { ZodError } from "zod";
 

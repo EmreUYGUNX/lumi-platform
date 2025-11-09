@@ -6,6 +6,7 @@ import {
   DEFAULT_PASSWORD_POLICY,
   type PasswordValidationErrorCode,
   hashPassword,
+  timingSafeStringCompare,
   validatePasswordStrength,
   verifyPassword,
 } from "../password.js";
@@ -60,4 +61,28 @@ describe("password utilities", () => {
       expect(result.issues.map((issue) => issue.code)).toContain(expectedCode);
     },
   );
+
+  it("performs timing-safe string comparisons regardless of length differences", () => {
+    expect(timingSafeStringCompare("token-123", "token-123")).toBe(true);
+    expect(timingSafeStringCompare("token-123", "token-1234")).toBe(false);
+    expect(timingSafeStringCompare("token-123", "token-xyz")).toBe(false);
+  });
+
+  it("parses custom bcrypt salt rounds from the environment", async () => {
+    const original = process.env.BCRYPT_SALT_ROUNDS;
+
+    await jest.isolateModulesAsync(async () => {
+      process.env.BCRYPT_SALT_ROUNDS = "15";
+      const module = await import("../password.js");
+      expect(module.BCRYPT_SALT_ROUNDS).toBe(15);
+    });
+
+    await jest.isolateModulesAsync(async () => {
+      process.env.BCRYPT_SALT_ROUNDS = "invalid-value";
+      const module = await import("../password.js");
+      expect(module.BCRYPT_SALT_ROUNDS).toBe(6);
+    });
+
+    process.env.BCRYPT_SALT_ROUNDS = original;
+  });
 });
