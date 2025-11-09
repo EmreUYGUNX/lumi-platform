@@ -15,8 +15,6 @@ interface MockCounter {
   labelledInc: jest.Mock;
 }
 
-const counters: MockCounter[] = [];
-
 jest.mock("../metrics.js", () => {
   const mockCounter = (): MockCounter => {
     const labelledInc = jest.fn();
@@ -27,14 +25,17 @@ jest.mock("../metrics.js", () => {
     };
   };
 
+  const mockCounters: MockCounter[] = [];
+
   return {
     __esModule: true,
     createCounter: jest.fn(() => {
       const counter = mockCounter();
-      counters.push(counter);
+      mockCounters.push(counter);
       return counter;
     }),
     isMetricsCollectionEnabled: jest.fn(() => true),
+    mockCounters,
   };
 });
 
@@ -45,11 +46,15 @@ jest.mock("../../lib/logger.js", () => ({
   },
 }));
 
+const metricsMock = jest.requireMock("../metrics.js") as typeof metricsModule & {
+  mockCounters: MockCounter[];
+};
+
 const mockedMetrics = metricsModule as unknown as {
   isMetricsCollectionEnabled: jest.Mock;
 };
 
-const [createdCounter, statusCounter, refundCounter] = counters;
+const [createdCounter, statusCounter, refundCounter] = metricsMock.mockCounters;
 
 if (!createdCounter || !statusCounter || !refundCounter) {
   throw new Error("Order metric counters failed to initialize in tests.");
