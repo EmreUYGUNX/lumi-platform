@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import * as fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +13,11 @@ const resolveSpecCandidates = (): string[] => {
     importMetaUrl = new Function("return import.meta.url")() as string;
   } catch {
     // Older Node targets may not expose import.meta; silently ignore.
+  }
+
+  const customPath = process.env.LUMI_OPENAPI_SPEC_PATH?.trim();
+  if (customPath) {
+    candidates.push(path.resolve(customPath));
   }
 
   if (importMetaUrl) {
@@ -46,7 +51,7 @@ const readSpecFile = (): string => {
   resolveSpecCandidates().some((candidate) => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- Candidate list sourced from known repo paths.
-      contents = readFileSync(candidate, "utf8");
+      contents = fs.readFileSync(candidate, "utf8");
       return true;
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
