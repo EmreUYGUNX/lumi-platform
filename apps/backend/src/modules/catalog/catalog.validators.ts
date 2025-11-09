@@ -20,6 +20,15 @@ export const productListQuerySchema = z
     categoryId: cuidSchema.optional(),
     categorySlug: slugSchema.optional(),
     refreshCache: z.coerce.boolean().optional(),
+    cursor: z.string().optional(),
+    take: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .passthrough();
+
+export const popularProductsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+    refreshCache: z.coerce.boolean().optional(),
   })
   .passthrough();
 
@@ -45,6 +54,7 @@ export const categoryCreateSchema = categoryCreateRequestSchema;
 export const categoryUpdateSchema = categoryUpdateRequestSchema;
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+export type PopularProductsQuery = z.infer<typeof popularProductsQuerySchema>;
 export type VariantQuery = z.infer<typeof variantQuerySchema>;
 export type CategoryTreeQuery = z.infer<typeof categoryTreeQuerySchema>;
 export type ProductFilterInput = z.infer<typeof productFilterSchema>;

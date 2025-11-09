@@ -122,6 +122,7 @@ const createService = (): jest.Mocked<CatalogService> =>
     updateVariant: jest.fn().mockResolvedValue(variantSummary),
     deleteVariant: jest.fn(),
     listCategories: jest.fn().mockResolvedValue([categorySummary]),
+    listPopularProducts: jest.fn().mockResolvedValue([productSummary]),
     getCategoryDetail: jest.fn().mockResolvedValue(categoryDetail),
     createCategory: jest.fn().mockResolvedValue(categorySummary),
     updateCategory: jest.fn().mockResolvedValue(categorySummary),
@@ -132,7 +133,7 @@ const createResponse = (): Response => {
   const res = {
     json: jest.fn(),
     status: jest.fn().mockReturnThis(),
-    setHeader: jest.fn(),
+    setHeader: jest.fn() as jest.Mock,
     end: jest.fn(),
     locals: {},
   };
@@ -178,6 +179,39 @@ describe("CatalogController", () => {
       }),
     );
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("sets caching headers and handles ETag for product listings", async () => {
+    const req = createRequest({ query: {} });
+    const res = createResponse();
+
+    await controller.listProducts(req, res, jest.fn());
+
+    const setHeaderMock = res.setHeader as unknown as jest.Mock;
+    const etagCall = setHeaderMock.mock.calls.find((call: [string, unknown]) => call[0] === "ETag");
+    const etag = etagCall?.[1];
+    expect(etag).toBeDefined();
+    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "public, max-age=60");
+
+    const cachedReq = createRequest({ headers: { "if-none-match": etag } });
+    const cachedRes = createResponse();
+
+    await controller.listProducts(cachedReq, cachedRes, jest.fn());
+
+    expect(cachedRes.status).toHaveBeenCalledWith(304);
+    expect(cachedRes.end).toHaveBeenCalled();
+    expect(cachedRes.json).not.toHaveBeenCalled();
+  });
+
+  it("returns cached payloads for the popular products endpoint", async () => {
+    const req = createRequest({ query: { limit: "5" } });
+    const res = createResponse();
+
+    await controller.listPopularProducts(req, res, jest.fn());
+
+    expect(service.listPopularProducts).toHaveBeenCalledWith(expect.objectContaining({ limit: 5 }));
+    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "public, max-age=300");
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.any(Array) }));
   });
 
   it("returns product detail and sets ETag headers", async () => {

@@ -69,9 +69,15 @@ export interface PaginationOptions<
   take?: number;
 }
 
+export interface CursorMeta {
+  hasMore: boolean;
+  next?: string;
+}
+
 export interface PaginatedResult<TItem> {
   items: TItem[];
   meta: PaginationMeta;
+  cursor?: CursorMeta;
 }
 
 export interface CursorPaginatedResult<TItem> {

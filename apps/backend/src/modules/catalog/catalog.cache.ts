@@ -1,10 +1,15 @@
 import { setTimeout as delay } from "node:timers/promises";
 
-import { createClient } from "redis";
-
 import { getConfig } from "@/config/index.js";
 import { createChildLogger } from "@/lib/logger.js";
+import { type RedisClientInstance as RedisClientLike, createRedisClient } from "@/lib/redis.js";
 import type { PaginatedResult } from "@/lib/repository/base.repository.js";
+import type { CatalogCacheMetricScope } from "@/observability/cache-metrics.js";
+import {
+  recordCatalogCacheHit,
+  recordCatalogCacheInvalidation,
+  recordCatalogCacheMiss,
+} from "@/observability/cache-metrics.js";
 import type { CategorySummaryDTO, ProductSummaryDTO } from "@lumi/shared/dto";
 
 export interface CategoryTreeNode extends CategorySummaryDTO {
@@ -23,18 +28,23 @@ export interface CatalogCache {
   getCategoryTree(key: string): Promise<CategoryTreeNode[] | undefined>;
   setCategoryTree(key: string, value: CategoryTreeNode[], ttlSeconds?: number): Promise<void>;
   invalidateCategoryTrees(): Promise<void>;
+  getPopularProducts(key: string): Promise<ProductSummaryDTO[] | undefined>;
+  setPopularProducts(key: string, value: ProductSummaryDTO[], ttlSeconds?: number): Promise<void>;
+  invalidatePopularProducts(): Promise<void>;
   shutdown(): Promise<void>;
 }
 
 const PRODUCT_CACHE_PREFIX = "catalog:products";
 const CATEGORY_CACHE_PREFIX = "catalog:categories";
+const POPULAR_CACHE_PREFIX = "catalog:popular";
 const DEFAULT_PRODUCT_TTL_SECONDS = 60;
 const DEFAULT_CATEGORY_TTL_SECONDS = 15 * 60;
+const DEFAULT_POPULAR_TTL_SECONDS = 5 * 60;
 const REDIS_RETRY_DELAY_MS = 250;
 const REDIS_MAX_RETRIES = 3;
 
 type ChildLogger = ReturnType<typeof createChildLogger>;
-type RedisClientInstance = ReturnType<typeof createClient>;
+type RedisClientInstance = RedisClientLike;
 
 const serialiseCacheValue = (value: unknown): string =>
   JSON.stringify({ value, cachedAt: Date.now() });
@@ -54,6 +64,16 @@ const deserialiseCacheValue = <T>(payload: string | null, logger: ChildLogger): 
 };
 
 const buildCacheKey = (prefix: string, key: string): string => `${prefix}:${key}`;
+
+const recordLookup = <T>(scope: CatalogCacheMetricScope, value: T | undefined): T | undefined => {
+  if (value === undefined) {
+    recordCatalogCacheMiss(scope);
+  } else {
+    recordCatalogCacheHit(scope);
+  }
+
+  return value;
+};
 
 const executeWithRetry = async <T>(operation: () => Promise<T>): Promise<T> => {
   let attempt = 0;
@@ -128,12 +148,12 @@ const createRedisCatalogCache = (
     }
   };
 
-  const deleteByPattern = async (pattern: string) =>
+  const deleteByPattern = async (pattern: string): Promise<boolean> =>
     withFallback(
       async () => {
         await ensureConnected();
         if (connectionFailed) {
-          return;
+          return false;
         }
 
         let cursor = "0";
@@ -154,26 +174,33 @@ const createRedisCatalogCache = (
             await executeWithRetry(() => client.del(result.keys));
           }
         } while (cursor !== "0");
+
+        return true;
       },
       async () => {
         if (pattern.startsWith(PRODUCT_CACHE_PREFIX)) {
           await fallback.invalidateProductLists();
         } else if (pattern.startsWith(CATEGORY_CACHE_PREFIX)) {
           await fallback.invalidateCategoryTrees();
+        } else if (pattern.startsWith(POPULAR_CACHE_PREFIX)) {
+          await fallback.invalidatePopularProducts();
         }
+
+        return false;
       },
     );
 
   return {
     async getProductList(key) {
       const cacheKey = buildCacheKey(PRODUCT_CACHE_PREFIX, key);
-      return withFallback(
+      const result = await withFallback(
         async () => {
           const payload = await executeWithRetry(() => client.get(cacheKey));
           return deserialiseCacheValue<PaginatedResult<ProductSummaryDTO>>(payload, logger);
         },
         () => fallback.getProductList(key),
       );
+      return recordLookup("products", result);
     },
     async setProductList(key, value, ttlSeconds = DEFAULT_PRODUCT_TTL_SECONDS) {
       const cacheKey = buildCacheKey(PRODUCT_CACHE_PREFIX, key);
@@ -191,17 +218,21 @@ const createRedisCatalogCache = (
     },
     async invalidateProductLists() {
       const pattern = `${PRODUCT_CACHE_PREFIX}:*`;
-      await deleteByPattern(pattern);
+      const handledByRedis = await deleteByPattern(pattern);
+      if (handledByRedis) {
+        recordCatalogCacheInvalidation("products");
+      }
     },
     async getCategoryTree(key) {
       const cacheKey = buildCacheKey(CATEGORY_CACHE_PREFIX, key);
-      return withFallback(
+      const result = await withFallback(
         async () => {
           const payload = await executeWithRetry(() => client.get(cacheKey));
           return deserialiseCacheValue<CategoryTreeNode[]>(payload, logger);
         },
         () => fallback.getCategoryTree(key),
       );
+      return recordLookup("categories", result);
     },
     async setCategoryTree(key, value, ttlSeconds = DEFAULT_CATEGORY_TTL_SECONDS) {
       const cacheKey = buildCacheKey(CATEGORY_CACHE_PREFIX, key);
@@ -219,7 +250,42 @@ const createRedisCatalogCache = (
     },
     async invalidateCategoryTrees() {
       const pattern = `${CATEGORY_CACHE_PREFIX}:*`;
-      await deleteByPattern(pattern);
+      const handledByRedis = await deleteByPattern(pattern);
+      if (handledByRedis) {
+        recordCatalogCacheInvalidation("categories");
+      }
+    },
+    async getPopularProducts(key) {
+      const cacheKey = buildCacheKey(POPULAR_CACHE_PREFIX, key);
+      const result = await withFallback(
+        async () => {
+          const payload = await executeWithRetry(() => client.get(cacheKey));
+          return deserialiseCacheValue<ProductSummaryDTO[]>(payload, logger);
+        },
+        () => fallback.getPopularProducts(key),
+      );
+      return recordLookup("popular", result);
+    },
+    async setPopularProducts(key, value, ttlSeconds = DEFAULT_POPULAR_TTL_SECONDS) {
+      const cacheKey = buildCacheKey(POPULAR_CACHE_PREFIX, key);
+      await withFallback(
+        async () => {
+          const payload = serialiseCacheValue(value);
+          await executeWithRetry(() =>
+            client.set(cacheKey, payload, {
+              EX: ttlSeconds,
+            }),
+          );
+        },
+        () => fallback.setPopularProducts(key, value, ttlSeconds),
+      );
+    },
+    async invalidatePopularProducts() {
+      const pattern = `${POPULAR_CACHE_PREFIX}:*`;
+      const handledByRedis = await deleteByPattern(pattern);
+      if (handledByRedis) {
+        recordCatalogCacheInvalidation("popular");
+      }
     },
     async shutdown() {
       if (connectionFailed) {
@@ -250,6 +316,7 @@ interface CacheEntry<T> {
 function createInMemoryCatalogCache(): CatalogCache {
   const productStore = new Map<string, CacheEntry<PaginatedResult<ProductSummaryDTO>>>();
   const categoryStore = new Map<string, CacheEntry<CategoryTreeNode[]>>();
+  const popularStore = new Map<string, CacheEntry<ProductSummaryDTO[]>>();
 
   const cleanup = <T>(store: Map<string, CacheEntry<T>>) => {
     const now = Date.now();
@@ -264,7 +331,7 @@ function createInMemoryCatalogCache(): CatalogCache {
     async getProductList(key) {
       cleanup(productStore);
       const entry = productStore.get(key);
-      return entry ? entry.value : undefined;
+      return recordLookup("products", entry ? entry.value : undefined);
     },
     async setProductList(key, value, ttlSeconds = DEFAULT_PRODUCT_TTL_SECONDS) {
       const expiresAt = Date.now() + ttlSeconds * 1000;
@@ -272,11 +339,12 @@ function createInMemoryCatalogCache(): CatalogCache {
     },
     async invalidateProductLists() {
       productStore.clear();
+      recordCatalogCacheInvalidation("products");
     },
     async getCategoryTree(key) {
       cleanup(categoryStore);
       const entry = categoryStore.get(key);
-      return entry ? entry.value : undefined;
+      return recordLookup("categories", entry ? entry.value : undefined);
     },
     async setCategoryTree(key, value, ttlSeconds = DEFAULT_CATEGORY_TTL_SECONDS) {
       const expiresAt = Date.now() + ttlSeconds * 1000;
@@ -284,10 +352,25 @@ function createInMemoryCatalogCache(): CatalogCache {
     },
     async invalidateCategoryTrees() {
       categoryStore.clear();
+      recordCatalogCacheInvalidation("categories");
+    },
+    async getPopularProducts(key) {
+      cleanup(popularStore);
+      const entry = popularStore.get(key);
+      return recordLookup("popular", entry ? entry.value : undefined);
+    },
+    async setPopularProducts(key, value, ttlSeconds = DEFAULT_POPULAR_TTL_SECONDS) {
+      const expiresAt = Date.now() + ttlSeconds * 1000;
+      popularStore.set(key, { value, expiresAt });
+    },
+    async invalidatePopularProducts() {
+      popularStore.clear();
+      recordCatalogCacheInvalidation("popular");
     },
     async shutdown() {
       productStore.clear();
       categoryStore.clear();
+      popularStore.clear();
     },
   };
 }
@@ -303,9 +386,9 @@ export const createCatalogCache = (): CatalogCache => {
       return createInMemoryCatalogCache();
     }
 
-    const client = createClient({ url: redisUrl });
-    client.on("error", (error) => {
-      logger.error("Redis catalog cache client error", { error });
+    const client = createRedisClient({
+      url: redisUrl,
+      name: "catalog-cache",
     });
 
     return createRedisCatalogCache(client);

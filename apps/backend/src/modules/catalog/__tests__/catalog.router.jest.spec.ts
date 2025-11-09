@@ -57,6 +57,7 @@ const createCatalogServiceStub = () => {
         hasPreviousPage: false,
       },
     }),
+    listPopularProducts: jest.fn().mockResolvedValue([product]),
     getProductDetail: jest.fn().mockResolvedValue({
       product,
       reviewSummary: {
@@ -106,6 +107,22 @@ describe("catalog router", () => {
         expect(stub.listPublicProducts).toHaveBeenCalledTimes(1);
         expect(response.body.success).toBe(true);
         expect(response.body.data[0].slug).toBe(product.slug);
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
+  });
+
+  it("returns the popular products feed", async () => {
+    const { stub, product } = createCatalogServiceStub();
+
+    await withTestApp(
+      async ({ app }) => {
+        const response = await request(app).get("/api/v1/products/popular").expect(200);
+
+        expect(stub.listPopularProducts).toHaveBeenCalledWith(
+          expect.objectContaining({ limit: 12 }),
+        );
+        expect(response.body.data[0].id).toBe(product.id);
       },
       appOptionsWithService(stub as unknown as CatalogService),
     );

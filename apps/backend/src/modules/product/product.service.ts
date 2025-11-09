@@ -7,7 +7,11 @@ import { Prisma } from "@prisma/client";
 import type { ZodError } from "zod";
 
 import { NotFoundError, ValidationError, type ValidationErrorDetail } from "@/lib/errors.js";
-import type { PaginatedResult, PaginationOptions } from "@/lib/repository/base.repository.js";
+import type {
+  CursorPaginatedResult,
+  PaginatedResult,
+  PaginationOptions,
+} from "@/lib/repository/base.repository.js";
 import {
   type PaginationRequest,
   type ProductAttributeFilter,
@@ -43,6 +47,18 @@ interface ProductRepositoryLike {
       "where"
     >,
   ): Promise<PaginatedResult<ProductWithRelations>>;
+  searchWithCursor(
+    filters: ProductSearchFilters,
+    pagination?: Omit<
+      PaginationOptions<
+        Prisma.ProductWhereInput,
+        Prisma.ProductOrderByWithRelationInput,
+        Prisma.ProductSelect,
+        Prisma.ProductInclude
+      >,
+      "where"
+    >,
+  ): Promise<CursorPaginatedResult<ProductWithRelations>>;
   listForRatingSort(filters: ProductSearchFilters): Promise<{ id: string; createdAt: Date }[]>;
   findWithRelations(ids: string[]): Promise<ProductWithRelations[]>;
   getReviewAggregates(
@@ -51,12 +67,72 @@ interface ProductRepositoryLike {
 }
 
 const DEFAULT_PRODUCT_INCLUDE: Prisma.ProductInclude = {
-  variants: true,
+  variants: {
+    select: {
+      id: true,
+      productId: true,
+      title: true,
+      sku: true,
+      price: true,
+      compareAtPrice: true,
+      stock: true,
+      attributes: true,
+      weightGrams: true,
+      isPrimary: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   categories: {
-    include: { category: true },
+    select: {
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          parentId: true,
+          level: true,
+          path: true,
+          imageUrl: true,
+          iconUrl: true,
+          displayOrder: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      isPrimary: true,
+      assignedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   },
   productMedia: {
-    include: { media: true },
+    select: {
+      productId: true,
+      mediaId: true,
+      sortOrder: true,
+      isPrimary: true,
+      createdAt: true,
+      updatedAt: true,
+      media: {
+        select: {
+          id: true,
+          assetId: true,
+          url: true,
+          type: true,
+          provider: true,
+          mimeType: true,
+          sizeBytes: true,
+          width: true,
+          height: true,
+          alt: true,
+          caption: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
   },
 };
 
@@ -171,6 +247,43 @@ const parseWithValidation = <T>(
   }
 
   return result.data;
+};
+
+const DEFAULT_CURSOR_TAKE = 24;
+const MAX_CURSOR_TAKE = 100;
+
+const encodeCursorToken = (payload: Record<string, unknown>): string => {
+  const json = JSON.stringify(payload);
+  return Buffer.from(json, "utf8").toString("base64url");
+};
+
+const decodeCursorToken = (token: string | undefined): Record<string, unknown> | undefined => {
+  if (!token) {
+    return undefined;
+  }
+
+  try {
+    const json = Buffer.from(token, "base64url").toString("utf8");
+    const payload = JSON.parse(json);
+    return payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const normaliseCursorTake = (value: number | undefined, fallback = DEFAULT_CURSOR_TAKE): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return fallback;
+  }
+
+  const coerced = Math.trunc(value);
+  if (coerced <= 0) {
+    return fallback;
+  }
+
+  return Math.min(coerced, MAX_CURSOR_TAKE);
 };
 
 const resolveSearchFilter = (raw: Record<string, unknown>): Record<string, unknown> => {
@@ -362,29 +475,62 @@ const parsePaginationInput = (input: unknown): PaginationRequest => {
   );
 };
 
+const stripCursorFields = (
+  filter: ProductFilter,
+): {
+  sanitizedFilter: ProductFilter;
+  cursorToken?: string;
+  cursorTake?: number;
+} => {
+  const clone = { ...filter } as ProductFilter & {
+    cursor?: string;
+    take?: number;
+  };
+
+  const cursorToken =
+    typeof clone.cursor === "string" && clone.cursor.length > 0 ? clone.cursor : undefined;
+  const cursorTake = typeof clone.take === "number" ? clone.take : undefined;
+
+  delete clone.cursor;
+  delete clone.take;
+
+  return {
+    sanitizedFilter: clone,
+    cursorToken,
+    cursorTake,
+  };
+};
+
 const extractSearchParameters = (
   input: unknown,
 ): {
   filter: ProductFilter;
   pagination: PaginationRequest;
+  cursorToken?: string;
+  cursorTake?: number;
 } => {
   if (input && typeof input === "object" && "filter" in (input as Record<string, unknown>)) {
     const { filter, pagination } = input as { filter?: unknown; pagination?: unknown };
+    const parsedFilter = parseFilterInput(filter ?? {});
+    const { sanitizedFilter, cursorToken, cursorTake } = stripCursorFields(parsedFilter);
     return {
-      filter: parseFilterInput(filter ?? {}),
+      filter: sanitizedFilter,
       pagination: parsePaginationInput(pagination ?? {}),
+      cursorToken,
+      cursorTake,
     };
   }
 
   const query = coerceQuery(input ?? {});
 
-  if (query.cursor !== undefined || query.take !== undefined) {
-    throw new ValidationError("Cursor-based pagination is not supported for this endpoint yet.");
-  }
+  const parsedFilter = parseFilterInput(query);
+  const { sanitizedFilter, cursorToken, cursorTake } = stripCursorFields(parsedFilter);
 
   return {
-    filter: parseFilterInput(query),
+    filter: sanitizedFilter,
     pagination: parsePaginationInput(query),
+    cursorToken,
+    cursorTake,
   };
 };
 
@@ -479,13 +625,28 @@ export class ProductService implements ProductServiceContract {
   }
 
   async search(input: unknown): Promise<ProductSearchResult> {
-    const { filter, pagination } = extractSearchParameters(input);
+    const { filter, pagination, cursorToken, cursorTake } = extractSearchParameters(input);
 
     const filters = toRepositoryFilters(filter);
     if (filter.sort === "rating") {
       return this.searchByRating(filters, pagination);
     }
     const orderBy = mapSortToOrderBy(filter.sort);
+
+    if (!cursorToken && cursorTake !== undefined) {
+      pagination.pageSize = normaliseCursorTake(
+        cursorTake,
+        pagination.pageSize ?? DEFAULT_CURSOR_TAKE,
+      );
+    }
+
+    if (cursorToken) {
+      return this.searchWithCursor(filters, {
+        cursorToken,
+        cursorTake,
+        orderBy,
+      });
+    }
 
     const result = await this.repository.search(filters, {
       page: pagination.page,
@@ -510,6 +671,47 @@ export class ProductService implements ProductServiceContract {
     throw new NotFoundError("Product not found.", {
       details: { slug },
     });
+  }
+
+  private async searchWithCursor(
+    filters: ProductSearchFilters,
+    options: {
+      cursorToken?: string;
+      cursorTake?: number;
+      orderBy?: Prisma.ProductOrderByWithRelationInput[] | undefined;
+    },
+  ): Promise<ProductSearchResult> {
+    const cursorPayload = decodeCursorToken(options.cursorToken);
+    const takeValue = normaliseCursorTake(options.cursorTake, DEFAULT_CURSOR_TAKE);
+
+    const cursorResult = await this.repository.searchWithCursor(filters, {
+      cursor: cursorPayload,
+      take: takeValue,
+      orderBy: options.orderBy,
+      include: DEFAULT_PRODUCT_INCLUDE,
+    });
+
+    const items = cursorResult.items.map((product) => mapProductToSummary(product));
+    const nextToken =
+      cursorResult.nextCursor && Object.keys(cursorResult.nextCursor).length > 0
+        ? encodeCursorToken(cursorResult.nextCursor)
+        : undefined;
+
+    return {
+      items,
+      meta: {
+        page: 1,
+        pageSize: takeValue,
+        totalItems: items.length,
+        totalPages: cursorResult.hasMore ? 2 : 1,
+        hasNextPage: cursorResult.hasMore,
+        hasPreviousPage: Boolean(options.cursorToken),
+      },
+      cursor: {
+        hasMore: cursorResult.hasMore,
+        next: nextToken,
+      },
+    };
   }
 
   private async searchByRating(

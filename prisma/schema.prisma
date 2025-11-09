@@ -122,22 +122,22 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  sessions       UserSession[]
-  roles          UserRole[]
-  permissions    UserPermission[]
-  securityEvents SecurityEvent[]
-  carts          Cart[]
-  reservations   InventoryReservation[]
-  orders         Order[]
-  addresses      Address[]
-  reviews        Review[]
-  savedCards     SavedCard[]
-  payments       Payment[]
-  auditLogs      AuditLog[]
-  couponUsages   CouponUsage[]
+  sessions                UserSession[]
+  roles                   UserRole[]
+  permissions             UserPermission[]
+  securityEvents          SecurityEvent[]
+  carts                   Cart[]
+  reservations            InventoryReservation[]
+  orders                  Order[]
+  addresses               Address[]
+  reviews                 Review[]
+  savedCards              SavedCard[]
+  payments                Payment[]
+  auditLogs               AuditLog[]
+  couponUsages            CouponUsage[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
-  preferences            UserPreference?
+  preferences             UserPreference?
 }
 
 model UserSession {
@@ -160,13 +160,13 @@ model UserSession {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String
-  expiresAt DateTime
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
   consumedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -175,15 +175,15 @@ model EmailVerificationToken {
 }
 
 model PasswordResetToken {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   tokenHash   String
   expiresAt   DateTime
   consumedAt  DateTime?
   requestedIp String?
   userAgent   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -273,7 +273,7 @@ model SecurityEvent {
 model Product {
   id              String          @id @default(cuid())
   title           String
-  slug            String
+  slug            String          @unique
   sku             String?         @unique
   description     String?
   summary         String?
@@ -295,7 +295,7 @@ model Product {
   reviews      Review[]
   orderItems   OrderItem[]
 
-  @@unique([slug])
+  @@index([status])
   @@index([status, createdAt])
   @@index([deletedAt])
   @@index([searchKeywords], type: Gin)
@@ -315,11 +315,11 @@ model ProductVariant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inventory    Inventory?
-  cartItems    CartItem[]
-  variantMedia VariantMedia[]
-  orderItems   OrderItem[]
+  product          Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory        Inventory?
+  cartItems        CartItem[]
+  variantMedia     VariantMedia[]
+  orderItems       OrderItem[]
   reservationItems InventoryReservationItem[]
 
   @@index([productId])
@@ -411,16 +411,16 @@ model Inventory {
 }
 
 model InventoryReservation {
-  id        String                       @id @default(cuid())
+  id        String                     @id @default(cuid())
   cartId    String
   userId    String
-  status    InventoryReservationStatus   @default(PENDING)
+  status    InventoryReservationStatus @default(PENDING)
   expiresAt DateTime
-  createdAt DateTime                     @default(now())
-  updatedAt DateTime                     @updatedAt
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
 
-  cart  Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cart  Cart                       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  user  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   items InventoryReservationItem[]
 
   @@index([cartId])
@@ -507,9 +507,9 @@ model Cart {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items CartItem[]
-  order Order?     @relation("CartOrder")
+  user         User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items        CartItem[]
+  order        Order?                 @relation("CartOrder")
   reservations InventoryReservation[]
 
   @@index([userId])
@@ -535,7 +535,7 @@ model CartItem {
 }
 
 model Address {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
   label      String
   fullName   String
@@ -546,9 +546,9 @@ model Address {
   state      String?
   postalCode String
   country    String
-  isDefault  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isDefault  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
   user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -559,17 +559,17 @@ model Address {
 }
 
 model UserPreference {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  language            String   @default("tr-TR")
-  currency            String   @default("TRY")
-  marketingOptIn      Boolean  @default(false)
-  emailNotifications  Boolean  @default(true)
-  smsNotifications    Boolean  @default(false)
-  pushNotifications   Boolean  @default(false)
-  privacySettings     Json?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  language           String   @default("tr-TR")
+  currency           String   @default("TRY")
+  marketingOptIn     Boolean  @default(false)
+  emailNotifications Boolean  @default(true)
+  smsNotifications   Boolean  @default(false)
+  pushNotifications  Boolean  @default(false)
+  privacySettings    Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -608,6 +608,7 @@ model Order {
   reviews         Review[]
 
   @@index([userId])
+  @@index([status])
   @@index([status, createdAt])
   @@index([userId, status, createdAt])
 }

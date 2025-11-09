@@ -1,4 +1,6 @@
 /* eslint-disable sonarjs/cognitive-complexity, sonarjs/no-duplicate-string, unicorn/no-null */
+import { performance } from "node:perf_hooks";
+
 import { InventoryPolicy, Prisma, ProductStatus, ReviewStatus } from "@prisma/client";
 import type { Category, PrismaClient } from "@prisma/client";
 
@@ -28,6 +30,7 @@ import { mapProductToSummary } from "@lumi/shared/dto";
 import { type CatalogCache, type CategoryTreeNode, createCatalogCache } from "./catalog.cache.js";
 
 const DEFAULT_CATEGORY_DEPTH = 3;
+const SLOW_PRODUCT_QUERY_THRESHOLD_MS = 120;
 
 export interface ReviewSummary {
   totalReviews: number;
@@ -171,8 +174,16 @@ export class CatalogService {
 
     const refreshCacheFlag = refreshCache === true || String(refreshCache).toLowerCase() === "true";
 
+    const cursorTokenCandidate =
+      typeof baseInput.cursor === "string"
+        ? baseInput.cursor
+        : typeof topLevelFilters.cursor === "string"
+          ? (topLevelFilters.cursor as string)
+          : undefined;
+    const shouldUseCache = !refreshCacheFlag && !cursorTokenCandidate;
+
     const cacheKey = stableStringify({ scope: "products", query: baseInput });
-    if (!refreshCacheFlag) {
+    if (shouldUseCache) {
       const cached = await this.cache.getProductList(cacheKey);
       if (cached) {
         return cached;
@@ -188,6 +199,9 @@ export class CatalogService {
       ...topLevelFilters,
       ...nestedFilter,
     };
+
+    delete filterCandidate.cursor;
+    delete filterCandidate.take;
 
     delete filterCandidate.status;
     delete filterCandidate.statuses;
@@ -279,8 +293,23 @@ export class CatalogService {
       pagination: paginationInput,
     };
 
+    const startedAt = performance.now();
     const result = await this.productService.search(searchInput);
-    await this.cache.setProductList(cacheKey, result);
+    const durationMs = performance.now() - startedAt;
+
+    if (durationMs > SLOW_PRODUCT_QUERY_THRESHOLD_MS) {
+      this.logger.warn("Catalog product search exceeded latency budget", {
+        durationMs: Number(durationMs.toFixed(2)),
+        page: result.meta.page,
+        pageSize: result.meta.pageSize,
+        filterCount: Object.keys(filterCandidate).length,
+      });
+    }
+
+    if (shouldUseCache) {
+      await this.cache.setProductList(cacheKey, result);
+    }
+
     return result;
   }
 
@@ -393,6 +422,7 @@ export class CatalogService {
 
     await this.cache.invalidateProductLists();
     await this.cache.invalidateCategoryTrees();
+    await this.cache.invalidatePopularProducts();
 
     return mapProductToSummary(created as ProductWithRelations);
   }
@@ -489,6 +519,7 @@ export class CatalogService {
 
     await this.cache.invalidateProductLists();
     await this.cache.invalidateCategoryTrees();
+    await this.cache.invalidatePopularProducts();
 
     const reloaded = await this.productRepository.findById(id, {
       include: {
@@ -536,6 +567,7 @@ export class CatalogService {
 
     await this.cache.invalidateProductLists();
     await this.cache.invalidateCategoryTrees();
+    await this.cache.invalidatePopularProducts();
   }
 
   async addVariant(
@@ -795,6 +827,28 @@ export class CatalogService {
     await this.prisma.productVariant.delete({ where: { id: variantId } });
 
     await this.cache.invalidateProductLists();
+    await this.cache.invalidatePopularProducts();
+  }
+
+  async listPopularProducts(
+    options: { limit?: number; refreshCache?: boolean } = {},
+  ): Promise<ProductSummaryDTO[]> {
+    const limit = Math.min(Math.max(options.limit ?? 12, 1), 50);
+    const cacheKey = stableStringify({ scope: "popular", limit });
+
+    if (!options.refreshCache) {
+      const cached = await this.cache.getPopularProducts(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const products = await this.productRepository.listPopularProducts(limit);
+    const summaries = products.map((product) =>
+      mapProductToSummary(product as ProductWithRelations),
+    );
+    await this.cache.setPopularProducts(cacheKey, summaries);
+    return summaries;
   }
 
   async listCategories(
@@ -988,6 +1042,7 @@ export class CatalogService {
     await this.categoryRepository.updateDescendantPaths(id, path, level);
     await this.cache.invalidateCategoryTrees();
     await this.cache.invalidateProductLists();
+    await this.cache.invalidatePopularProducts();
 
     const reloaded = await this.prisma.category.findUnique({ where: { id } });
     return CatalogService.toCategorySummary(reloaded ?? updated);
@@ -1030,6 +1085,7 @@ export class CatalogService {
 
     await this.cache.invalidateCategoryTrees();
     await this.cache.invalidateProductLists();
+    await this.cache.invalidatePopularProducts();
   }
 
   private limitCategoryDepth(nodes: CategoryTreeNode[], depth: number): CategoryTreeNode[] {
