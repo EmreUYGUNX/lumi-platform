@@ -47,6 +47,7 @@ describe("OpenAPI documentation", () => {
     expect(response.body.paths?.["/internal/metrics"]?.get?.security?.[0]).toHaveProperty(
       "basicAuth",
     );
+    expect(response.body.paths?.["/api/v1/products"]?.get).toBeDefined();
   });
 
   it("exposes a builder for generating documentation outside HTTP context", () => {
@@ -54,6 +55,7 @@ describe("OpenAPI documentation", () => {
     const document = createOpenApiDocument(config);
 
     expect(document.paths?.["/api/v1/admin/users"]?.get?.responses?.["403"]).toBeDefined();
+    expect(document.paths?.["/api/v1/products"]?.get?.summary).toBeDefined();
   });
 
   it("serves Swagger UI using the configured site title", async () => {

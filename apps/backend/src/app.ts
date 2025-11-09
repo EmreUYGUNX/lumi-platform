@@ -60,6 +60,42 @@ export const createApp = ({
   const resolveConfig = (): ApplicationConfig => (app.locals.config as ApplicationConfig) ?? config;
 
   const docsRouter = Router();
+  const docsAccessToken = process.env.API_DOCS_ACCESS_TOKEN?.trim();
+
+  if (docsAccessToken) {
+    docsRouter.use((req, res, next) => {
+      if (req.get("x-docs-access") !== docsAccessToken) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: "DOCS_UNAUTHORIZED",
+            message: "Provide a valid X-Docs-Access header to view API documentation.",
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+            requestId: req.get("x-request-id"),
+          },
+        });
+        return;
+      }
+
+      next();
+    });
+  } else if (config.app.environment === "production") {
+    docsRouter.use((_req, res) => {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "DOCS_DISABLED",
+          message: "Interactive API documentation is disabled in production.",
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+  }
+
   docsRouter.use("/", swaggerUi.serve);
   docsRouter.get("/", swaggerUi.setup(undefined, getSwaggerUiOptions(config)));
   docsRouter.get("/openapi.json", (_req, res) => {

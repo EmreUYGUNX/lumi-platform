@@ -8,6 +8,7 @@ This directory hosts the API specifications, endpoint references, and integratio
 - `schemas/` – Shared request/response schemas sourced from `@lumi/types`.
 - `changelog/` – Versioned change logs documenting API additions, deprecations, and removals.
 - `auth-endpoints.md` – Narrative companion to the OpenAPI spec covering authentication flows, error semantics, and rate limits.
+- `packages/shared/src/api-schemas/openapi.yaml` – Canonical OpenAPI 3.1 spec merged into the backend Swagger pipeline.
 
 ## Authoring Standards
 

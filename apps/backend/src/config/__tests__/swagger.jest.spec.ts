@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import swaggerJsdoc, { type Options as SwaggerJSDocOptions } from "swagger-jsdoc";
 
+import { getCoreApiOpenApiDocument } from "@lumi/shared";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createTestConfig } from "../../testing/config.js";
@@ -14,7 +15,48 @@ jest.mock("swagger-jsdoc", () => {
   };
 });
 
+jest.mock("@lumi/shared", () => ({
+  __esModule: true,
+  getCoreApiOpenApiDocument: jest.fn(() => ({
+    openapi: "3.1.0",
+    info: {
+      title: "Shared Spec",
+      version: "1.0.0",
+    },
+    tags: [
+      {
+        name: "Catalog",
+        description: "Shared catalog routes",
+      },
+    ],
+    servers: [
+      {
+        url: "https://shared.spec/api",
+        description: "Shared reference",
+      },
+    ],
+    components: {
+      schemas: {
+        SharedProduct: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+          },
+        },
+      },
+    },
+    paths: {
+      "/api/v1/products": {
+        get: {
+          summary: "List products",
+        },
+      },
+    },
+  })),
+}));
+
 const mockedSwaggerJsdoc = jest.mocked(swaggerJsdoc);
+const mockedCoreSpec = jest.mocked(getCoreApiOpenApiDocument);
 
 const createConfig = (overrides: Partial<ApplicationConfig["app"]> = {}): ApplicationConfig =>
   createTestConfig({
@@ -34,6 +76,7 @@ describe("swagger configuration", () => {
     mockedSwaggerJsdoc.mockImplementation(
       (options?: SwaggerJSDocOptions) => (options?.definition ?? {}) as object,
     );
+    mockedCoreSpec.mockClear();
   });
 
   it("builds OpenAPI definition with local fallback server when necessary", () => {
@@ -56,7 +99,12 @@ describe("swagger configuration", () => {
         url: "http://localhost:3000/api",
         description: "Local development",
       },
+      {
+        url: "https://shared.spec/api",
+        description: "Shared reference",
+      },
     ]);
+    expect(mockedCoreSpec).toHaveBeenCalled();
   });
 
   it("omits local server when primary URL already targets localhost", () => {
@@ -67,6 +115,10 @@ describe("swagger configuration", () => {
       {
         url: "http://localhost:3000/api",
         description: "Primary API entrypoint",
+      },
+      {
+        url: "https://shared.spec/api",
+        description: "Shared reference",
       },
     ]);
   });
@@ -79,6 +131,8 @@ describe("swagger configuration", () => {
       url: "/api/docs/openapi.json",
       docExpansion: "list",
       displayRequestDuration: true,
+      tryItOutEnabled: true,
+      supportedSubmitMethods: ["get", "post", "put", "patch", "delete"],
       persistAuthorization: true,
     });
   });

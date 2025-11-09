@@ -19,6 +19,20 @@ The User Management API powers customer-facing profile operations and administra
 
 All customer routes enforce the customer rate limit (120 requests / 5 minutes per user/IP). Audit events are emitted for profile, address, and preference mutations.
 
+## Profile Management
+
+- `GET /api/v1/users/me` returns the canonical `UserProfile` envelope (`user`, `addresses`, `preferences`). Responses always hydrate the default address first.
+- `PUT /api/v1/users/me` accepts `firstName`, `lastName`, `phone`. Unknown fields removed, phone numbers normalised into E.164 when possible.
+- `PUT /api/v1/users/me/password` requires both `currentPassword` and `newPassword`. Successful changes revoke all other sessions via the session service.
+- Preference operations auto-create a preference record on first write to maintain backward compatibility with legacy accounts.
+
+## Address Management
+
+- `POST /api/v1/users/me/addresses` enforces max 10 active addresses; the first entry is auto-marked default.
+- `PUT /api/v1/users/me/addresses/{addressId}` rejects attempts to edit addresses owned by other users (S3 guard) with `FORBIDDEN`.
+- `DELETE` requests perform logical deletion when referenced by open orders (so that historical shipments remain intact).
+- `PUT /api/v1/users/me/addresses/{addressId}/default` runs inside a transaction to ensure only one default exists per user.
+
 ## Admin Endpoints
 
 | Method | Path                             | Description                                                                            |

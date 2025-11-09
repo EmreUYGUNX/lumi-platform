@@ -7,6 +7,7 @@ import type { OpenAPIV3_1 as OpenApi31 } from "openapi-types";
 import swaggerJsdoc, { type Options as SwaggerJSDocOptions } from "swagger-jsdoc";
 import type { SwaggerUiOptions } from "swagger-ui-express";
 
+import { getCoreApiOpenApiDocument } from "@lumi/shared";
 import type { ApplicationConfig } from "@lumi/types";
 
 const API_SOURCE_GLOBS = [
@@ -86,6 +87,127 @@ const buildServers = (config: ApplicationConfig): OpenApi31.ServerObject[] => {
   }
 
   return servers;
+};
+
+const normaliseServerUrl = (url: string): string => url.replace(/\/+$/, "").toLowerCase();
+
+const mergeServers = (
+  config: ApplicationConfig,
+  extensionServers: OpenApi31.ServerObject[] = [],
+): OpenApi31.ServerObject[] => {
+  const dynamicServers = buildServers(config);
+  const seen = new Set(dynamicServers.map((server) => normaliseServerUrl(server.url)));
+
+  extensionServers.forEach((server) => {
+    const key = normaliseServerUrl(server.url);
+    if (seen.has(key)) {
+      return;
+    }
+
+    dynamicServers.push(server);
+    seen.add(key);
+  });
+
+  return dynamicServers;
+};
+
+const mergeRecords = <T>(
+  base?: Record<string, T>,
+  extension?: Record<string, T>,
+): Record<string, T> | undefined => {
+  if (!base && !extension) {
+    return undefined;
+  }
+
+  if (!base) {
+    return { ...extension };
+  }
+
+  if (!extension) {
+    return { ...base };
+  }
+
+  return { ...extension, ...base };
+};
+
+const mergeComponents = (
+  base?: OpenApi31.ComponentsObject,
+  extension?: OpenApi31.ComponentsObject,
+): OpenApi31.ComponentsObject | undefined => {
+  if (!base && !extension) {
+    return undefined;
+  }
+
+  if (!base) {
+    return extension;
+  }
+
+  if (!extension) {
+    return base;
+  }
+
+  return {
+    ...extension,
+    ...base,
+    schemas: mergeRecords(base.schemas, extension.schemas),
+    responses: mergeRecords(base.responses, extension.responses),
+    parameters: mergeRecords(base.parameters, extension.parameters),
+    requestBodies: mergeRecords(base.requestBodies, extension.requestBodies),
+    securitySchemes: mergeRecords(base.securitySchemes, extension.securitySchemes),
+    headers: mergeRecords(base.headers, extension.headers),
+    examples: mergeRecords(base.examples, extension.examples),
+  };
+};
+
+const mergeTags = (
+  baseTags: OpenApi31.TagObject[] = [],
+  extensionTags: OpenApi31.TagObject[] = [],
+): OpenApi31.TagObject[] => {
+  const result = [...baseTags];
+  const seen = new Map(baseTags.map((tag) => [tag.name, tag]));
+
+  extensionTags.forEach((tag) => {
+    const existing = seen.get(tag.name);
+    if (existing) {
+      if (!existing.description && tag.description) {
+        existing.description = tag.description;
+      }
+      return;
+    }
+
+    result.push(tag);
+    seen.set(tag.name, tag);
+  });
+
+  return result;
+};
+
+const mergeOpenApiDocuments = (
+  config: ApplicationConfig,
+  baseDocument: OpenApi31.Document,
+  extensionDocument: OpenApi31.Document,
+): OpenApi31.Document => {
+  const document = baseDocument;
+
+  document.info = {
+    ...extensionDocument.info,
+    ...document.info,
+    title: `${config.app.name} API`,
+  };
+
+  document.tags = mergeTags(document.tags, extensionDocument.tags);
+  if (!document.paths) {
+    document.paths = extensionDocument.paths;
+  } else if (extensionDocument.paths) {
+    document.paths = {
+      ...extensionDocument.paths,
+      ...document.paths,
+    };
+  }
+  document.components = mergeComponents(document.components, extensionDocument.components);
+  document.servers = mergeServers(config, extensionDocument.servers);
+
+  return document;
 };
 
 /* eslint-disable sonarjs/no-duplicate-string */
@@ -2933,8 +3055,11 @@ const buildSwaggerJSDocOptions = (config: ApplicationConfig): SwaggerJSDocOption
   failOnErrors: true,
 });
 
-export const createOpenApiDocument = (config: ApplicationConfig): OpenApi31.Document =>
-  swaggerJsdoc(buildSwaggerJSDocOptions(config)) as OpenApi31.Document;
+export const createOpenApiDocument = (config: ApplicationConfig): OpenApi31.Document => {
+  const document = swaggerJsdoc(buildSwaggerJSDocOptions(config)) as OpenApi31.Document;
+  const coreSpec = getCoreApiOpenApiDocument();
+  return mergeOpenApiDocuments(config, document, coreSpec);
+};
 
 export const getSwaggerUiOptions = (config: ApplicationConfig): SwaggerUiOptions => ({
   customSiteTitle: `${config.app.name} API Reference`,
@@ -2945,6 +3070,8 @@ export const getSwaggerUiOptions = (config: ApplicationConfig): SwaggerUiOptions
     defaultModelExpandDepth: 2,
     defaultModelsExpandDepth: 1,
     persistAuthorization: true,
+    tryItOutEnabled: true,
+    supportedSubmitMethods: ["get", "post", "put", "patch", "delete"],
     syntaxHighlight: {
       activated: true,
     },
