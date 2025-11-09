@@ -2,8 +2,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma, ProductStatus } from "@prisma/client";
 
-import { NotFoundError, ValidationError } from "@/lib/errors.js";
-import type { PaginatedResult } from "@/lib/repository/base.repository.js";
+import { NotFoundError } from "@/lib/errors.js";
+import type { CursorPaginatedResult, PaginatedResult } from "@/lib/repository/base.repository.js";
 import type { ProductWithRelations } from "@lumi/shared/dto";
 
 import type { ProductSearchFilters } from "../product.repository.js";
@@ -24,6 +24,11 @@ type RepositorySearch = (
   pagination?: unknown,
 ) => Promise<PaginatedResult<ProductWithRelations>>;
 
+type RepositorySearchWithCursor = (
+  filters: ProductSearchFilters,
+  pagination?: unknown,
+) => Promise<CursorPaginatedResult<ProductWithRelations>>;
+
 const createRepository = (overrides: Partial<Record<string, unknown>> = {}) => {
   const listForRatingSort = jest
     .fn<(filters: ProductSearchFilters) => Promise<{ id: string; createdAt: Date }[]>>()
@@ -38,6 +43,11 @@ const createRepository = (overrides: Partial<Record<string, unknown>> = {}) => {
   return {
     findBySlug: jest.fn<RepositoryFindBySlug>(),
     search: jest.fn<RepositorySearch>(),
+    searchWithCursor: jest.fn<RepositorySearchWithCursor>().mockResolvedValue({
+      items: [],
+      hasMore: false,
+      nextCursor: undefined,
+    }),
     listForRatingSort,
     findWithRelations,
     getReviewAggregates: getAggregates,
@@ -159,6 +169,28 @@ describe("ProductService", () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.title).toBe("Aurora Desk Lamp");
     expect(result.meta.totalItems).toBe(1);
+  });
+
+  it("delegates cursor-driven searches to the repository", async () => {
+    const product = createProductEntity();
+    const cursorResponse = {
+      items: [product],
+      hasMore: true,
+      nextCursor: { id: product.id },
+    };
+
+    const repository = createRepository();
+    repository.searchWithCursor = jest
+      .fn<RepositorySearchWithCursor>()
+      .mockResolvedValue(cursorResponse);
+    const service = new ProductService(repository as never);
+
+    const result = await service.search({ filter: { cursor: "opaque-token", take: 5 } });
+
+    expect(repository.searchWithCursor).toHaveBeenCalledTimes(1);
+    expect(repository.search).not.toHaveBeenCalled();
+    expect(result.cursor?.hasMore).toBe(true);
+    expect(result.cursor?.next).toBeDefined();
   });
 
   it("throws NotFoundError when product cannot be located", async () => {
@@ -350,15 +382,25 @@ describe("ProductService", () => {
     expect(result.meta.hasNextPage).toBe(false);
   });
 
-  it("rejects cursor-based pagination parameters", async () => {
+  it("gracefully handles malformed cursor tokens", async () => {
     const repository = createRepository();
+    repository.searchWithCursor = jest.fn<RepositorySearchWithCursor>().mockResolvedValue({
+      items: [],
+      hasMore: false,
+      nextCursor: undefined,
+    });
     const service = new ProductService(repository as never);
 
     await expect(
       service.search({
-        cursor: "opaque-id",
+        filter: { cursor: "not-base64" },
       }),
-    ).rejects.toBeInstanceOf(ValidationError);
+    ).resolves.toMatchObject({
+      cursor: expect.objectContaining({
+        hasMore: false,
+      }),
+    });
+    expect(repository.searchWithCursor).toHaveBeenCalled();
   });
 });
 

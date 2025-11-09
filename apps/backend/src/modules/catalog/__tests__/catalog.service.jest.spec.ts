@@ -24,6 +24,7 @@ const createCatalogCacheStub = (): CatalogCache & {
 } => {
   const store = new Map<string, unknown>();
   const categoryStore = new Map<string, unknown>();
+  const popularStore = new Map<string, unknown>();
   const getCalls = jest.fn();
   const setCalls = jest.fn();
   const categoryGetCalls = jest.fn();
@@ -56,9 +57,19 @@ const createCatalogCacheStub = (): CatalogCache & {
     async invalidateCategoryTrees() {
       categoryStore.clear();
     },
+    async getPopularProducts(key) {
+      return popularStore.get(key) as unknown;
+    },
+    async setPopularProducts(key, value) {
+      popularStore.set(key, value);
+    },
+    async invalidatePopularProducts() {
+      popularStore.clear();
+    },
     async shutdown() {
       store.clear();
       categoryStore.clear();
+      popularStore.clear();
     },
   } as unknown as CatalogCache & {
     getCalls: jest.Mock;
@@ -83,6 +94,7 @@ const createProductRepositoryStub = (prisma: ReturnType<typeof createPrismaStub>
 
   return {
     search,
+    listPopularProducts: jest.fn().mockResolvedValue([createProductEntity()]),
     findBySlug: jest.fn(),
     findById: jest.fn(),
     listVariants: jest.fn(),
@@ -235,6 +247,73 @@ describe("CatalogService", () => {
     expect(cache.setCalls).toHaveBeenCalledTimes(1);
   });
 
+  it("skips cache lookups for cursor-based product queries", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    const cache = createCatalogCacheStub();
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    await service.listPublicProducts({ cursor: "opaque-cursor-token" });
+
+    expect(cache.getCalls).not.toHaveBeenCalled();
+    expect(cache.setCalls).not.toHaveBeenCalled();
+  });
+
+  it("preserves pagination metadata for large datasets", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    productRepository.search.mockResolvedValue({
+      items: Array.from({ length: 24 }, () => createProductEntity()),
+      meta: {
+        page: 1,
+        pageSize: 24,
+        totalItems: 10_000,
+        totalPages: 417,
+        hasNextPage: true,
+        hasPreviousPage: false,
+      },
+    });
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache: createCatalogCacheStub(),
+      prisma: prisma as unknown as any,
+    });
+
+    const result = await service.listPublicProducts({});
+
+    expect(result.meta.totalItems).toBe(10_000);
+    expect(result.meta.totalPages).toBe(417);
+  });
+
+  it("returns cached popular products without hitting the repository", async () => {
+    const prisma = createPrismaStub();
+    const productRepository = createProductRepositoryStub(prisma);
+    const cache = createCatalogCacheStub();
+    cache.getPopularProducts = jest.fn().mockResolvedValue([{ id: "cached-popular" }]);
+    cache.setPopularProducts = jest.fn();
+
+    const service = new CatalogService({
+      productRepository: productRepository as unknown as any,
+      categoryRepository: createCategoryRepositoryStub() as unknown as any,
+      cache,
+      prisma: prisma as unknown as any,
+    });
+
+    const result = await service.listPopularProducts({ limit: 12 });
+
+    expect(result).toEqual([{ id: "cached-popular" }]);
+    expect(productRepository.listPopularProducts).not.toHaveBeenCalled();
+    expect(cache.setPopularProducts).not.toHaveBeenCalled();
+  });
+
   it("rejects inactive products in detail view", async () => {
     const prisma = createPrismaStub();
     const productRepository = createProductRepositoryStub(prisma);
@@ -340,6 +419,7 @@ describe("CatalogService", () => {
     const cache = {
       invalidateProductLists: jest.fn().mockResolvedValue(undefined),
       invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+      invalidatePopularProducts: jest.fn().mockResolvedValue(undefined),
     };
 
     const service = new CatalogService({
@@ -555,6 +635,7 @@ describe("CatalogService", () => {
     const cache = {
       invalidateProductLists: jest.fn().mockResolvedValue(undefined),
       invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+      invalidatePopularProducts: jest.fn().mockResolvedValue(undefined),
     };
 
     const service = new CatalogService({
@@ -616,6 +697,7 @@ describe("CatalogService", () => {
       cache: {
         invalidateProductLists: jest.fn(),
         invalidateCategoryTrees: jest.fn(),
+        invalidatePopularProducts: jest.fn(),
       } as unknown as any,
       prisma: prisma as unknown as any,
     });
@@ -678,6 +760,7 @@ describe("CatalogService", () => {
     const cache = {
       invalidateProductLists: jest.fn().mockResolvedValue(undefined),
       invalidateCategoryTrees: jest.fn().mockResolvedValue(undefined),
+      invalidatePopularProducts: jest.fn().mockResolvedValue(undefined),
     };
 
     const service = new CatalogService({

@@ -16,6 +16,7 @@ import {
   categoryCreateSchema,
   categoryTreeQuerySchema,
   categoryUpdateSchema,
+  popularProductsQuerySchema,
   productCreateSchema,
   productListQuerySchema,
   productUpdateSchema,
@@ -35,6 +36,8 @@ export interface CatalogControllerOptions {
 
 export class CatalogController {
   public readonly listProducts: RequestHandler;
+
+  public readonly listPopularProducts: RequestHandler;
 
   public readonly getProduct: RequestHandler;
 
@@ -68,6 +71,7 @@ export class CatalogController {
     this.service = options.service;
 
     this.listProducts = asyncHandler(this.handleListProducts.bind(this));
+    this.listPopularProducts = asyncHandler(this.handleListPopularProducts.bind(this));
     this.getProduct = asyncHandler(this.handleGetProduct.bind(this));
     this.listVariants = asyncHandler(this.handleListVariants.bind(this));
     this.createProduct = asyncHandler(this.handleCreateProduct.bind(this));
@@ -104,6 +108,21 @@ export class CatalogController {
 
     const result = await this.service.listPublicProducts(query);
 
+    const responseSnapshot = {
+      items: result.items,
+      meta: result.meta,
+      cursor: result.cursor,
+    };
+    const etag = computeEtag(responseSnapshot);
+
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "public, max-age=60");
+
     res.json(
       paginatedResponse(result.items, {
         totalItems: result.meta.totalItems,
@@ -112,6 +131,38 @@ export class CatalogController {
         totalPages: result.meta.totalPages,
         hasNextPage: result.meta.hasNextPage,
         hasPreviousPage: result.meta.hasPreviousPage,
+        meta: result.cursor ? { cursor: result.cursor } : undefined,
+      }),
+    );
+  }
+
+  private async handleListPopularProducts(req: Request, res: Response): Promise<void> {
+    const params = popularProductsQuerySchema.parse(req.query);
+    const limit = params.limit ?? 12;
+    const products = await this.service.listPopularProducts({
+      limit,
+      refreshCache: params.refreshCache,
+    });
+
+    const payload = {
+      limit,
+      items: products,
+    };
+    const etag = computeEtag(payload);
+
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "public, max-age=300");
+
+    res.json(
+      successResponse(products, {
+        popular: {
+          limit,
+        },
       }),
     );
   }
@@ -330,6 +381,7 @@ export class CatalogController {
       refresh: query.refresh,
     });
 
+    res.setHeader("Cache-Control", "public, max-age=900");
     res.json(successResponse(categories));
   }
 

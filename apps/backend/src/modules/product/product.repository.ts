@@ -29,13 +29,81 @@ export interface ProductSearchFilters {
   attributes?: Record<string, string | string[]>;
 }
 
-const PRODUCT_DEFAULT_INCLUDE: Prisma.ProductInclude = {
-  variants: true,
+const PRODUCT_VARIANT_SELECT: Prisma.ProductVariantSelect = {
+  id: true,
+  productId: true,
+  title: true,
+  sku: true,
+  price: true,
+  compareAtPrice: true,
+  stock: true,
+  attributes: true,
+  weightGrams: true,
+  isPrimary: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const PRODUCT_MEDIA_SELECT: Prisma.ProductMediaSelect = {
+  productId: true,
+  mediaId: true,
+  sortOrder: true,
+  isPrimary: true,
+  createdAt: true,
+  updatedAt: true,
+  media: {
+    select: {
+      id: true,
+      assetId: true,
+      url: true,
+      type: true,
+      provider: true,
+      mimeType: true,
+      sizeBytes: true,
+      width: true,
+      height: true,
+      alt: true,
+      caption: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+};
+
+const PRODUCT_CATEGORY_SELECT: Prisma.ProductCategorySelect = {
+  category: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      parentId: true,
+      level: true,
+      path: true,
+      imageUrl: true,
+      iconUrl: true,
+      displayOrder: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  productId: true,
+  categoryId: true,
+  isPrimary: true,
+  assignedAt: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const PRODUCT_SUMMARY_INCLUDE: Prisma.ProductInclude = {
+  variants: {
+    select: PRODUCT_VARIANT_SELECT,
+  },
   productMedia: {
-    include: { media: true },
+    select: PRODUCT_MEDIA_SELECT,
   },
   categories: {
-    include: { category: true },
+    select: PRODUCT_CATEGORY_SELECT,
   },
 };
 
@@ -318,7 +386,7 @@ export class ProductRepository extends BaseRepository<
     slug: string,
     options: { include?: Prisma.ProductInclude; select?: Prisma.ProductSelect } = {},
   ): Promise<ProductWithRelations | null> {
-    const include = options.include ?? PRODUCT_DEFAULT_INCLUDE;
+    const include = options.include ?? PRODUCT_SUMMARY_INCLUDE;
 
     return (await this.findFirst({
       where: { slug },
@@ -341,7 +409,7 @@ export class ProductRepository extends BaseRepository<
   ): Promise<PaginatedResult<ProductWithRelations>> {
     const where = buildProductSearchWhere(filters);
 
-    const include = pagination.include ?? PRODUCT_DEFAULT_INCLUDE;
+    const include = pagination.include ?? PRODUCT_SUMMARY_INCLUDE;
 
     return this.paginate<Prisma.ProductFindManyArgs, ProductWithRelations>({
       ...pagination,
@@ -359,6 +427,65 @@ export class ProductRepository extends BaseRepository<
     });
 
     return products as unknown as ProductListingSummary[];
+  }
+
+  async listPopularProducts(limit = 12): Promise<ProductWithRelations[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 50));
+    const aggregates = await this.prisma.orderItem.groupBy({
+      by: ["productId"],
+      _sum: { quantity: true },
+      orderBy: {
+        _sum: {
+          quantity: "desc",
+        },
+      },
+      take: safeLimit * 3,
+    });
+
+    const productIds = aggregates.map((entry) => entry.productId);
+
+    if (productIds.length === 0) {
+      return (await this.findMany({
+        where: { status: ProductStatus.ACTIVE },
+        include: PRODUCT_SUMMARY_INCLUDE,
+        take: safeLimit,
+        orderBy: [{ createdAt: "desc" }],
+      })) as ProductWithRelations[];
+    }
+
+    const records = (await this.findMany({
+      where: {
+        id: { in: productIds },
+        status: ProductStatus.ACTIVE,
+      },
+      include: PRODUCT_SUMMARY_INCLUDE,
+    })) as ProductWithRelations[];
+
+    const recordMap = new Map(records.map((record) => [record.id, record]));
+    const ordered: ProductWithRelations[] = [];
+
+    aggregates.forEach((entry) => {
+      const record = recordMap.get(entry.productId);
+      if (record) {
+        ordered.push(record);
+      }
+    });
+
+    if (ordered.length < safeLimit) {
+      const fallback = (await this.findMany({
+        where: {
+          status: ProductStatus.ACTIVE,
+          id: { notIn: ordered.map((product) => product.id) },
+        },
+        include: PRODUCT_SUMMARY_INCLUDE,
+        orderBy: [{ createdAt: "desc" }],
+        take: safeLimit - ordered.length,
+      })) as ProductWithRelations[];
+
+      ordered.push(...fallback);
+    }
+
+    return ordered.slice(0, safeLimit);
   }
 
   async getReviewAggregates(
@@ -419,7 +546,7 @@ export class ProductRepository extends BaseRepository<
 
     const records = await this.findMany({
       where: { id: { in: ids } },
-      include: PRODUCT_DEFAULT_INCLUDE,
+      include: PRODUCT_SUMMARY_INCLUDE,
     });
 
     return records as ProductWithRelations[];
@@ -489,18 +616,18 @@ export class ProductRepository extends BaseRepository<
       >,
       "where"
     > = {},
-  ): Promise<CursorPaginatedResult<ProductListingSummary>> {
+  ): Promise<CursorPaginatedResult<ProductWithRelations>> {
     const where = buildProductSearchWhere(filters);
 
     const result = await this.paginateWithCursor({
       ...pagination,
       where,
-      select: PRODUCT_LISTING_SELECT,
+      include: pagination.include ?? PRODUCT_SUMMARY_INCLUDE,
       orderBy:
         pagination.orderBy ?? ([{ status: "asc" }, { createdAt: "desc" }, { id: "asc" }] as const),
     });
 
-    return result as unknown as CursorPaginatedResult<ProductListingSummary>;
+    return result as unknown as CursorPaginatedResult<ProductWithRelations>;
   }
 
   async listVariants(
