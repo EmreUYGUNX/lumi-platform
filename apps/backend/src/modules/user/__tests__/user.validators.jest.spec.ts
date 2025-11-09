@@ -6,6 +6,8 @@ import {
   adminUserListQuerySchema,
   createAddressSchema,
   updateAddressSchema,
+  updatePreferencesSchema,
+  updateProfileSchema,
   userPreferencePatchSchema,
   userProfileUpdateSchema,
 } from "../user.validators.js";
@@ -16,6 +18,7 @@ describe("user.validators", () => {
 
     const result = userProfileUpdateSchema.parse({ firstName: "Ada" });
     expect(result.firstName).toBe("Ada");
+    expect(updateProfileSchema.parse({ firstName: "Ada" })).toEqual(result);
   });
 
   it("validates address creation payload", () => {
@@ -59,5 +62,6 @@ describe("user.validators", () => {
     expect(parsed.notifications?.email).toBe(false);
     expect(parsed.marketingOptIn).toBe(true);
     expect(() => userPreferenceUpdateSchema.parse(payload)).not.toThrow();
+    expect(updatePreferencesSchema.parse(payload)).toEqual(parsed);
   });
 });

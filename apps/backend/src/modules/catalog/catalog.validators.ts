@@ -6,6 +6,7 @@ import {
   categoryUpdateRequestSchema,
   cuidSchema,
   productCreateRequestSchema,
+  productFilterSchema as productFilterSchemaBase,
   productUpdateRequestSchema,
   productVariantInputSchema,
   productVariantUpdateSchema as productVariantUpdateSchemaBase,
@@ -37,6 +38,7 @@ export const categoryTreeQuerySchema = z
 
 export const productCreateSchema = productCreateRequestSchema;
 export const productUpdateSchema = productUpdateRequestSchema;
+export const productFilterSchema = productFilterSchemaBase;
 export const productVariantCreateSchema = productVariantInputSchema;
 export const productVariantUpdateSchema = productVariantUpdateSchemaBase;
 export const categoryCreateSchema = categoryCreateRequestSchema;
@@ -45,3 +47,4 @@ export const categoryUpdateSchema = categoryUpdateRequestSchema;
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 export type VariantQuery = z.infer<typeof variantQuerySchema>;
 export type CategoryTreeQuery = z.infer<typeof categoryTreeQuerySchema>;
+export type ProductFilterInput = z.infer<typeof productFilterSchema>;

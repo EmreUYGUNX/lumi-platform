@@ -107,6 +107,10 @@ export const orderStatsQuerySchema = z
   })
   .strict();
 
+export const createOrderSchema = createOrderInputSchema;
+export const updateOrderStatusSchema = orderStatusUpdateSchema;
+export const refundOrderSchema = orderRefundSchema;
+
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
 export type AdminOrderListQuery = z.infer<typeof adminOrderListQuerySchema>;
