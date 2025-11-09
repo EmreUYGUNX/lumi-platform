@@ -227,6 +227,27 @@ const ensureAdminUser = async (tx: TransactionClient, roles: Map<string, Role>):
     log.warn("Admin role not available to assign", { email: adminEmail });
   }
 
+  await tx.userPreference.upsert({
+    where: { userId: adminUser.id },
+    update: {
+      language: "tr-TR",
+      currency: "TRY",
+      marketingOptIn: true,
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: false,
+    },
+    create: {
+      userId: adminUser.id,
+      language: "tr-TR",
+      currency: "TRY",
+      marketingOptIn: true,
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: false,
+    },
+  });
+
   log.info("Admin user ensured", { email: adminEmail });
   return adminUser;
 };

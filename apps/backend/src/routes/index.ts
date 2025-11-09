@@ -4,14 +4,19 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 
+import { createAuthController } from "@/modules/auth/auth.controller.js";
+import type { AuthControllerOptions } from "@/modules/auth/auth.controller.js";
 import { createAuthRouter } from "@/modules/auth/auth.routes.js";
 import type { AuthRouterOptions } from "@/modules/auth/auth.routes.js";
+import { createAuthService } from "@/modules/auth/auth.service.js";
 import { createCartRouter } from "@/modules/cart/cart.router.js";
 import type { CartRouterOptions } from "@/modules/cart/cart.router.js";
 import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
 import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
 import { createOrderRouter } from "@/modules/order/order.router.js";
 import type { OrderRouterOptions } from "@/modules/order/order.router.js";
+import { createUserRouter } from "@/modules/user/user.router.js";
+import type { UserRouterOptions } from "@/modules/user/user.router.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { createChildLogger } from "../lib/logger.js";
@@ -31,6 +36,7 @@ interface ApiRouterOptions {
   authOptions?: AuthRouterOptions;
   cartOptions?: Pick<CartRouterOptions, "service">;
   orderOptions?: Pick<OrderRouterOptions, "service">;
+  userOptions?: UserRouterOptions;
 }
 
 interface VersionMetadata {
@@ -118,9 +124,28 @@ export const createV1Router = (
     }),
   );
 
-  const authRouterOptions: AuthRouterOptions = options.authOptions
-    ? { registerRoute: registerV1Route, ...options.authOptions }
-    : { registerRoute: registerV1Route };
+  const authOptions = options.authOptions ?? {};
+  const sharedAuthService =
+    authOptions.controllerOptions?.service ??
+    options.userOptions?.authService ??
+    createAuthService({ config });
+
+  const controllerOptions: AuthControllerOptions = {
+    config,
+    service: sharedAuthService,
+  };
+
+  if (authOptions.controllerOptions) {
+    Object.assign(controllerOptions, authOptions.controllerOptions);
+  }
+
+  const authController = authOptions.controller ?? createAuthController(controllerOptions);
+
+  const authRouterOptions: AuthRouterOptions = {
+    ...authOptions,
+    registerRoute: registerV1Route,
+    controller: authController,
+  };
 
   router.use("/auth", createAuthRouter(config, authRouterOptions));
 
@@ -152,6 +177,15 @@ export const createV1Router = (
     createOrderRouter(config, {
       registerRoute: registerV1Route,
       ...options.orderOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createUserRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.userOptions,
+      authService: options.userOptions?.authService ?? sharedAuthService,
     }),
   );
   return router;

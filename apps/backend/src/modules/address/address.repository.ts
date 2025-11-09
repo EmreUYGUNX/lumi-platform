@@ -28,6 +28,7 @@ export class AddressRepository extends BaseRepository<
         runInTransaction: (callback) => prisma.$transaction(callback),
         primaryKey: "id",
         defaultSort: [{ createdAt: "desc" }],
+        softDeleteField: "deletedAt",
       },
     );
   }

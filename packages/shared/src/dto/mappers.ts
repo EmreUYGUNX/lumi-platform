@@ -38,17 +38,21 @@ import type {
   ProductMediaEntity,
   ProductVariantEntity,
   ProductWithRelations,
+  UserPreferenceEntity,
   UserWithRoleEntities,
 } from "./prisma-types.js";
 import {
   userDetailSchema,
   userPermissionSchema,
+  userPreferenceSchema,
+  userPrivacySettingsSchema,
   userRoleSchema,
   userSummarySchema,
 } from "./user.dto.js";
 import type {
   UserCreateRequestDTO,
   UserDetailDTO,
+  UserPreferenceDTO,
   UserSummaryDTO,
   UserUpdateRequestDTO,
 } from "./user.dto.js";
@@ -394,7 +398,7 @@ export const mapCartToSummary = (cart: CartWithItems, currency?: string): CartSu
   });
 };
 
-const mapAddress = (address: AddressEntity | null | undefined): AddressDTO | null => {
+const mapAddressInternal = (address: AddressEntity | null | undefined): AddressDTO | null => {
   if (!address) {
     return null;
   }
@@ -415,6 +419,50 @@ const mapAddress = (address: AddressEntity | null | undefined): AddressDTO | nul
     createdAt: address.createdAt.toISOString(),
     updatedAt: address.updatedAt.toISOString(),
   });
+};
+
+export const mapAddressEntity = (address: AddressEntity): AddressDTO => {
+  const dto = mapAddressInternal(address);
+  if (!dto) {
+    throw new Error("Address entity mapping requires a non-null address.");
+  }
+  return dto;
+};
+
+export const mapOptionalAddress = (address: AddressEntity | null | undefined): AddressDTO | null =>
+  mapAddressInternal(address);
+
+const normalisePrivacySettings = (value: unknown) => {
+  let payload: ReturnType<(typeof userPrivacySettingsSchema)["parse"]> | undefined;
+
+  if (isPlainObject(value)) {
+    const result = userPrivacySettingsSchema.safeParse(value);
+    if (result.success) {
+      payload = result.data;
+    }
+  }
+
+  return payload;
+};
+
+export const mapUserPreferenceEntity = (preference: UserPreferenceEntity): UserPreferenceDTO => {
+  const payload = {
+    id: preference.id,
+    userId: preference.userId,
+    language: preference.language,
+    currency: preference.currency,
+    marketingOptIn: preference.marketingOptIn,
+    notifications: {
+      email: preference.emailNotifications,
+      sms: preference.smsNotifications,
+      push: preference.pushNotifications,
+    },
+    privacy: normalisePrivacySettings(preference.privacySettings),
+    createdAt: preference.createdAt.toISOString(),
+    updatedAt: preference.updatedAt.toISOString(),
+  };
+
+  return userPreferenceSchema.parse(payload);
 };
 
 const mapOrderItems = (order: OrderWithRelations, currency: string) =>
@@ -513,8 +561,8 @@ export const mapOrderToDetail = (order: OrderWithRelations): OrderDetailDTO => {
     ...summary,
     customer: mapOrderCustomer(order),
     version: order.version,
-    shippingAddress: mapAddress(order.shippingAddress),
-    billingAddress: mapAddress(order.billingAddress),
+    shippingAddress: mapOptionalAddress(order.shippingAddress),
+    billingAddress: mapOptionalAddress(order.billingAddress),
     payments: order.payments?.map((payment) => mapPaymentToSummary(payment)) ?? [],
     timeline: buildOrderTimeline(order),
     tracking: buildTrackingSummary(order),

@@ -1,4 +1,6 @@
 export * from "./user/user.repository.js";
+export * from "./user/user.service.js";
+export * from "./user/user.controller.js";
 export * from "./product/product.repository.js";
 export * from "./product/product.service.js";
 export * from "./category/category.repository.js";
