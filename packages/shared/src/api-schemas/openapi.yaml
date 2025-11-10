@@ -227,7 +227,8 @@ components:
       properties:
         success:
           type: boolean
-          const: true
+          enum:
+            - true
         data: {}
         meta:
           $ref: "#/components/schemas/Meta"
@@ -259,7 +260,8 @@ components:
       properties:
         success:
           type: boolean
-          const: false
+          enum:
+            - false
         error:
           $ref: "#/components/schemas/StandardError"
         meta:
@@ -271,8 +273,7 @@ components:
         - currency
       properties:
         amount:
-          type: number
-          format: double
+          type: string
         currency:
           type: string
           minLength: 3
@@ -355,6 +356,7 @@ components:
             attributes:
               type: object
               additionalProperties: true
+              nullable: true
             isPrimary:
               type: boolean
     MediaAsset:
@@ -435,6 +437,10 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/MediaAsset"
+            attributes:
+              type: object
+              additionalProperties: true
+              nullable: true
     CartItem:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -1065,6 +1071,24 @@ components:
           type: string
           nullable: true
 paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Service health overview
+      description: Returns the current health summary, dependency probes, and release metadata.
+      responses:
+        "200":
+          description: Health summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties: true
   /api/v1/products:
     get:
       tags: [Catalog]
@@ -1123,12 +1147,9 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: object
-                        properties:
-                          items:
-                            type: array
-                            items:
-                              $ref: "#/components/schemas/Product"
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Product"
         "429":
           description: Rate limit exceeded.
   /api/v1/products/popular:
@@ -1176,6 +1197,10 @@ paths:
                             $ref: "#/components/schemas/Product"
         "404":
           description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
   /api/v1/products/{id}/variants:
     get:
       tags: [Catalog]

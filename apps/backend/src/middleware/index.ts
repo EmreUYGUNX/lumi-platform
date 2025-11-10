@@ -13,6 +13,7 @@ import { createMetricsMiddleware } from "./metrics.js";
 import { createRateLimiterBundle } from "./rateLimiter.js";
 import { createRequestIdMiddleware } from "./requestId.js";
 import { createRequestLoggingMiddleware } from "./requestLogger.js";
+import { responseFormatter } from "./response-formatter.js";
 import { createSanitizationMiddleware } from "./sanitize.js";
 import { createSecurityMiddleware } from "./security.js";
 
@@ -58,7 +59,8 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
 
   app.use(createDeserializeUserMiddleware());
 
-  const requestLogger = createRequestLoggingMiddleware(config);
+  app.use(responseFormatter);
 
+  const requestLogger = createRequestLoggingMiddleware(config);
   app.use(requestLogger);
 };

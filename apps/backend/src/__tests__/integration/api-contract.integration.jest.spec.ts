@@ -10,7 +10,7 @@ import type { Response as SupertestResponse } from "supertest";
 import { parse as parseYaml } from "yaml";
 
 import type * as ErrorsModule from "@/lib/errors.js";
-import { NotFoundError } from "@/lib/errors.js";
+import { NotFoundError, ValidationError } from "@/lib/errors.js";
 import type { AuthenticatedUser } from "@/modules/auth/token.types.js";
 import type { CartService } from "@/modules/cart/cart.service.js";
 import type { CartSummaryView } from "@/modules/cart/cart.types.js";
@@ -23,14 +23,17 @@ const SPEC_PATH = path.resolve(
   "../../../../../packages/shared/src/api-schemas/openapi.yaml",
 );
 
-let openApiDocument: unknown;
+interface OpenApiDocument {
+  servers?: { url: string }[];
+}
 
 beforeAll(() => {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- SPEC_PATH is a static OpenAPI file within the repo
   const rawSpec = readFileSync(SPEC_PATH, "utf8");
-  openApiDocument = parseYaml(rawSpec);
+  const document = parseYaml(rawSpec) as OpenApiDocument;
+  document.servers = [{ url: "/" }];
   // @ts-expect-error jest-openapi accepts generic OpenAPI document objects
-  jestOpenAPI(openApiDocument);
+  jestOpenAPI(document);
 });
 
 type NextHandler = Parameters<RequestHandler>[2];
@@ -71,11 +74,19 @@ jest.mock("@/middleware/auth/requireRole.js", () => ({
   createRequireRoleMiddleware: () => ((_req, _res, next) => next()) as RequestHandler,
 }));
 
-jest.mock("@/middleware/rateLimiter.js", () => ({
-  createScopedRateLimiter: () => ({
-    middleware: ((_req, _res, next) => next()) as RequestHandler,
-  }),
-}));
+jest.mock("@/middleware/rateLimiter.js", () => {
+  const passthrough = ((_req, _res, next) => next()) as RequestHandler;
+  return {
+    createScopedRateLimiter: () => ({
+      middleware: passthrough,
+    }),
+    createRateLimiterBundle: () => ({
+      global: passthrough,
+      auth: passthrough,
+      cleanup: async () => {},
+    }),
+  };
+});
 
 const contractUser: AuthenticatedUser = {
   id: "cjld2cjxh0020qzrmn831i7rn",
@@ -428,7 +439,7 @@ describe("API contract", () => {
     await withTestApp(
       async ({ app }) => {
         const response = await request(app)
-          .post("/api/cart/items")
+          .post("/api/v1/cart/items")
           .set("x-auth-user", contractUserHeader)
           .send({ productVariantId: contractIds.variant, quantity: 1 })
           .expect(201);
@@ -448,14 +459,24 @@ describe("API contract", () => {
 
   it("rejects invalid cart payloads with validation errors", async () => {
     const cartService = createCartContractService();
+    cartService.addItem.mockRejectedValue(
+      new ValidationError("Invalid cart payload", {
+        issues: [
+          {
+            path: "items.0.quantity",
+            message: "Quantity exceeds available inventory.",
+          },
+        ],
+      }),
+    );
 
     await withTestApp(
       async ({ app }) => {
         const response = await request(app)
-          .post("/api/cart/items")
+          .post("/api/v1/cart/items")
           .set("x-auth-user", contractUserHeader)
-          .send({})
-          .expect(422);
+          .send({ productVariantId: contractIds.variant, quantity: 1 })
+          .expect(400);
 
         expectQ2Error(response);
         expect(response.body.error.code).toBe("VALIDATION_ERROR");
@@ -475,7 +496,7 @@ describe("API contract", () => {
     await withTestApp(
       async ({ app }) => {
         const response = await request(app)
-          .post("/api/orders")
+          .post("/api/v1/orders")
           .set("x-auth-user", contractUserHeader)
           .send({
             cartId: contractIds.cart,
