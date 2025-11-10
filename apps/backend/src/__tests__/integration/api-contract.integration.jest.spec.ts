@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/no-null */
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import type { Request, RequestHandler } from "express";
@@ -17,9 +18,9 @@ import type { CatalogService } from "@/modules/catalog/catalog.service.js";
 import type { OrderService } from "@/modules/order/order.service.js";
 import { withTestApp } from "@/testing/index.js";
 
-const SPEC_PATH = new URL(
+const SPEC_PATH = path.resolve(
+  __dirname,
   "../../../../../packages/shared/src/api-schemas/openapi.yaml",
-  import.meta.url,
 );
 
 let openApiDocument: unknown;
