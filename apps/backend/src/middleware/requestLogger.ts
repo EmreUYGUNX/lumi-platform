@@ -5,9 +5,95 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import type { ApplicationConfig, RequestLoggingConfig } from "@lumi/types";
 
+import type { AuditLogEntry } from "../audit/audit-log.service.js";
+import { recordAuditLog } from "../audit/audit-log.service.js";
 import { logError, logger, mergeRequestContext } from "../lib/logger.js";
 
 type CompletionEvent = "finish" | "close" | "error";
+
+const ADMIN_ROUTE_PREFIX = "/api/v1/admin";
+const SENSITIVE_KEYS = new Set([
+  "password",
+  "pass",
+  "token",
+  "secret",
+  "authorization",
+  "apikey",
+  "refreshtoken",
+  "accesstoken",
+  "clientsecret",
+  "creditcard",
+]);
+
+const maskSensitive = (input: unknown): unknown => {
+  if (Array.isArray(input)) {
+    return input.map((value) => maskSensitive(value));
+  }
+
+  if (input && typeof input === "object") {
+    return Object.fromEntries(
+      Object.entries(input as Record<string, unknown>).map(([key, value]) => {
+        if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+          return [key, "[REDACTED]"];
+        }
+
+        return [key, maskSensitive(value)];
+      }),
+    );
+  }
+
+  return input;
+};
+
+const sanitiseAuditPayload = (payload: unknown): unknown => {
+  if (payload === undefined) {
+    return undefined;
+  }
+
+  try {
+    return maskSensitive(payload);
+  } catch {
+    return undefined;
+  }
+};
+
+const isAdminRoute = (request: Request): boolean => {
+  const path = request.originalUrl ?? request.url ?? "";
+  return path.startsWith(ADMIN_ROUTE_PREFIX);
+};
+
+const isMutationMethod = (method: string): boolean =>
+  ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
+
+const resolveAuditEntity = (
+  request: Request,
+  auditContext: Partial<AuditLogEntry>,
+): { entity: string; entityId: string } => {
+  if (auditContext.entity) {
+    return {
+      entity: auditContext.entity,
+      entityId: auditContext.entityId ?? "unknown",
+    };
+  }
+
+  const path = (request.originalUrl ?? request.url ?? "").split("?")[0] ?? "";
+  const segments = path.split("/").filter(Boolean);
+  const adminSegments = segments.slice(3); // strip api/v1/admin
+
+  if (adminSegments.length === 0) {
+    return { entity: "admin", entityId: "root" };
+  }
+
+  const [entity, entityId] = adminSegments;
+
+  return {
+    entity: entity ?? "admin",
+    entityId: entityId ?? "n/a",
+  };
+};
+
+const shouldCaptureAuditLog = (request: Request, statusCode: number): boolean =>
+  isAdminRoute(request) && isMutationMethod(request.method) && statusCode < 500;
 
 const REQUEST_LOGGER_ERROR_KEY = "requestLoggerError";
 const MAX_SERIALISATION_DEPTH = 5;
@@ -378,6 +464,35 @@ export const createRequestLoggingMiddleware = (
         }
 
         activeLogger.info(COMPLETION_MESSAGE, metadata);
+
+        if (shouldCaptureAuditLog(request, statusCode)) {
+          const auditContext = (response.locals?.audit ?? {}) as Partial<AuditLogEntry>;
+          const { entity, entityId } = resolveAuditEntity(request, auditContext);
+          const auditEntry: AuditLogEntry = {
+            userId: request.user?.id,
+            actorType: "ADMIN",
+            action: auditContext.action ?? `${entity}.${request.method.toLowerCase()}`,
+            entity,
+            entityId,
+            before: auditContext.before ?? undefined,
+            after: auditContext.after ?? undefined,
+            ipAddress: request.ip,
+            userAgent,
+            metadata: {
+              requestId: correlationId ?? request.id ?? response.locals.requestId ?? "unknown",
+              requestBody: sanitiseAuditPayload(request.body),
+              responseStatus: statusCode,
+            },
+          };
+
+          recordAuditLog(auditEntry).catch((error) => {
+            errorLogger(error ?? new Error("Failed to write audit log entry"), FAILURE_MESSAGE, {
+              path: request.originalUrl ?? request.url,
+              method: request.method,
+              lifecycle: "audit",
+            });
+          });
+        }
       } catch (loggingError) {
         // eslint-disable-next-line no-console
         console.error("Request logging middleware failed", loggingError);

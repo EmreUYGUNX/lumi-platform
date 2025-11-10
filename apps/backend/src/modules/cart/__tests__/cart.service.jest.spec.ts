@@ -1460,6 +1460,38 @@ describe("CartService public operations", () => {
     applySpy.mockRestore();
   });
 
+  it("removes items by delegating to updateItem with zero quantity", async () => {
+    const { service, repository, cart } = createService();
+    const context = createContext();
+    const item = cart.items[0];
+    if (!item) {
+      throw new Error("cart fixture missing item");
+    }
+
+    const internals = service as unknown as CartServiceInternals;
+    const applySpy = spyOnCartInternal(internals, "applyUpdateItem");
+    applySpy.mockResolvedValue({
+      itemId: item.id,
+      variantId: item.productVariantId,
+      previousQuantity: 2,
+      newQuantity: 0,
+    });
+
+    const view = await service.removeItem(context, item.id);
+
+    expect(repository.withTransaction).toHaveBeenCalled();
+    expect(applySpy).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ id: cart.id }),
+      context,
+      item.id,
+      0,
+    );
+    expect(view.cart.id).toBe(cart.id);
+
+    applySpy.mockRestore();
+  });
+
   it("clears the cart and returns refreshed state", async () => {
     const { service, repository, cart } = createService();
     const context = createContext();

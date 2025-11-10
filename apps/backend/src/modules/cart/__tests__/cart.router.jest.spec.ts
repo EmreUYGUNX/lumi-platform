@@ -10,7 +10,8 @@ import type { RateLimitRouteConfig } from "@lumi/types";
 
 import { createCartRouter } from "../cart.router.js";
 import type { CartService } from "../cart.service.js";
-import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
+import type { CartItemWithProduct, CartSummaryView, CartValidationReport } from "../cart.types.js";
+import type { AddCartItemInput, UpdateCartItemInput } from "../cart.validators.js";
 
 const createSampleCartView = (): CartSummaryView => {
   const timestamp = new Date("2025-02-01T12:00:00.000Z").toISOString();
@@ -47,6 +48,64 @@ const createSampleCartView = (): CartSummaryView => {
   };
 };
 
+const attachCartItem = (view: CartSummaryView, quantity = 1): CartSummaryView => {
+  const unitPrice = { amount: "199.00", currency: "TRY" };
+  const product = {
+    id: "ckproductsample0000000000001",
+    title: "Aurora Lamp",
+    slug: "aurora-lamp",
+    status: "ACTIVE",
+    inventoryPolicy: "TRACK",
+    price: unitPrice,
+    currency: "TRY",
+  } satisfies CartItemWithProduct["product"];
+  const timestamps = {
+    createdAt: view.cart.createdAt,
+    updatedAt: new Date("2025-02-01T12:00:00.000Z").toISOString(),
+  };
+  const variant = {
+    id: "ckvariantsample000000000001",
+    title: "Default",
+    sku: "VAR-1",
+    price: unitPrice,
+    stock: 10,
+    attributes: null,
+    weightGrams: null,
+    isPrimary: true,
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamps.updatedAt,
+  } satisfies CartItemWithProduct["variant"];
+  const totalAmount = (199 * quantity).toFixed(2);
+  const items: CartItemWithProduct[] = [
+    {
+      id: "ckcartitemsample00000000001",
+      cartId: view.cart.id,
+      productVariantId: variant.id,
+      quantity,
+      unitPrice,
+      product,
+      variant,
+      availableStock: 10,
+      createdAt: timestamps.createdAt,
+      updatedAt: timestamps.updatedAt,
+    },
+  ];
+  const totals = {
+    subtotal: { amount: totalAmount, currency: "TRY" },
+    tax: { amount: "0.00", currency: "TRY" },
+    discount: { amount: "0.00", currency: "TRY" },
+    total: { amount: totalAmount, currency: "TRY" },
+  };
+  return {
+    ...view,
+    cart: {
+      ...view.cart,
+      items,
+      totals,
+    },
+  };
+};
+
 const createSampleValidationReport = (): CartValidationReport => {
   const view = createSampleCartView();
   return {
@@ -76,6 +135,64 @@ const createCartServiceMock = () => {
   } as unknown as CartService & Record<string, jest.Mock>;
 };
 
+const createStatefulCartService = () => {
+  const view = attachCartItem(createSampleCartView(), 1);
+  const updateTotals = () => {
+    const quantity = view.cart.items[0]?.quantity ?? 0;
+    const total = (199 * quantity).toFixed(2);
+    view.cart.totals = {
+      subtotal: { amount: total, currency: "TRY" },
+      tax: { amount: "0.00", currency: "TRY" },
+      discount: { amount: "0.00", currency: "TRY" },
+      total: { amount: total, currency: "TRY" },
+    };
+    view.cart.updatedAt = new Date().toISOString();
+  };
+
+  const service = {
+    getCart: jest.fn(async () => view),
+    addItem: jest.fn(async (_ctx, input: AddCartItemInput) => {
+      const item = view.cart.items[0];
+      if (item) {
+        item.quantity += input.quantity;
+      }
+      updateTotals();
+      return view;
+    }),
+    updateItem: jest.fn(async (_ctx, _itemId, input: UpdateCartItemInput) => {
+      const item = view.cart.items[0];
+      if (item) {
+        item.quantity = input.quantity;
+      }
+      updateTotals();
+      return view;
+    }),
+    removeItem: jest.fn(async () => {
+      view.cart.items = [];
+      updateTotals();
+      return view;
+    }),
+    clearCart: jest.fn(async () => {
+      view.cart.items = [];
+      updateTotals();
+      return view;
+    }),
+    mergeCart: jest.fn(async () => {
+      const merged = attachCartItem(createSampleCartView(), 1).cart.items[0];
+      if (merged) {
+        view.cart.items.push({ ...merged, id: "ckmergeditem00000000000001" });
+      }
+      updateTotals();
+      return view;
+    }),
+    validateCart: jest.fn(async () => createSampleValidationReport()),
+    cleanupExpiredCarts: jest.fn(),
+    shutdown: jest.fn(),
+  } as unknown as CartService & Record<string, jest.Mock>;
+
+  return { service, view };
+};
+
 const createAuthenticatedUser = () => ({
   id: "user_test",
   email: "user@example.com",
@@ -99,9 +216,9 @@ const attachUser: RequestHandler = (req, _res, next) => {
   next();
 };
 
-const createTestApp = () => {
+const createTestApp = (overrides: { service?: CartService & Record<string, jest.Mock> } = {}) => {
   const config = createTestConfig();
-  const service = createCartServiceMock();
+  const service = overrides.service ?? createCartServiceMock();
   const app = express();
   app.use(express.json());
   const testLimiterConfig: RateLimitRouteConfig = {
@@ -174,6 +291,25 @@ describe("cart router", () => {
     );
   });
 
+  it("increments quantities when adding items through the API", async () => {
+    const stateful = createStatefulCartService();
+    const { app } = createTestApp({ service: stateful.service });
+    const item = stateful.view.cart.items[0];
+    if (!item) {
+      throw new Error("cart fixture missing stateful item");
+    }
+
+    const payload = {
+      productVariantId: item.productVariantId,
+      quantity: 2,
+    };
+
+    const response = await request(app).post("/api/cart/items").send(payload).expect(201);
+
+    expect(stateful.service.addItem).toHaveBeenCalled();
+    expect(response.body.data.cart.items[0].quantity).toBe(3);
+  });
+
   it("updates the quantity of an existing cart item", async () => {
     const { app, service } = createTestApp();
 
@@ -187,6 +323,27 @@ describe("cart router", () => {
       itemId,
       payload,
     );
+  });
+
+  it("returns updated quantities after item mutations", async () => {
+    const stateful = createStatefulCartService();
+    const { app } = createTestApp({ service: stateful.service });
+    const item = stateful.view.cart.items[0];
+    if (!item) {
+      throw new Error("cart fixture missing stateful item");
+    }
+
+    const response = await request(app)
+      .put(`/api/cart/items/${item.id}`)
+      .send({ quantity: 5 })
+      .expect(200);
+
+    expect(stateful.service.updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_test" }),
+      item.id,
+      { quantity: 5 },
+    );
+    expect(response.body.data.cart.items[0].quantity).toBe(5);
   });
 
   it("validates the cart before checkout", async () => {
@@ -234,6 +391,20 @@ describe("cart router", () => {
     );
   });
 
+  it("returns an empty cart payload when the last item is removed", async () => {
+    const stateful = createStatefulCartService();
+    const { app } = createTestApp({ service: stateful.service });
+    const item = stateful.view.cart.items[0];
+    if (!item) {
+      throw new Error("cart fixture missing stateful item");
+    }
+
+    const response = await request(app).delete(`/api/cart/items/${item.id}`).expect(200);
+
+    expect(stateful.service.removeItem).toHaveBeenCalled();
+    expect(response.body.data.cart.items).toHaveLength(0);
+  });
+
   it("merges carts using the authenticated user context", async () => {
     const { app, service } = createTestApp();
 
@@ -246,6 +417,22 @@ describe("cart router", () => {
       sessionId: "guest_session",
       strategy: "replace",
     });
+  });
+
+  it("combines cart contents when merge succeeds", async () => {
+    const stateful = createStatefulCartService();
+    const { app } = createTestApp({ service: stateful.service });
+
+    const response = await request(app)
+      .post("/api/cart/merge")
+      .send({ sessionId: "guest_session", strategy: "sum" })
+      .expect(200);
+
+    expect(stateful.service.mergeCart).toHaveBeenCalledWith("user_test", {
+      sessionId: "guest_session",
+      strategy: "sum",
+    });
+    expect(response.body.data.cart.items.length).toBeGreaterThan(1);
   });
 
   it("requires authentication for cart routes", async () => {
