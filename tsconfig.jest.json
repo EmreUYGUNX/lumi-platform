@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "isolatedModules": false,
     "verbatimModuleSyntax": false,
-    "types": ["node", "jest", "@testing-library/jest-dom"],
+    "types": ["node", "jest", "@testing-library/jest-dom", "jest-openapi"],
     "outDir": "./dist-jest",
     "noEmitOnError": false,
     "allowJs": true,

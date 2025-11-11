@@ -95,9 +95,11 @@ describe("admin audit log routes", () => {
       ],
       pagination: {
         page: 1,
-        perPage: 20,
-        total: 1,
+        pageSize: 20,
+        totalItems: 1,
         totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
       },
     });
 
@@ -120,7 +122,7 @@ describe("admin audit log routes", () => {
 
     expect(response.body.success).toBe(true);
     expect(response.body.data).toHaveLength(1);
-    expect(response.body.meta.pagination.total).toBe(1);
+    expect(response.body.meta.pagination.totalItems).toBe(1);
     expect(mockedAuditService.queryAuditLogs).toHaveBeenCalledWith({
       page: undefined,
       perPage: undefined,

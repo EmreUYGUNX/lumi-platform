@@ -779,6 +779,57 @@ describe("OrderService", () => {
     });
   });
 
+  it("returns detailed order view for the owning user", async () => {
+    const repository = createOrderRepositoryMock();
+    const order = createOrderFixture({
+      metadata: {
+        shipment: { trackingNumber: "TRK-SECURE" },
+        internalNotes: [{ id: "note-1", authorId: "admin", message: "secret" }],
+      },
+    });
+    repository.findById.mockResolvedValue(order);
+
+    const { service } = createService({ repository });
+
+    const detail = await service.getUserOrder(USER_ID, order.id);
+
+    expect(repository.findById).toHaveBeenCalledWith(
+      order.id,
+      expect.objectContaining({
+        include: expect.objectContaining({
+          items: expect.objectContaining({
+            include: expect.objectContaining({
+              product: true,
+              productVariant: true,
+            }),
+          }),
+          payments: true,
+          shippingAddress: true,
+          billingAddress: true,
+          user: true,
+        }),
+      }),
+    );
+    expect(detail.id).toBe(order.id);
+    expect(detail.metadata).toEqual({
+      shipment: expect.objectContaining({ trackingNumber: "TRK-SECURE" }),
+    });
+    expect(detail.metadata).not.toHaveProperty("internalNotes");
+  });
+
+  it("prevents users from accessing orders they do not own", async () => {
+    const repository = createOrderRepositoryMock();
+    repository.findById.mockResolvedValue(
+      createOrderFixture({
+        userId: ensureCuid("another-user"),
+      }),
+    );
+
+    const { service } = createService({ repository });
+
+    await expect(service.getUserOrder(USER_ID, ORDER_ID)).rejects.toThrow(NotFoundError);
+  });
+
   it("builds public tracking summaries with shipment details", async () => {
     const repository = createOrderRepositoryMock();
     repository.findByReference.mockResolvedValue(

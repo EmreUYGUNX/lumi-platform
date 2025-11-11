@@ -9,8 +9,11 @@ import type {
 
 import type { ApplicationConfig } from "@lumi/types";
 
-import type { AppError, ErrorDetails } from "../lib/errors.js";
+import { ApiError } from "../errors/api-error.js";
+import type { ErrorCode, ErrorDetails } from "../lib/errors.js";
 import {
+  AppError,
+  ERROR_CODES,
   InternalServerError,
   MethodNotAllowedError,
   NotFoundError,
@@ -93,6 +96,19 @@ const buildErrorResponse = (
   }
 
   return payload;
+};
+
+const adaptApiErrorToAppError = (error: ApiError): AppError => {
+  const isOperational = error.status < 500;
+  const details = error.details && error.details.length > 0 ? { issues: error.details } : undefined;
+
+  return new AppError(error.message, error.status, {
+    code: (error.code ?? ERROR_CODES.INTERNAL) as ErrorCode,
+    details,
+    cause: error.cause ?? error,
+    isOperational,
+    exposeDetails: isOperational,
+  });
 };
 
 export type ExpressErrorMiddleware = RequestHandler | ErrorRequestHandler;
@@ -277,6 +293,8 @@ const createGlobalErrorHandler =
 
     if (isAppError(err)) {
       resolvedError = err;
+    } else if (err instanceof ApiError) {
+      resolvedError = adaptApiErrorToAppError(err);
     } else if (err instanceof Error) {
       resolvedError = new InternalServerError(undefined, { cause: err });
     } else {

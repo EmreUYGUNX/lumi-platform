@@ -49,7 +49,7 @@ describe("compression middleware", () => {
       .expect(200);
 
     expect(response.headers["content-encoding"]).toBe("gzip");
-    expect(response.body.data.length).toBe(2048);
+    expect(response.body.data.data.length).toBe(2048);
   });
 
   it("avoids compressing small payloads to preserve latency", async () => {

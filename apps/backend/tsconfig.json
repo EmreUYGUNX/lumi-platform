@@ -13,7 +13,8 @@
       "compression",
       "jsonwebtoken",
       "nodemailer",
-      "hpp"
+      "hpp",
+      "jest-openapi"
     ],
     "paths": {
       "@/*": ["./src/*"],
@@ -26,7 +27,7 @@
       "@lumi/testing/*": ["../../packages/testing/src/*"]
     }
   },
-  "include": ["src/**/*", "__tests__/**/*"],
+  "include": ["src/**/*", "__tests__/**/*", "tests/**/*"],
   "references": [
     {
       "path": "../../packages/shared"

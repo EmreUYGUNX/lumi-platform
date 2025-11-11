@@ -3,6 +3,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import request from "supertest";
 
+import { NotFoundError } from "@/lib/errors.js";
 import { createTestApp, withTestApp } from "@/testing/index.js";
 
 import type { CatalogService } from "../catalog.service.js";
@@ -145,5 +146,109 @@ describe("catalog router", () => {
     } finally {
       await cleanup();
     }
+  });
+
+  it("supports filtering, pagination, and sorting with Q2 responses for listings", async () => {
+    const { stub, product } = createCatalogServiceStub();
+    stub.listPublicProducts.mockResolvedValue({
+      items: [product],
+      meta: {
+        page: 2,
+        pageSize: 12,
+        totalItems: 48,
+        totalPages: 4,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      },
+      cursor: { hasMore: true, next: "cursor_token" },
+    });
+
+    await withTestApp(
+      async ({ app }) => {
+        const response = await request(app)
+          .get("/api/v1/products?categorySlug=lighting&page=2&perPage=12&sort=price_desc")
+          .expect(200);
+
+        expect(stub.listPublicProducts).toHaveBeenCalledWith(
+          expect.objectContaining({
+            categorySlug: "lighting",
+            pagination: expect.objectContaining({ page: 2, pageSize: 12 }),
+            sort: "price_desc",
+          }),
+        );
+        expect(response.body.success).toBe(true);
+        expect(response.body.data[0].slug).toBe(product.slug);
+        expect(response.body.meta.pagination.page).toBe(2);
+        expect(response.body.meta.pagination.totalItems).toBe(48);
+        expect(response.body.meta.cursor.next).toBe("cursor_token");
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
+  });
+
+  it("returns enriched product detail payloads including variants and media", async () => {
+    const { stub, product } = createCatalogServiceStub();
+    stub.getProductDetail.mockResolvedValue({
+      product: {
+        ...product,
+        media: [
+          {
+            id: "media_1",
+            url: "https://cdn.lumi.test/aurora.jpg",
+            type: "image",
+            alt: "Aurora Lamp hero",
+            isPrimary: true,
+          },
+        ],
+        categories: [
+          {
+            id: "cat_lighting",
+            name: "Lighting",
+            slug: "lighting",
+            description: null,
+            parentId: null,
+            level: 0,
+            path: "/lighting",
+            imageUrl: null,
+            iconUrl: null,
+            displayOrder: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      },
+      reviewSummary: {
+        totalReviews: 12,
+        averageRating: 4.8,
+        ratingBreakdown: { 5: 10, 4: 2 },
+      },
+    });
+
+    await withTestApp(
+      async ({ app }) => {
+        const response = await request(app).get("/api/v1/products/aurora-lamp").expect(200);
+
+        expect(stub.getProductDetail).toHaveBeenCalledWith("aurora-lamp");
+        expect(response.body.data.product.variants[0].sku).toBe("VAR-1");
+        expect(response.body.data.product.media[0].url).toContain("aurora");
+        expect(response.body.data.reviews.totalReviews).toBe(12);
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
+  });
+
+  it("returns 404 errors in Q2 format when product slugs are unknown", async () => {
+    const { stub } = createCatalogServiceStub();
+    stub.getProductDetail.mockRejectedValue(new NotFoundError("Product not found"));
+
+    await withTestApp(
+      async ({ app }) => {
+        const response = await request(app).get("/api/v1/products/missing").expect(404);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe("NOT_FOUND");
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
   });
 });

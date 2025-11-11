@@ -200,4 +200,89 @@ describe("UserService", () => {
       SECONDARY_ADDRESS_ID,
     );
   });
+
+  it("updates profile fields with trimmed values and returns the refreshed view", async () => {
+    const { service, prisma } = buildService();
+    const refreshedProfile = {
+      user: { ...baseUserEntity, firstName: "Ada", lastName: "Lovelace" },
+      addresses: [],
+      preferences: {
+        language: "tr-TR",
+        currency: "TRY",
+        marketingOptIn: false,
+        notifications: { email: true, sms: false, push: false },
+        privacy: null,
+      },
+    } as Awaited<ReturnType<typeof service.getProfile>>;
+
+    const profileSpy = jest.spyOn(service, "getProfile").mockResolvedValue(refreshedProfile);
+
+    const result = await service.updateProfile(USER_ID, {
+      firstName: "  Ada ",
+      lastName: " Lovelace ",
+      phone: "+90 555 000 0000",
+    });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: USER_ID },
+      data: {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        phone: "+90 555 000 0000",
+      },
+    });
+    expect(profileSpy).toHaveBeenCalledWith(USER_ID);
+    expect(result).toBe(refreshedProfile);
+
+    profileSpy.mockRestore();
+  });
+
+  it("patches user preferences including notifications and privacy settings", async () => {
+    const { service, prisma } = buildService();
+    const preferenceRecord = {
+      id: "ckpref0000000000000000001",
+      userId: USER_ID,
+      language: "tr-TR",
+      currency: "TRY",
+      marketingOptIn: false,
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: false,
+      privacySettings: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prisma.userPreference.findUnique.mockResolvedValue(preferenceRecord);
+    prisma.userPreference.update.mockResolvedValue({
+      ...preferenceRecord,
+      language: "en-US",
+      marketingOptIn: true,
+      emailNotifications: false,
+      smsNotifications: true,
+      pushNotifications: true,
+      privacySettings: { shareData: false, personalisedAds: false },
+    });
+
+    const result = await service.updatePreferences(USER_ID, {
+      language: "en-US",
+      marketingOptIn: true,
+      notifications: { email: false, sms: true, push: true },
+      privacy: { shareData: false, personalisedAds: false },
+    });
+
+    expect(prisma.userPreference.update).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      data: expect.objectContaining({
+        language: "en-US",
+        marketingOptIn: true,
+        emailNotifications: false,
+        smsNotifications: true,
+        pushNotifications: true,
+        privacySettings: { shareData: false, personalisedAds: false },
+      }),
+    });
+    expect(result.language).toBe("en-US");
+    expect(result.notifications.sms).toBe(true);
+    expect(result.notifications.push).toBe(true);
+  });
 });

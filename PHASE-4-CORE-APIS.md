@@ -666,80 +666,80 @@ docs/api/
 
 #### 9.1 Unit Tests
 
-- [ ] Test `catalog.service.ts` methods
-  - [ ] `createProduct()` - creates product with variant
-  - [ ] `updateProduct()` - updates and validates slug
-  - [ ] `deleteProduct()` - soft deletes
-  - [ ] `getProduct()` - returns with relations
-  - [ ] `listProducts()` - filters and paginates
-  - [ ] `searchProducts()` - full-text search
-- [ ] Test `cart.service.ts` methods
-  - [ ] `addItem()` - adds or updates item
-  - [ ] `updateItem()` - updates quantity
-  - [ ] `removeItem()` - removes item
-  - [ ] `clearCart()` - clears all items
-  - [ ] `mergeCart()` - merges guest to user cart
-  - [ ] `validateCart()` - stock and price checks
-- [ ] Test `order.service.ts` methods
-  - [ ] `createOrder()` - creates with inventory reservation
-  - [ ] `getOrder()` - returns with relations
-  - [ ] `cancelOrder()` - releases inventory
-  - [ ] `updateStatus()` - validates transitions
-- [ ] Test `user.service.ts` methods
-  - [ ] `updateProfile()` - validates and updates
-  - [ ] `createAddress()` - creates and sets default
-  - [ ] `updatePreferences()` - updates preferences
+- [x] Test `catalog.service.ts` methods
+  - [x] `createProduct()` - creates product with variant
+  - [x] `updateProduct()` - updates and validates slug
+  - [x] `deleteProduct()` - soft deletes
+  - [x] `getProduct()` - returns with relations
+  - [x] `listProducts()` - filters and paginates
+  - [x] `searchProducts()` - full-text search
+- [x] Test `cart.service.ts` methods
+  - [x] `addItem()` - adds or updates item
+  - [x] `updateItem()` - updates quantity
+  - [x] `removeItem()` - removes item
+  - [x] `clearCart()` - clears all items
+  - [x] `mergeCart()` - merges guest to user cart
+  - [x] `validateCart()` - stock and price checks
+- [x] Test `order.service.ts` methods
+  - [x] `createOrder()` - creates with inventory reservation
+  - [x] `getOrder()` - returns with relations
+  - [x] `cancelOrder()` - releases inventory
+  - [x] `updateStatus()` - validates transitions
+- [x] Test `user.service.ts` methods
+  - [x] `updateProfile()` - validates and updates
+  - [x] `createAddress()` - creates and sets default
+  - [x] `updatePreferences()` - updates preferences
 
 #### 9.2 Integration Tests
 
-- [ ] Test product listing endpoint
-  - [ ] Returns Q2 format
-  - [ ] Filters work correctly
-  - [ ] Pagination works
-  - [ ] Sorting works
-- [ ] Test product detail endpoint
-  - [ ] Returns product with variants
-  - [ ] Returns 404 for invalid slug
-  - [ ] Includes media and categories
-- [ ] Test cart operations
-  - [ ] Add item increases quantity
-  - [ ] Update item changes quantity
-  - [ ] Remove item deletes record
-  - [ ] Merge cart combines items
-- [ ] Test order creation
-  - [ ] Creates order from cart
-  - [ ] Reserves inventory
-  - [ ] Sends confirmation email
-  - [ ] Returns payment intent
-- [ ] Test admin endpoints
-  - [ ] Unauthorized returns 403
-  - [ ] RBAC enforcement works
-  - [ ] Audit logs created
+- [x] Test product listing endpoint
+  - [x] Returns Q2 format
+  - [x] Filters work correctly
+  - [x] Pagination works
+  - [x] Sorting works
+- [x] Test product detail endpoint
+  - [x] Returns product with variants
+  - [x] Returns 404 for invalid slug
+  - [x] Includes media and categories
+- [x] Test cart operations
+  - [x] Add item increases quantity
+  - [x] Update item changes quantity
+  - [x] Remove item deletes record
+  - [x] Merge cart combines items
+- [x] Test order creation
+  - [x] Creates order from cart
+  - [x] Reserves inventory
+  - [x] Sends confirmation email
+  - [x] Returns payment intent
+- [x] Test admin endpoints
+  - [x] Unauthorized returns 403
+  - [x] RBAC enforcement works
+  - [x] Audit logs created
 
 #### 9.3 Average/Error/Recovery Tests
 
-- [ ] **Average Tests** (`tests/average/api-average.test.ts`)
-  - [ ] Login → Browse catalog → Add to cart → Checkout flow
-  - [ ] Verify response times < 250ms (P95)
-  - [ ] Verify all responses in Q2 format
-- [ ] **Error Tests**
-  - [ ] 409 Conflict - Insufficient stock
-  - [ ] 412 Precondition Failed - Price mismatch
-  - [ ] 422 Validation Error - Invalid input
-  - [ ] 429 Rate Limit - Too many requests
-  - [ ] 500 Server Error - Database error
-- [ ] **Recovery Tests**
-  - [ ] Payment failure → Order rollback → Inventory restored
-  - [ ] Cart merge conflict → Quantity sum → Stock validation
-  - [ ] Order cancellation → Refund initiated → Inventory released
+- [x] **Average Tests** (`tests/average/api-average.test.ts`)
+  - [x] Login → Browse catalog → Add to cart → Checkout flow
+  - [x] Verify response times < 250ms (P95)
+  - [x] Verify all responses in Q2 format
+- [x] **Error Tests**
+  - [x] 409 Conflict - Insufficient stock
+  - [x] 412 Precondition Failed - Price mismatch
+  - [x] 422 Validation Error - Invalid input
+  - [x] 429 Rate Limit - Too many requests
+  - [x] 500 Server Error - Database error
+- [x] **Recovery Tests**
+  - [x] Payment failure → Order rollback → Inventory restored
+  - [x] Cart merge conflict → Quantity sum → Stock validation
+  - [x] Order cancellation → Refund initiated → Inventory released
 
 #### 9.4 Contract Tests
 
-- [ ] Install `jest-openapi` package
-- [ ] Test all responses against OpenAPI spec
-- [ ] Validate request schemas
-- [ ] Validate response schemas
-- [ ] Test error responses format
+- [x] Install `jest-openapi` package
+- [x] Test all responses against OpenAPI spec
+- [x] Validate request schemas
+- [x] Validate response schemas
+- [x] Test error responses format
 
 ---
 
