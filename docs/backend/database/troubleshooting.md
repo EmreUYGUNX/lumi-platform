@@ -10,7 +10,7 @@ Use this checklist when diagnosing database issues in development, staging, or p
 | `relation already exists`                                        | Migration attempting to recreate dropped table/index | Inspect `migration.sql`, remove redundant DDL, or drop the conflicting object manually before deployment.                                                 |
 | `column ... contains null values`                                | Backfilling non-null column without defaults         | Split the migration: add nullable column, backfill via script, alter to `NOT NULL`. Document the manual step in the rollout ticket.                       |
 
-## 2. Slow Queries (>200 ms)
+## 2. Slow Queries (>100 ms)
 
 1. Check the slow query log emitted by Prisma (`WARN prisma:query` entries).
 2. Run the captured SQL in staging with `EXPLAIN (ANALYZE, BUFFERS)` to inspect plan regressions.

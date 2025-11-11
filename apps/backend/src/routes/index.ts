@@ -103,6 +103,14 @@ const createDeprecationMiddleware = (
   };
 };
 
+const createVersionHeaderMiddleware = (version: string): RequestHandler => {
+  return (_req, res, next) => {
+    res.setHeader("X-API-Version", version);
+    res.locals.apiVersion = version;
+    next();
+  };
+};
+
 /**
  * Builds the router for API version `v1`. All new API surface should be added here.
  *
@@ -210,7 +218,7 @@ export const createApiRouter = (
     registerRoute: v1RegisterRoute,
     ...forwardedOptions,
   });
-  router.use("/v1", v1Router);
+  router.use("/v1", createVersionHeaderMiddleware("v1"), v1Router);
 
   // Backwards compatibility: keep legacy `/api/*` routes mapped to v1 but mark them deprecated.
   const legacyMetadata: VersionMetadata = {
@@ -222,7 +230,12 @@ export const createApiRouter = (
     registerRoute,
     ...forwardedOptions,
   });
-  router.use("/", createDeprecationMiddleware("v0", legacyMetadata), legacyRouter);
+  router.use(
+    "/",
+    createVersionHeaderMiddleware("v0"),
+    createDeprecationMiddleware("v0", legacyMetadata),
+    legacyRouter,
+  );
 
   return router;
 };

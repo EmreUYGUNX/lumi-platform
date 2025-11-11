@@ -57,6 +57,7 @@ describe("API router versioning", () => {
 
         const response = await request(app).get("/api/v1/health/live").expect(200);
 
+        expect(response.headers["x-api-version"]).toBe("v1");
         expect(response.headers.deprecation).toBeUndefined();
         expect(response.headers.warning).toBeUndefined();
         expect(response.body.success).toBe(true);
@@ -83,6 +84,7 @@ describe("API router versioning", () => {
 
         const response = await request(app).get("/api/health/live").expect(200);
 
+        expect(response.headers["x-api-version"]).toBe("v0");
         expect(response.headers.deprecation).toBe("true");
         expect(response.headers.warning).toContain("deprecated");
         expect(response.headers.link).toContain("/docs/api");

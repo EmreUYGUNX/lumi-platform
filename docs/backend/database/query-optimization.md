@@ -8,7 +8,7 @@ The Lumi backend now exposes deep visibility into database performance and provi
 | --------------------------- | --------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `db_queries_total`          | Counter   | `model`, `operation`, `status` | Tracks the total number of Prisma queries grouped by model and operation type.                    |
 | `db_query_duration_seconds` | Histogram | `model`, `operation`, `status` | Captures query latency distribution to surface hotspots.                                          |
-| `db_slow_queries_total`     | Counter   | `model`, `operation`           | Counts queries that exceeded the configured `DATABASE_SLOW_QUERY_THRESHOLD_MS` (default `200ms`). |
+| `db_slow_queries_total`     | Counter   | `model`, `operation`           | Counts queries that exceeded the configured `DATABASE_SLOW_QUERY_THRESHOLD_MS` (default `100ms`). |
 
 > All metrics are exported with the `lumi_` prefix when `METRICS_PREFIX` is configured (default).
 
