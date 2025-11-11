@@ -10,7 +10,7 @@ This guide catalogues the high-value database query patterns supported by the Ph
   - Requires `Product` GIN index on `searchKeywords` and composite index on `(status, createdAt)` for ordering.
   - Always request `include: { variants: true, productMedia: { include: { media: true } } }` to avoid N+1 when mappers build DTOs.
   - Cursor pagination leverages `(createdAt DESC, id DESC)` ordering to maintain deterministic pages.
-- **Metrics**: `lumi_db_query_duration_seconds{model="Product",operation="findMany"}` plus slow query alerts (<200 ms target).
+- **Metrics**: `lumi_db_query_duration_seconds{model="Product",operation="findMany"}` plus slow query alerts (<100 ms target).
 
 ## 2. Category Navigation
 

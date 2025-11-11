@@ -50,7 +50,7 @@ const hasLength = (value: string) => value.length > 0;
 
 const MAX_QUERY_TIMEOUT_MS = 120 * 1e3;
 const DEFAULT_QUERY_TIMEOUT_MS = 5 * 1e3;
-const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 200;
+const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 100;
 const MIN_SLOW_QUERY_THRESHOLD_MS = 50;
 
 const booleanTransformer = (value: unknown, fallback = false) => {

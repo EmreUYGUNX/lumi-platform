@@ -67,6 +67,7 @@ export {
 } from "./alerts.js";
 
 export { getSentryInstance, isSentryEnabled, setSentryUser } from "./sentry.js";
+export { traceOrderOperation, type OrderTraceContext } from "./order-tracing.js";
 
 let bootstrapComplete = false;
 

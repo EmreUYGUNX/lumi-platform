@@ -23,9 +23,11 @@ import { ConflictError, NotFoundError, UnauthorizedError } from "@/lib/errors.js
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 import {
+  type OrderTraceContext,
   recordOrderCreatedMetric,
   recordOrderRefundMetric,
   recordOrderStatusTransitionMetric,
+  traceOrderOperation,
 } from "@/observability/index.js";
 import {
   type MoneyDTO,
@@ -528,124 +530,141 @@ export class OrderService {
       });
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const { shippingId, billingId } = await this.ensureAddresses(context.userId, input, tx);
-      const cart = await OrderService.loadCart(validation.cartId, tx);
+    const performCreation = async ({
+      setContext,
+    }: {
+      setContext: (extra: Partial<OrderTraceContext>) => void;
+    }): Promise<CreateOrderResult> => {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const { shippingId, billingId } = await this.ensureAddresses(context.userId, input, tx);
+        const cart = await OrderService.loadCart(validation.cartId, tx);
 
-      if (cart.userId !== context.userId) {
-        throw new UnauthorizedError("You cannot checkout another user's cart.");
-      }
+        if (cart.userId !== context.userId) {
+          throw new UnauthorizedError("You cannot checkout another user's cart.");
+        }
 
-      if (cart.items.length === 0) {
-        throw new ConflictError("Cannot create an order from an empty cart.");
-      }
+        if (cart.items.length === 0) {
+          throw new ConflictError("Cannot create an order from an empty cart.");
+        }
 
-      const reference = await this.generateReference(tx);
-      const currency = cart.items[0]?.productVariant?.product?.currency ?? DEFAULT_CURRENCY;
-      const orderItems = OrderService.buildOrderItems(cart, currency);
-      const subtotal = OrderService.normaliseMoney(validation.totals.subtotal.amount);
-      const tax = OrderService.normaliseMoney(validation.totals.tax.amount);
-      const discount = OrderService.normaliseMoney(validation.totals.discount.amount);
-      const total = OrderService.normaliseMoney(validation.totals.total.amount);
+        const reference = await this.generateReference(tx);
+        const currency = cart.items[0]?.productVariant?.product?.currency ?? DEFAULT_CURRENCY;
+        const orderItems = OrderService.buildOrderItems(cart, currency);
+        const subtotal = OrderService.normaliseMoney(validation.totals.subtotal.amount);
+        const tax = OrderService.normaliseMoney(validation.totals.tax.amount);
+        const discount = OrderService.normaliseMoney(validation.totals.discount.amount);
+        const total = OrderService.normaliseMoney(validation.totals.total.amount);
 
-      const order = await tx.order.create({
-        data: {
-          reference,
-          userId: context.userId,
-          cartId: cart.id,
-          status: OrderStatus.PENDING,
-          subtotalAmount: subtotal,
-          taxAmount: tax,
-          discountAmount: discount,
-          totalAmount: total,
-          currency,
-          shippingAddressId: shippingId,
-          billingAddressId: billingId,
-          notes: input.notes ?? null,
-          metadata: input.metadata ?? Prisma.JsonNull,
-        },
-      });
-
-      await tx.orderItem.createMany({
-        data: orderItems.map((item) => ({
-          ...item,
-          orderId: order.id,
-        })),
-      });
-
-      await OrderService.decrementInventory(tx, orderItems);
-
-      await tx.cart.update({
-        where: { id: cart.id },
-        data: {
-          status: "CHECKED_OUT",
-          updatedAt: new Date(),
-        },
-      });
-
-      await tx.cartItem.deleteMany({
-        where: { cartId: cart.id },
-      });
-
-      await tx.inventoryReservation.updateMany({
-        where: { cartId: cart.id, status: { in: ["PENDING", "ACTIVE"] } },
-        data: { status: "RELEASED" },
-      });
-
-      let payment: Payment | undefined;
-      if (input.payment) {
-        payment = await tx.payment.create({
+        const order = await tx.order.create({
           data: {
-            orderId: order.id,
+            reference,
             userId: context.userId,
-            provider: input.payment.provider ?? PaymentProvider.MANUAL,
-            status: PaymentStatus.INITIATED,
-            transactionId: input.payment.transactionId ?? randomUUID(),
-            amount: total,
+            cartId: cart.id,
+            status: OrderStatus.PENDING,
+            subtotalAmount: subtotal,
+            taxAmount: tax,
+            discountAmount: discount,
+            totalAmount: total,
             currency,
-            paymentChannel: input.payment.paymentChannel ?? null,
-            paymentGroup: input.payment.paymentGroup ?? null,
-            cardToken: input.payment.cardToken ?? null,
+            shippingAddressId: shippingId,
+            billingAddressId: billingId,
+            notes: input.notes ?? null,
+            metadata: input.metadata ?? Prisma.JsonNull,
           },
         });
-      }
 
-      const fullOrder = await tx.order.findFirst({
-        where: { id: order.id },
-        include: {
-          items: {
-            include: {
-              product: true,
-              productVariant: true,
-            },
+        setContext({ orderId: order.id, reference });
+
+        await tx.orderItem.createMany({
+          data: orderItems.map((item) => ({
+            ...item,
+            orderId: order.id,
+          })),
+        });
+
+        await OrderService.decrementInventory(tx, orderItems);
+
+        await tx.cart.update({
+          where: { id: cart.id },
+          data: {
+            status: "CHECKED_OUT",
+            updatedAt: new Date(),
           },
-          payments: true,
-          shippingAddress: true,
-          billingAddress: true,
-          user: true,
-        },
+        });
+
+        await tx.cartItem.deleteMany({
+          where: { cartId: cart.id },
+        });
+
+        await tx.inventoryReservation.updateMany({
+          where: { cartId: cart.id, status: { in: ["PENDING", "ACTIVE"] } },
+          data: { status: "RELEASED" },
+        });
+
+        let payment: Payment | undefined;
+        if (input.payment) {
+          payment = await tx.payment.create({
+            data: {
+              orderId: order.id,
+              userId: context.userId,
+              provider: input.payment.provider ?? PaymentProvider.MANUAL,
+              status: PaymentStatus.INITIATED,
+              transactionId: input.payment.transactionId ?? randomUUID(),
+              amount: total,
+              currency,
+              paymentChannel: input.payment.paymentChannel ?? null,
+              paymentGroup: input.payment.paymentGroup ?? null,
+              cardToken: input.payment.cardToken ?? null,
+            },
+          });
+        }
+
+        const fullOrder = await tx.order.findFirst({
+          where: { id: order.id },
+          include: {
+            items: {
+              include: {
+                product: true,
+                productVariant: true,
+              },
+            },
+            payments: true,
+            shippingAddress: true,
+            billingAddress: true,
+            user: true,
+          },
+        });
+
+        if (!fullOrder) {
+          throw new NotFoundError("Order not found after creation.");
+        }
+
+        return {
+          order: fullOrder,
+          payment,
+        };
       });
 
-      if (!fullOrder) {
-        throw new NotFoundError("Order not found after creation.");
-      }
+      const detail = OrderService.stripInternalMetadata(
+        mapOrderToDetail(result.order as unknown as OrderWithRelations),
+      );
+      recordOrderCreatedMetric();
+      await this.sendOrderEmail(detail, context, "confirmed");
 
       return {
-        order: fullOrder,
-        payment,
+        order: detail,
+        payment: result.payment ? mapPaymentToSummary(result.payment) : undefined,
       };
-    });
-
-    const detail = OrderService.stripInternalMetadata(
-      mapOrderToDetail(result.order as unknown as OrderWithRelations),
-    );
-    recordOrderCreatedMetric();
-    await this.sendOrderEmail(detail, context, "confirmed");
-
-    return {
-      order: detail,
-      payment: result.payment ? mapPaymentToSummary(result.payment) : undefined,
     };
+
+    return traceOrderOperation(
+      "create",
+      {
+        userId: context.userId,
+        cartId: validation.cartId,
+      },
+      performCreation,
+    );
   }
 
   async listUserOrders(userId: string, query: OrderListQuery): Promise<OrderListResult> {
@@ -712,112 +731,120 @@ export class OrderService {
       throw new UnauthorizedError("Authentication required.");
     }
 
-    const order = (await this.repository.findById(orderId, {
-      include: {
-        items: true,
-        payments: true,
-        shippingAddress: true,
-        billingAddress: true,
-      },
-    })) as OrderWithRelations | null;
-
-    if (order === null || order.userId !== context.userId) {
-      throw new NotFoundError(ORDER_NOT_FOUND_ERROR);
-    }
-
-    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PAID) {
-      throw new ConflictError("This order can no longer be cancelled.");
-    }
-
-    const cancellationDeadline = new Date(
-      order.createdAt.getTime() + ORDER_CANCELLATION_WINDOW_MINUTES * 60 * 1000,
-    );
-    if (new Date() > cancellationDeadline) {
-      throw new ConflictError("The cancellation window for this order has expired.", {
-        details: { deadline: cancellationDeadline.toISOString() },
-      });
-    }
-
-    const paymentToRefund = order.payments?.[0];
-    const refundAmount = new Prisma.Decimal(order.totalAmount);
-    const gatewayResult =
-      order.status === OrderStatus.PAID && paymentToRefund
-        ? await this.paymentGateway.refund(paymentToRefund as Payment, {
-            amount: refundAmount,
-            reason: input.reason ?? null,
-          })
-        : undefined;
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: OrderStatus.CANCELLED,
-          cancelledAt: new Date(),
-          notes: input.reason ?? order.notes,
-          version: { increment: 1 },
-        },
-      });
-
-      await OrderService.restockInventory(tx, order.id);
-
-      if (order.status === OrderStatus.PAID) {
-        await tx.payment.updateMany({
-          where: { orderId: order.id },
-          data: {
-            status: PaymentStatus.REFUNDED,
-            failureReason: input.reason ?? null,
+    return traceOrderOperation(
+      "cancel",
+      { orderId, userId: context.userId },
+      async ({ setContext }) => {
+        const order = (await this.repository.findById(orderId, {
+          include: {
+            items: true,
+            payments: true,
+            shippingAddress: true,
+            billingAddress: true,
           },
-        });
-        if (paymentToRefund) {
-          await tx.paymentRefund.create({
-            data: {
-              paymentId: paymentToRefund.id,
-              amount: refundAmount,
-              currency: paymentToRefund.currency,
-              reason: input.reason ?? "Customer cancellation",
-              status: gatewayResult?.status ?? "COMPLETED",
-              refundId: gatewayResult?.referenceId ?? null,
-              processedAt: new Date(),
-              failureReason: gatewayResult?.failureReason ?? null,
-            },
+        })) as OrderWithRelations | null;
+
+        if (order === null || order.userId !== context.userId) {
+          throw new NotFoundError(ORDER_NOT_FOUND_ERROR);
+        }
+
+        setContext({ orderId: order.id, reference: order.reference });
+
+        if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PAID) {
+          throw new ConflictError("This order can no longer be cancelled.");
+        }
+
+        const cancellationDeadline = new Date(
+          order.createdAt.getTime() + ORDER_CANCELLATION_WINDOW_MINUTES * 60 * 1000,
+        );
+        if (new Date() > cancellationDeadline) {
+          throw new ConflictError("The cancellation window for this order has expired.", {
+            details: { deadline: cancellationDeadline.toISOString() },
           });
         }
-        recordOrderRefundMetric({ type: "user_cancelled" });
-      }
 
-      return tx.order.findFirst({
-        where: { id: order.id },
-        include: {
-          items: {
-            include: {
-              product: true,
-              productVariant: true,
+        const paymentToRefund = order.payments?.[0];
+        const refundAmount = new Prisma.Decimal(order.totalAmount);
+        const gatewayResult =
+          order.status === OrderStatus.PAID && paymentToRefund
+            ? await this.paymentGateway.refund(paymentToRefund as Payment, {
+                amount: refundAmount,
+                reason: input.reason ?? null,
+              })
+            : undefined;
+
+        const updated = await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: OrderStatus.CANCELLED,
+              cancelledAt: new Date(),
+              notes: input.reason ?? order.notes,
+              version: { increment: 1 },
             },
-          },
-          payments: true,
-          shippingAddress: true,
-          billingAddress: true,
-          user: true,
-        },
-      });
-    });
+          });
 
-    if (!updated) {
-      throw new NotFoundError(ORDER_NOT_FOUND_ERROR);
-    }
+          await OrderService.restockInventory(tx, order.id);
 
-    recordOrderStatusTransitionMetric({
-      from: order.status,
-      to: OrderStatus.CANCELLED,
-    });
+          if (order.status === OrderStatus.PAID) {
+            await tx.payment.updateMany({
+              where: { orderId: order.id },
+              data: {
+                status: PaymentStatus.REFUNDED,
+                failureReason: input.reason ?? null,
+              },
+            });
+            if (paymentToRefund) {
+              await tx.paymentRefund.create({
+                data: {
+                  paymentId: paymentToRefund.id,
+                  amount: refundAmount,
+                  currency: paymentToRefund.currency,
+                  reason: input.reason ?? "Customer cancellation",
+                  status: gatewayResult?.status ?? "COMPLETED",
+                  refundId: gatewayResult?.referenceId ?? null,
+                  processedAt: new Date(),
+                  failureReason: gatewayResult?.failureReason ?? null,
+                },
+              });
+            }
+            recordOrderRefundMetric({ type: "user_cancelled" });
+          }
 
-    const detail = OrderService.stripInternalMetadata(
-      mapOrderToDetail(updated as unknown as OrderWithRelations),
+          return tx.order.findFirst({
+            where: { id: order.id },
+            include: {
+              items: {
+                include: {
+                  product: true,
+                  productVariant: true,
+                },
+              },
+              payments: true,
+              shippingAddress: true,
+              billingAddress: true,
+              user: true,
+            },
+          });
+        });
+
+        if (!updated) {
+          throw new NotFoundError(ORDER_NOT_FOUND_ERROR);
+        }
+
+        recordOrderStatusTransitionMetric({
+          from: order.status,
+          to: OrderStatus.CANCELLED,
+        });
+
+        const detail = OrderService.stripInternalMetadata(
+          mapOrderToDetail(updated as unknown as OrderWithRelations),
+        );
+        const emailStatus = order.status === OrderStatus.PAID ? "refunded" : "updated";
+        await this.sendOrderEmail(detail, context, emailStatus);
+        return detail;
+      },
     );
-    const emailStatus = order.status === OrderStatus.PAID ? "refunded" : "updated";
-    await this.sendOrderEmail(detail, context, emailStatus);
-    return detail;
   }
 
   async trackOrder(params: OrderTrackingParams) {
@@ -960,58 +987,70 @@ export class OrderService {
       });
     }
 
-    let metadata = OrderService.sanitiseMetadata(order.metadata);
-    const shipmentUpdates: Partial<ShipmentMetadata> = {};
-
-    if (input.trackingNumber !== undefined) {
-      shipmentUpdates.trackingNumber = input.trackingNumber ?? null;
-    }
-    if (input.trackingUrl !== undefined) {
-      shipmentUpdates.trackingUrl = input.trackingUrl ?? null;
-    }
-    if (input.carrier !== undefined) {
-      shipmentUpdates.carrier = input.carrier ?? null;
-    }
-    if (input.estimatedDelivery) {
-      shipmentUpdates.estimatedDelivery = input.estimatedDelivery.toISOString();
-    }
-
-    if (Object.keys(shipmentUpdates).length > 0) {
-      metadata = OrderService.mergeShipmentMetadata(metadata, shipmentUpdates);
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: input.status,
-          version: { increment: 1 },
-          ...(Object.keys(shipmentUpdates).length > 0
-            ? { metadata: metadata as Prisma.InputJsonValue }
-            : {}),
-        },
-      });
-
-      if (input.status === OrderStatus.CANCELLED) {
-        await OrderService.restockInventory(tx, orderId);
-      }
-    });
-
-    recordOrderStatusTransitionMetric({ from: order.status, to: input.status });
-
-    const updated = await this.getAdminOrder(orderId);
-
-    await this.sendOrderEmail(
-      OrderService.stripInternalMetadata(updated),
+    return traceOrderOperation(
+      "status_update",
       {
-        userId: order.userId ?? "system",
-        email: order.user?.email ?? null,
-        firstName: order.user?.firstName ?? null,
+        orderId,
+        userId: order.userId ?? undefined,
+        operationStage: `${order.status}->${input.status}`,
       },
-      "updated",
-    );
+      async ({ setContext }) => {
+        setContext({ reference: order.reference });
 
-    return updated;
+        let metadata = OrderService.sanitiseMetadata(order.metadata);
+        const shipmentUpdates: Partial<ShipmentMetadata> = {};
+
+        if (input.trackingNumber !== undefined) {
+          shipmentUpdates.trackingNumber = input.trackingNumber ?? null;
+        }
+        if (input.trackingUrl !== undefined) {
+          shipmentUpdates.trackingUrl = input.trackingUrl ?? null;
+        }
+        if (input.carrier !== undefined) {
+          shipmentUpdates.carrier = input.carrier ?? null;
+        }
+        if (input.estimatedDelivery) {
+          shipmentUpdates.estimatedDelivery = input.estimatedDelivery.toISOString();
+        }
+
+        if (Object.keys(shipmentUpdates).length > 0) {
+          metadata = OrderService.mergeShipmentMetadata(metadata, shipmentUpdates);
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.order.update({
+            where: { id: orderId },
+            data: {
+              status: input.status,
+              version: { increment: 1 },
+              ...(Object.keys(shipmentUpdates).length > 0
+                ? { metadata: metadata as Prisma.InputJsonValue }
+                : {}),
+            },
+          });
+
+          if (input.status === OrderStatus.CANCELLED) {
+            await OrderService.restockInventory(tx, orderId);
+          }
+        });
+
+        recordOrderStatusTransitionMetric({ from: order.status, to: input.status });
+
+        const updated = await this.getAdminOrder(orderId);
+
+        await this.sendOrderEmail(
+          OrderService.stripInternalMetadata(updated),
+          {
+            userId: order.userId ?? "system",
+            email: order.user?.email ?? null,
+            firstName: order.user?.firstName ?? null,
+          },
+          "updated",
+        );
+
+        return updated;
+      },
+    );
   }
 
   async addInternalNote(
@@ -1096,65 +1135,76 @@ export class OrderService {
     if (refundType === "full" && matchesOrderTotal === false) {
       throw new ConflictError("Full refunds must match the order total.");
     }
-
-    const gatewayResponse = await this.paymentGateway.refund(payment as Payment, {
-      amount: refundAmount,
-      reason: input.reason ?? null,
-    });
-
-    const shouldCancelOrder = refundType === "full";
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: shouldCancelOrder ? PaymentStatus.REFUNDED : payment.status,
-          failureReason: input.reason ?? null,
-        },
-      });
-
-      await tx.paymentRefund.create({
-        data: {
-          paymentId: payment.id,
-          amount: refundAmount,
-          currency: payment.currency,
-          reason: input.reason ?? null,
-          status: gatewayResponse.status,
-          refundId: gatewayResponse.referenceId ?? null,
-          processedAt: new Date(),
-          failureReason: gatewayResponse.failureReason ?? null,
-        },
-      });
-
-      await tx.order.update({
-        where: { id: order.id },
-        data: shouldCancelOrder
-          ? {
-              status: OrderStatus.CANCELLED,
-              cancelledAt: new Date(),
-            }
-          : {
-              notes: input.reason ?? order.notes,
-            },
-      });
-
-      if (shouldCancelOrder) {
-        await OrderService.restockInventory(tx, order.id);
-      }
-    });
-
-    recordOrderRefundMetric({ type: refundType });
-    const detail = await this.getAdminOrder(orderId);
-    await this.sendOrderEmail(
-      detail,
+    return traceOrderOperation(
+      "refund",
       {
-        userId: order.userId ?? "system",
-        email: order.user?.email ?? null,
-        firstName: order.user?.firstName ?? null,
+        orderId,
+        userId: order.userId ?? undefined,
+        operationStage: refundType,
       },
-      "refunded",
+      async ({ setContext }) => {
+        setContext({ reference: order.reference });
+
+        const gatewayResponse = await this.paymentGateway.refund(payment as Payment, {
+          amount: refundAmount,
+          reason: input.reason ?? null,
+        });
+
+        const shouldCancelOrder = refundType === "full";
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: shouldCancelOrder ? PaymentStatus.REFUNDED : payment.status,
+              failureReason: input.reason ?? null,
+            },
+          });
+
+          await tx.paymentRefund.create({
+            data: {
+              paymentId: payment.id,
+              amount: refundAmount,
+              currency: payment.currency,
+              reason: input.reason ?? null,
+              status: gatewayResponse.status,
+              refundId: gatewayResponse.referenceId ?? null,
+              processedAt: new Date(),
+              failureReason: gatewayResponse.failureReason ?? null,
+            },
+          });
+
+          await tx.order.update({
+            where: { id: order.id },
+            data: shouldCancelOrder
+              ? {
+                  status: OrderStatus.CANCELLED,
+                  cancelledAt: new Date(),
+                }
+              : {
+                  notes: input.reason ?? order.notes,
+                },
+          });
+
+          if (shouldCancelOrder) {
+            await OrderService.restockInventory(tx, order.id);
+          }
+        });
+
+        recordOrderRefundMetric({ type: refundType });
+        const detail = await this.getAdminOrder(orderId);
+        await this.sendOrderEmail(
+          detail,
+          {
+            userId: order.userId ?? "system",
+            email: order.user?.email ?? null,
+            firstName: order.user?.firstName ?? null,
+          },
+          "refunded",
+        );
+        return detail;
+      },
     );
-    return detail;
   }
 
   async getOrderStats(query: OrderStatsQuery): Promise<OrderStats> {
