@@ -202,9 +202,11 @@ describe("audit log service", () => {
     });
     expect(result.pagination).toEqual({
       page: 1,
-      perPage: 100,
-      total: 25,
+      pageSize: 100,
+      totalItems: 25,
       totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
     });
     expect(result.data).toHaveLength(1);
   });
