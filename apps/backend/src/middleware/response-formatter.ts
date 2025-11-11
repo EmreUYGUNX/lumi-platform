@@ -4,17 +4,9 @@ import type { NextFunction, Request, Response } from "express";
 
 const REQUEST_ID_HEADER = "x-request-id";
 
-export interface PaginationMeta {
-  page: number;
-  perPage: number;
-  total: number;
-  totalPages: number;
-}
-
 export interface ResponseMeta {
   timestamp: string;
   requestId: string;
-  pagination?: PaginationMeta;
   [key: string]: unknown;
 }
 
@@ -44,55 +36,8 @@ export interface ErrorResponse {
 
 export type ApiResponse<TData = unknown> = SuccessResponse<TData> | ErrorResponse;
 
-export interface PaginationInput {
-  page: number;
-  perPage: number;
-  total: number;
-}
-
 const isObject = (input: unknown): input is Record<string, unknown> =>
   typeof input === "object" && input !== null;
-
-const toNumber = (value: unknown, fallback: number) => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return fallback;
-};
-
-export const buildPaginationMeta = (input: PaginationInput): PaginationMeta => {
-  const page = Math.max(1, Math.trunc(input.page));
-  const perPage = Math.max(1, Math.trunc(input.perPage));
-  const total = Math.max(0, Math.trunc(input.total));
-  const totalPages = Math.max(1, Math.ceil(total / perPage));
-
-  return {
-    page,
-    perPage,
-    total,
-    totalPages,
-  };
-};
-
-const normalisePaginationMeta = (value: unknown): PaginationMeta | undefined => {
-  if (!isObject(value)) {
-    return undefined;
-  }
-
-  const page = toNumber(value.page, 1);
-  const perPage = toNumber(value.perPage, 1);
-  const total = toNumber(value.total, 0);
-
-  return buildPaginationMeta({ page, perPage, total });
-};
 
 const buildDetailFromObject = (detail: Record<string, unknown>): ErrorDetail => {
   const { field, message, ...rest } = detail;
@@ -135,15 +80,18 @@ const toErrorDetails = (value: unknown): ErrorDetail[] | undefined => {
   return detail ? [detail] : undefined;
 };
 
-const buildMeta = (requestId: string, meta?: Partial<ResponseMeta>): ResponseMeta => {
+const buildMeta = (requestId: string, meta?: Record<string, unknown>): ResponseMeta => {
   const timestamp = new Date().toISOString();
-  const pagination = normalisePaginationMeta(meta?.pagination);
+  const { requestId: metaRequestId, ...rest } = (meta ?? {}) as Record<string, unknown> & {
+    requestId?: string;
+  };
+  const resolvedRequestId =
+    typeof metaRequestId === "string" && metaRequestId.length > 0 ? metaRequestId : requestId;
 
   return {
-    ...meta,
+    ...rest,
     timestamp,
-    requestId,
-    ...(pagination ? { pagination } : {}),
+    requestId: resolvedRequestId,
   };
 };
 
@@ -179,18 +127,24 @@ export const formatError = (error: ErrorInput, meta?: Partial<ResponseMeta>): Er
   };
 };
 
+const hasValidMeta = (meta: unknown): boolean => {
+  return meta === undefined || isObject(meta);
+};
+
 const isFormattedResponse = (payload: unknown): payload is ApiResponse => {
   if (!isObject(payload)) {
     return false;
   }
 
   if (payload.success === true) {
-    return "data" in payload && isObject(payload.meta);
+    return "data" in payload && hasValidMeta(payload.meta);
   }
 
   if (payload.success === false) {
     return (
-      isObject(payload.meta) && isObject(payload.error) && typeof payload.error.code === "string"
+      hasValidMeta(payload.meta) &&
+      isObject(payload.error) &&
+      typeof (payload.error as { code?: unknown }).code === "string"
     );
   }
 
@@ -198,9 +152,8 @@ const isFormattedResponse = (payload: unknown): payload is ApiResponse => {
 };
 
 const ensureRequestMetadata = <T extends ApiResponse>(payload: T, requestId: string): T => {
-  const meta = payload.meta ?? ({} as ResponseMeta);
-  const { requestId: metaRequestId, ...restMeta } = meta;
-  const updatedMeta: ResponseMeta = buildMeta(metaRequestId ?? requestId, restMeta);
+  const meta = (payload.meta ?? undefined) as Record<string, unknown> | undefined;
+  const updatedMeta: ResponseMeta = buildMeta(requestId, meta);
 
   return {
     ...payload,
@@ -270,8 +223,12 @@ const attachHelpers = (res: Response, requestId: string) => {
 
 export const responseFormatter = (req: Request, res: Response, next: NextFunction): void => {
   const headerRequestId = req.get(REQUEST_ID_HEADER);
-  const requestId = headerRequestId && headerRequestId.length > 0 ? headerRequestId : randomUUID();
+  const inheritedRequestId =
+    (typeof req.id === "string" && req.id.length > 0 ? req.id : undefined) ||
+    (headerRequestId && headerRequestId.length > 0 ? headerRequestId : undefined);
+  const requestId = inheritedRequestId ?? randomUUID();
 
+  req.id = requestId;
   req.requestId = requestId;
   res.requestId = requestId;
   res.setHeader("X-Request-Id", requestId);
@@ -279,6 +236,10 @@ export const responseFormatter = (req: Request, res: Response, next: NextFunctio
   const originalJson = attachHelpers(res, requestId);
 
   res.json = (payload: unknown) => {
+    if (res.locals?.disableResponseFormatter) {
+      return originalJson(payload);
+    }
+
     if (isFormattedResponse(payload)) {
       return originalJson(ensureRequestMetadata(payload, requestId));
     }

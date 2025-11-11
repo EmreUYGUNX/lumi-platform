@@ -2,7 +2,7 @@ import type { AuditLog, Prisma } from "@prisma/client";
 
 import { prisma } from "../database/prisma.js";
 import { logger } from "../lib/logger.js";
-import { type PaginationMeta, buildPaginationMeta } from "../middleware/response-formatter.js";
+import type { PaginationMeta } from "../lib/response.js";
 
 export type AuditActorType = "ADMIN" | "SYSTEM" | "CUSTOMER" | "ANONYMOUS";
 
@@ -169,6 +169,13 @@ export const queryAuditLogs = async (query: AuditLogQuery = {}): Promise<AuditLo
 
   return {
     data,
-    pagination: buildPaginationMeta({ page, perPage, total }),
+    pagination: {
+      totalItems: total,
+      totalPages: total === 0 ? 0 : Math.max(1, Math.ceil(total / perPage)),
+      page,
+      pageSize: perPage,
+      hasNextPage: page * perPage < total,
+      hasPreviousPage: page > 1,
+    },
   };
 };

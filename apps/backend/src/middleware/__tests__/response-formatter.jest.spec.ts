@@ -6,7 +6,6 @@ import { createApiClient } from "@lumi/testing";
 import {
   type ErrorResponse,
   type SuccessResponse,
-  buildPaginationMeta,
   formatError,
   formatSuccess,
   responseFormatter,
@@ -48,7 +47,15 @@ describe("response formatter middleware", () => {
   it("exposes helper functions to format success and error responses", () => {
     const success = formatSuccess(
       { ok: true },
-      { requestId: "req", pagination: buildPaginationMeta({ page: 1, perPage: 10, total: 25 }) },
+      {
+        requestId: "req",
+        pagination: {
+          page: 1,
+          perPage: 10,
+          total: 25,
+          totalPages: 3,
+        },
+      },
     );
     expect(success.success).toBe(true);
     expect(success.meta.requestId).toBe("req");
@@ -99,26 +106,25 @@ describe("response formatter middleware", () => {
     expect(body.error.code).toBe("CUSTOM");
   });
 
-  it("normalises pagination metadata supplied as primitive values", () => {
+  it("preserves existing metadata structures without mutation", () => {
+    const paginationMeta = {
+      page: 2,
+      pageSize: 5,
+      totalItems: 37,
+      totalPages: 8,
+      cursor: "cursor-token",
+    };
+
     const response = formatSuccess(
       { ok: true },
       {
-        requestId: "req-3",
-        pagination: {
-          page: "2",
-          perPage: "5",
-          total: "37",
-          totalPages: 999,
-        } as unknown as ReturnType<typeof buildPaginationMeta>,
+        pagination: paginationMeta,
+        metaVersion: "v2",
       },
     );
 
-    expect(response.meta.pagination).toEqual({
-      page: 2,
-      perPage: 5,
-      total: 37,
-      totalPages: 8,
-    });
+    expect(response.meta.pagination).toEqual(paginationMeta);
+    expect(response.meta.metaVersion).toBe("v2");
   });
 
   it("wraps unformatted error payloads to match the standard structure", async () => {
@@ -227,7 +233,12 @@ describe("response formatter middleware", () => {
           { ok: true },
           {
             requestId: "existing",
-            pagination: buildPaginationMeta({ page: 1, perPage: 10, total: 10 }),
+            pagination: {
+              page: 1,
+              pageSize: 10,
+              totalItems: 10,
+              totalPages: 1,
+            },
           },
         ),
       );
@@ -238,7 +249,7 @@ describe("response formatter middleware", () => {
     const body = response.body as SuccessResponse<{ ok: boolean }>;
 
     expect(body.meta.requestId).toBe("existing");
-    expect(body.meta.pagination?.totalPages).toBe(1);
+    expect((body.meta.pagination as { totalPages: number } | undefined)?.totalPages).toBe(1);
   });
 
   it("generates request identifiers when metadata does not provide one", () => {

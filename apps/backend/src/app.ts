@@ -101,6 +101,7 @@ export const createApp = ({
   docsRouter.get("/openapi.json", (_req, res) => {
     const document = createOpenApiDocument(resolveConfig());
     res.setHeader("Cache-Control", "no-store");
+    res.locals.disableResponseFormatter = true;
     res.json(document);
   });
   app.use("/api/docs", docsRouter);
