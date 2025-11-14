@@ -99,6 +99,12 @@ export interface RateLimiterOptions {
    * Optional override for the internal bypass header token.
    */
   internalBypassToken?: string;
+  /**
+   * Optional custom key generator. When provided, the limiter will derive the key from the supplied
+   * function instead of relying solely on the request IP. Returning an empty string falls back to
+   * the default IP-based key.
+   */
+  keyGenerator?: (req: Request) => string | undefined;
 }
 
 const buildLimiterOptions = (
@@ -116,7 +122,21 @@ const buildLimiterOptions = (
     standardHeaders: true,
     legacyHeaders: true,
     skipFailedRequests: false,
-    keyGenerator: (req) => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ""),
+    keyGenerator: (req) => {
+      const explicitKey = overrides.keyGenerator?.(req);
+      const normalisedExplicitKey =
+        typeof explicitKey === "string" && explicitKey.trim().length > 0
+          ? explicitKey.trim().toLowerCase()
+          : undefined;
+      const fallbackKey = ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "");
+      const key = normalisedExplicitKey ?? fallbackKey;
+
+      if (overrides.identifier) {
+        return `${overrides.identifier}:${key}`;
+      }
+
+      return key;
+    },
     skip: (req) => {
       if (!rateConfig.enabled) {
         return true;

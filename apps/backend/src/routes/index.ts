@@ -13,6 +13,7 @@ import { createCartRouter } from "@/modules/cart/cart.router.js";
 import type { CartRouterOptions } from "@/modules/cart/cart.router.js";
 import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
 import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
+import { createMediaRouter } from "@/modules/media/media.router.js";
 import { createOrderRouter } from "@/modules/order/order.router.js";
 import type { OrderRouterOptions } from "@/modules/order/order.router.js";
 import { createUserRouter } from "@/modules/user/user.router.js";
@@ -185,6 +186,13 @@ export const createV1Router = (
     createOrderRouter(config, {
       registerRoute: registerV1Route,
       ...options.orderOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createMediaRouter(config, {
+      registerRoute: registerV1Route,
     }),
   );
 

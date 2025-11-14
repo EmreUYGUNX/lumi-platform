@@ -3,7 +3,10 @@ import { v2 as cloudinary } from "cloudinary";
 
 import { type CloudinaryIntegrationConfig, getCloudinaryConfig } from "./cloudinary.config.js";
 import { CloudinaryIntegrationError } from "./cloudinary.errors.js";
-import { buildDefaultDeliveryTransformation } from "./cloudinary.helpers.js";
+import {
+  type CloudinaryEagerTransformation,
+  buildDefaultDeliveryTransformation,
+} from "./cloudinary.helpers.js";
 
 type UploadableSource = Buffer | string;
 type TransformationDefinition = Exclude<NonNullable<UploadApiOptions["transformation"]>, string>;
@@ -39,6 +42,22 @@ export interface GenerateImageUrlOptions {
   resourceType?: UploadApiOptions["resource_type"];
   type?: UploadApiOptions["type"];
   version?: number | string;
+}
+
+export interface GenerateUploadSignatureOptions {
+  folder?: string;
+  tags?: string[];
+  eager?: CloudinaryEagerTransformation[];
+}
+
+export interface UploadSignaturePayload {
+  signature: string;
+  timestamp: number;
+  expiresAt: string;
+  folder: string;
+  apiKey: string;
+  cloudName: string;
+  params: Record<string, string | number>;
 }
 
 export class CloudinaryClient {
@@ -108,6 +127,45 @@ export class CloudinaryClient {
       transformation,
       version: options.version,
     });
+  }
+
+  generateUploadSignature(options: GenerateUploadSignatureOptions = {}): UploadSignaturePayload {
+    const config = this.ensureConfiguration();
+    const timestamp = Math.round(Date.now() / 1000);
+    const folder = options.folder ?? config.folders.products;
+    const tags = Array.isArray(options.tags)
+      ? options.tags.filter((tag) => typeof tag === "string" && tag.trim().length > 0)
+      : [];
+    const eager = options.eager?.length
+      ? CloudinaryClient.serialiseEagerTransformations(options.eager)
+      : undefined;
+
+    const params: Record<string, string | number> = {
+      timestamp,
+      folder,
+    };
+
+    if (tags.length > 0) {
+      params.tags = tags.join(",");
+    }
+
+    if (eager) {
+      params.eager = eager;
+    }
+
+    const signature = cloudinary.utils.api_sign_request(params, config.credentials.apiSecret);
+
+    const expiresAt = new Date((timestamp + config.signatureTtlSeconds) * 1000).toISOString();
+
+    return {
+      signature,
+      timestamp,
+      expiresAt,
+      folder,
+      apiKey: config.credentials.apiKey,
+      cloudName: config.credentials.cloudName,
+      params,
+    };
   }
 
   private static mergeTransformations(
@@ -228,6 +286,20 @@ export class CloudinaryClient {
       details,
       error,
     );
+  }
+
+  private static serialiseEagerTransformations(
+    transformations: CloudinaryEagerTransformation[],
+  ): string {
+    return transformations
+      .map((entry) =>
+        Object.entries(entry)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => `${key}_${value}`)
+          .join(","),
+      )
+      .filter((definition) => definition.length > 0)
+      .join("|");
   }
 }
 
