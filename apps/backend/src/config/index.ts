@@ -121,6 +121,9 @@ const buildConfig = (env: ResolvedEnvironment = getEnvironment()): ApplicationCo
   },
   auth: buildAuthConfig(env),
   email: buildEmailConfig(env),
+  media: {
+    cloudinary: env.cloudinary,
+  },
   observability: {
     sentryDsn: env.sentryDsn,
     logs: {

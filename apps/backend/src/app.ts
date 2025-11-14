@@ -17,7 +17,12 @@ import {
 } from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
 import { createApiRouter } from "./routes/index.js";
-import { createInternalRouter } from "./routes/internal.js";
+import {
+  createInternalRouter,
+  createMetricsAuthMiddleware,
+  metricsHandler,
+  normalisePath,
+} from "./routes/internal.js";
 import {
   attachRouteRegistry,
   createRouteRegistrar,
@@ -112,6 +117,9 @@ export const createApp = ({
 
   app.use("/api", createApiRouter(config, { registerRoute: registerApiRoute, ...apiOptions }));
   app.use("/internal", createInternalRouter(config, { registerRoute: registerInternalRoute }));
+
+  const metricsPath = normalisePath(config.observability.metrics.endpoint);
+  app.get(metricsPath, createMetricsAuthMiddleware(config), metricsHandler);
 
   registerErrorHandlers(app, config);
 
