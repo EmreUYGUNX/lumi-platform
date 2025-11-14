@@ -176,9 +176,9 @@ jobs:
           echo "PostgreSQL did not become ready in time" >&2
           exit 1
       - name: Apply migrations
-        run: pnpm --filter @lumi/backend exec prisma migrate deploy --schema prisma/schema.prisma
+        run: pnpm --filter @lumi/backend exec prisma migrate deploy --schema ../../prisma/schema.prisma
       - name: Verify migration status
-        run: pnpm --filter @lumi/backend exec prisma migrate status --schema prisma/schema.prisma
+        run: pnpm --filter @lumi/backend exec prisma migrate status --schema ../../prisma/schema.prisma
 
   build:
     name: Build Artifacts
