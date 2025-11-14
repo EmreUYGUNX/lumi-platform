@@ -52,6 +52,7 @@ const MAX_QUERY_TIMEOUT_MS = 120 * 1e3;
 const DEFAULT_QUERY_TIMEOUT_MS = 5 * 1e3;
 const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 100;
 const MIN_SLOW_QUERY_THRESHOLD_MS = 50;
+const DEFAULT_CLOUDINARY_BREAKPOINTS = [320, 640, 768, 1024, 1280, 1536, 1920] as const;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {
@@ -89,6 +90,39 @@ const csvTransformer = (value: unknown, fallback: string[]): string[] => {
 const optionalString = (value: unknown) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
   return trimmed === "" ? undefined : trimmed;
+};
+
+const parseResponsiveBreakpointList = (raw: string, ctx: z.RefinementCtx): number[] => {
+  const tokens = raw
+    .split(",")
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+
+  if (tokens.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "CLOUDINARY_RESPONSIVE_BREAKPOINTS must contain at least one value",
+    });
+
+    return z.NEVER;
+  }
+
+  const breakpoints = tokens.map((token) => Number.parseInt(token, 10));
+  const invalidIndex = breakpoints.findIndex(
+    (value) => !Number.isFinite(value) || value <= 0 || Number.isNaN(value),
+  );
+
+  if (invalidIndex >= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "CLOUDINARY_RESPONSIVE_BREAKPOINTS must contain positive integers",
+      path: ["CLOUDINARY_RESPONSIVE_BREAKPOINTS", invalidIndex],
+    });
+
+    return z.NEVER;
+  }
+
+  return [...new Set(breakpoints)].sort((a, b) => a - b);
 };
 
 /* eslint-disable security/detect-object-injection */
@@ -138,6 +172,24 @@ const applyTestEnvironmentDefaults = () => {
   setEnvDefault("EMAIL_SUPPORT_ADDRESS", "support@lumi.test");
   setEnvDefault("EMAIL_SUPPORT_URL", "http://localhost:3100/support");
   setEnvDefault("EMAIL_TEMPLATE_DEFAULT_LOCALE", "en-US");
+  setEnvDefault("CLOUDINARY_CLOUD_NAME", "lumi-test");
+  setEnvDefault("CLOUDINARY_API_KEY", "test-api-key");
+  setEnvDefault("CLOUDINARY_API_SECRET", "test-api-secret");
+  setEnvDefault("CLOUDINARY_SECURE_DELIVERY", "true");
+  setEnvDefault("CLOUDINARY_UPLOAD_PRESET_PRODUCTS", "lumi_products");
+  setEnvDefault("CLOUDINARY_UPLOAD_PRESET_BANNERS", "lumi_banners");
+  setEnvDefault("CLOUDINARY_UPLOAD_PRESET_AVATARS", "lumi_avatars");
+  setEnvDefault("CLOUDINARY_FOLDER_PRODUCTS", "lumi/products");
+  setEnvDefault("CLOUDINARY_FOLDER_BANNERS", "lumi/banners");
+  setEnvDefault("CLOUDINARY_FOLDER_AVATARS", "lumi/avatars");
+  setEnvDefault("CLOUDINARY_RESPONSIVE_BREAKPOINTS", DEFAULT_CLOUDINARY_BREAKPOINTS.join(","));
+  setEnvDefault("CLOUDINARY_SIGNATURE_TTL", "300");
+  setEnvDefault("CLOUDINARY_WEBHOOK_URL", "http://localhost:4000/webhooks/cloudinary");
+  setEnvDefault("CLOUDINARY_WEBHOOK_SIGNING_SECRET", "test-cloudinary-webhook-secret");
+  setEnvDefault("CLOUDINARY_DEFAULT_FORMAT", "auto");
+  setEnvDefault("CLOUDINARY_DEFAULT_FETCH_FORMAT", "auto");
+  setEnvDefault("CLOUDINARY_DEFAULT_QUALITY", "auto:good");
+  setEnvDefault("CLOUDINARY_DEFAULT_DPR", "auto");
 };
 
 const DURATION_UNITS_IN_SECONDS = {
@@ -617,6 +669,41 @@ const EnvSchema = z
       .int()
       .min(1, "AUTH_BRUTE_FORCE_CAPTCHA_THRESHOLD must be at least 1")
       .default(10),
+    CLOUDINARY_CLOUD_NAME: z.string().min(1, "CLOUDINARY_CLOUD_NAME is required"),
+    CLOUDINARY_API_KEY: z.string().min(1, "CLOUDINARY_API_KEY is required"),
+    CLOUDINARY_API_SECRET: z.string().min(1, "CLOUDINARY_API_SECRET is required"),
+    CLOUDINARY_SECURE_DELIVERY: z
+      .any()
+      .transform((value) => booleanTransformer(value, true))
+      .pipe(z.boolean()),
+    CLOUDINARY_UPLOAD_PRESET_PRODUCTS: z
+      .string()
+      .min(1, "CLOUDINARY_UPLOAD_PRESET_PRODUCTS is required"),
+    CLOUDINARY_UPLOAD_PRESET_BANNERS: z
+      .string()
+      .min(1, "CLOUDINARY_UPLOAD_PRESET_BANNERS is required"),
+    CLOUDINARY_UPLOAD_PRESET_AVATARS: z
+      .string()
+      .min(1, "CLOUDINARY_UPLOAD_PRESET_AVATARS is required"),
+    CLOUDINARY_FOLDER_PRODUCTS: z.string().min(1, "CLOUDINARY_FOLDER_PRODUCTS is required"),
+    CLOUDINARY_FOLDER_BANNERS: z.string().min(1, "CLOUDINARY_FOLDER_BANNERS is required"),
+    CLOUDINARY_FOLDER_AVATARS: z.string().min(1, "CLOUDINARY_FOLDER_AVATARS is required"),
+    CLOUDINARY_RESPONSIVE_BREAKPOINTS: z
+      .string()
+      .default(DEFAULT_CLOUDINARY_BREAKPOINTS.join(","))
+      .transform((value, ctx) => parseResponsiveBreakpointList(value, ctx)),
+    CLOUDINARY_SIGNATURE_TTL: z.coerce
+      .number()
+      .int()
+      .min(60, "CLOUDINARY_SIGNATURE_TTL must be at least 60 seconds")
+      .max(3600, "CLOUDINARY_SIGNATURE_TTL must not exceed 3600 seconds")
+      .default(300),
+    CLOUDINARY_WEBHOOK_URL: z.string().url().optional().transform(optionalString),
+    CLOUDINARY_WEBHOOK_SIGNING_SECRET: z.string().optional().transform(optionalString),
+    CLOUDINARY_DEFAULT_FORMAT: z.string().default("auto"),
+    CLOUDINARY_DEFAULT_FETCH_FORMAT: z.string().default("auto"),
+    CLOUDINARY_DEFAULT_QUALITY: z.string().default("auto:good"),
+    CLOUDINARY_DEFAULT_DPR: z.string().default("auto"),
     VALIDATION_STRICT: z
       .any()
       .transform((value) => booleanTransformer(value, true))
@@ -1099,6 +1186,36 @@ const toResolvedEnvironment = (parsed: EnvParseResult): ResolvedEnvironment => (
       maxDelayMs: parsed.AUTH_BRUTE_FORCE_DELAY_MAX_MS,
     },
     captchaThreshold: parsed.AUTH_BRUTE_FORCE_CAPTCHA_THRESHOLD,
+  },
+  cloudinary: {
+    credentials: {
+      cloudName: parsed.CLOUDINARY_CLOUD_NAME,
+      apiKey: parsed.CLOUDINARY_API_KEY,
+      apiSecret: parsed.CLOUDINARY_API_SECRET,
+      secure: parsed.CLOUDINARY_SECURE_DELIVERY,
+    },
+    uploadPresets: {
+      products: parsed.CLOUDINARY_UPLOAD_PRESET_PRODUCTS,
+      banners: parsed.CLOUDINARY_UPLOAD_PRESET_BANNERS,
+      avatars: parsed.CLOUDINARY_UPLOAD_PRESET_AVATARS,
+    },
+    folders: {
+      products: parsed.CLOUDINARY_FOLDER_PRODUCTS,
+      banners: parsed.CLOUDINARY_FOLDER_BANNERS,
+      avatars: parsed.CLOUDINARY_FOLDER_AVATARS,
+    },
+    responsiveBreakpoints: parsed.CLOUDINARY_RESPONSIVE_BREAKPOINTS,
+    signatureTtlSeconds: parsed.CLOUDINARY_SIGNATURE_TTL,
+    defaultDelivery: {
+      format: parsed.CLOUDINARY_DEFAULT_FORMAT,
+      fetchFormat: parsed.CLOUDINARY_DEFAULT_FETCH_FORMAT,
+      quality: parsed.CLOUDINARY_DEFAULT_QUALITY,
+      dpr: parsed.CLOUDINARY_DEFAULT_DPR,
+    },
+    webhook: {
+      url: parsed.CLOUDINARY_WEBHOOK_URL ?? undefined,
+      signingSecret: parsed.CLOUDINARY_WEBHOOK_SIGNING_SECRET ?? undefined,
+    },
   },
 });
 

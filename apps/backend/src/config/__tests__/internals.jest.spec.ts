@@ -149,6 +149,36 @@ const createSecuritySection = (): ApplicationConfig["security"] => ({
   },
 });
 
+const createMediaSection = (): ApplicationConfig["media"] => ({
+  cloudinary: {
+    credentials: {
+      cloudName: "lumi-test",
+      apiKey: "cloudinary-api-key",
+      apiSecret: "cloudinary-api-secret",
+      secure: true,
+    },
+    uploadPresets: {
+      products: "lumi_products",
+      banners: "lumi_banners",
+      avatars: "lumi_avatars",
+    },
+    folders: {
+      products: "lumi/products",
+      banners: "lumi/banners",
+      avatars: "lumi/avatars",
+    },
+    responsiveBreakpoints: [320, 640, 768],
+    signatureTtlSeconds: 300,
+    defaultDelivery: {
+      format: "auto",
+      fetchFormat: "auto",
+      quality: "auto:good",
+      dpr: "auto",
+    },
+    webhook: {},
+  },
+});
+
 const createAuthSection = (): ApplicationConfig["auth"] => ({
   jwt: {
     access: {
@@ -288,6 +318,7 @@ describe("configuration internals", () => {
       security: createSecuritySection(),
       auth: createAuthSection(),
       email: createEmailSection(),
+      media: createMediaSection(),
       observability: {
         sentryDsn: undefined,
         logs: {
@@ -355,6 +386,7 @@ describe("configuration internals", () => {
       security: createSecuritySection(),
       auth: createAuthSection(),
       email: createEmailSection(),
+      media: createMediaSection(),
       observability: {
         sentryDsn: undefined,
         logs: {

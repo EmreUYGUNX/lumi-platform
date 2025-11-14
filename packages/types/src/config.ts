@@ -219,6 +219,43 @@ export interface EmailConfig {
   template: EmailTemplateConfig;
 }
 
+export interface CloudinaryCredentialsConfig {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+  secure: boolean;
+}
+
+export interface CloudinaryPresetConfig {
+  products: string;
+  banners: string;
+  avatars: string;
+}
+
+export type CloudinaryFolderConfig = CloudinaryPresetConfig;
+
+export interface CloudinaryDeliveryDefaults {
+  format: string;
+  fetchFormat: string;
+  quality: string;
+  dpr: string;
+}
+
+export interface CloudinaryWebhookConfig {
+  url?: string;
+  signingSecret?: string;
+}
+
+export interface CloudinaryRuntimeConfig {
+  credentials: CloudinaryCredentialsConfig;
+  uploadPresets: CloudinaryPresetConfig;
+  folders: CloudinaryFolderConfig;
+  responsiveBreakpoints: number[];
+  signatureTtlSeconds: number;
+  defaultDelivery: CloudinaryDeliveryDefaults;
+  webhook: CloudinaryWebhookConfig;
+}
+
 export interface AuthConfig {
   jwt: {
     access: AuthTokenConfig;
@@ -322,6 +359,7 @@ export interface ResolvedEnvironment {
   configHotReload: boolean;
   configEncryptionKey?: string;
   ci: boolean;
+  cloudinary: CloudinaryRuntimeConfig;
 }
 
 export interface ApplicationConfig {
@@ -361,6 +399,9 @@ export interface ApplicationConfig {
     health: HealthConfig;
   };
   email: EmailConfig;
+  media: {
+    cloudinary: CloudinaryRuntimeConfig;
+  };
   featureFlags: FeatureFlagMap;
   runtime: {
     ci: boolean;

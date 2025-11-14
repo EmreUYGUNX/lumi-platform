@@ -48,7 +48,7 @@ const getActiveConfig = (req: Request, fallback: ApplicationConfig): Application
   return current ?? fallback;
 };
 
-const createMetricsAuthMiddleware =
+export const createMetricsAuthMiddleware =
   (initialConfig: ApplicationConfig): RequestHandler =>
   (req: Request, res: Response, next: NextFunction) => {
     const { basicAuth } = getActiveConfig(req, initialConfig).observability.metrics;
@@ -126,7 +126,7 @@ const formatUnknownError = (error: unknown) =>
  *             schema:
  *               $ref: '#/components/schemas/StandardErrorResponse'
  */
-const metricsHandler: RequestHandler = asyncHandler(async (_req, res) => {
+export const metricsHandler: RequestHandler = asyncHandler(async (_req, res) => {
   if (!isMetricsCollectionEnabled()) {
     res.status(503).json(
       errorResponse({
@@ -192,7 +192,7 @@ const createHealthHandler = (initialConfig: ApplicationConfig): RequestHandler =
     }
   });
 
-const normalisePath = (path: string): string => {
+export const normalisePath = (path: string): string => {
   if (!path || path === "/") {
     return "/metrics";
   }
