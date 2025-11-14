@@ -5,6 +5,7 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { type DeepPartial, createTestConfig, deepMerge } from "../../../testing/config.js";
 import { CloudinaryClient, getCloudinaryClient } from "../cloudinary.client.js";
+import { CloudinaryIntegrationError } from "../cloudinary.errors.js";
 
 jest.mock("../../../config/index.js", () => {
   const changeHandlers = new Set<
@@ -114,6 +115,26 @@ describe("CloudinaryClient", () => {
     expect(options.upload_preset).toBe("lumi_banners");
   });
 
+  it("applies avatar preset and stringifies context/metadata values", async () => {
+    const client = new CloudinaryClient();
+    const buffer = Buffer.from("avatar");
+
+    await client.upload(buffer, {
+      folder: "lumi/avatars",
+      // eslint-disable-next-line unicorn/no-null -- ensures null values are stringified
+      context: { productId: 42, optional: null },
+      metadata: { zoom: 1, label: "Primary", enabled: true },
+    });
+
+    const firstCall = uploadMock.mock.calls[0];
+    expect(firstCall).toBeDefined();
+    const options = firstCall?.[1] as UploadApiOptions;
+    expect(options.folder).toBe("lumi/avatars");
+    expect(options.upload_preset).toBe("lumi_avatars");
+    expect(options.context).toEqual({ productId: "42", optional: "" });
+    expect(options.metadata).toEqual({ zoom: "1", label: "Primary", enabled: "true" });
+  });
+
   it("deletes assets using the Cloudinary destroy API", async () => {
     const client = new CloudinaryClient();
 
@@ -188,5 +209,28 @@ describe("CloudinaryClient", () => {
     const instanceB = getCloudinaryClient();
 
     expect(instanceA).toBe(instanceB);
+  });
+
+  it("wraps upload errors with CloudinaryIntegrationError and preserves metadata", async () => {
+    const client = new CloudinaryClient();
+    const failure = {
+      http_code: 503,
+      error: { message: "Service unavailable", http_code: 503 },
+    };
+    uploadMock.mockRejectedValueOnce(failure);
+
+    await expect(client.upload(Buffer.from("fail"))).rejects.toMatchObject({
+      operation: "upload",
+      statusCode: 503,
+      details: failure.error,
+    });
+  });
+
+  it("wraps delete errors even when Cloudinary returns a plain Error", async () => {
+    const client = new CloudinaryClient();
+    const plainError = new Error("network down");
+    destroyMock.mockRejectedValueOnce(plainError);
+
+    await expect(client.deleteAsset("123")).rejects.toBeInstanceOf(CloudinaryIntegrationError);
   });
 });
