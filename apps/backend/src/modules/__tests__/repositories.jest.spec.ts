@@ -359,35 +359,134 @@ describe("Repository layer", () => {
     );
   });
 
-  it("MediaRepository.upsertMedia updates existing record", async () => {
+  it("MediaRepository.createAsset delegates to Prisma client", async () => {
     const delegates: Record<string, MockDelegate> = {
-      media: {
-        findFirst: jest.fn(),
+      mediaAsset: {
+        create: jest.fn().mockResolvedValue({ id: "asset-1" }),
       },
     };
 
-    const transactionDelegates: Record<string, MockDelegate> = {
-      media: {
-        findFirst: jest.fn().mockResolvedValue({ id: "media-1" }),
-        update: jest.fn(),
-        create: jest.fn(),
-      },
-    };
-
-    const prisma = createPrismaStub(delegates, transactionDelegates);
+    const prisma = createPrismaStub(delegates);
     const repository = new MediaRepository(prisma);
 
-    await repository.upsertMedia({
-      assetId: "asset-1",
+    await repository.createAsset({
+      publicId: "lumi/products/asset-1",
       url: "https://cdn.example.com/image.jpg",
-      type: "IMAGE" as Prisma.MediaType,
-      provider: "CLOUDINARY" as Prisma.MediaProvider,
-      mimeType: "image/jpeg",
-      sizeBytes: 100,
+      secureUrl: "https://cdn.example.com/image.jpg",
+      format: "jpg",
+      bytes: 512_000,
+      uploadedBy: {
+        connect: { id: "user-1" },
+      },
     });
 
-    expect(transactionDelegates.media.update).toHaveBeenCalled();
-    expect(transactionDelegates.media.create).not.toHaveBeenCalled();
+    expect(delegates.mediaAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        publicId: "lumi/products/asset-1",
+        uploadedBy: { connect: { id: "user-1" } },
+      }),
+    });
+  });
+
+  it("MediaRepository.list applies relation filters", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      mediaAsset: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new MediaRepository(prisma);
+
+    await repository.list({ productId: "product-1", tag: "hero" }, { page: 1, pageSize: 10 });
+
+    const findManyArgs = delegates.mediaAsset.findMany.mock
+      .calls[0]?.[0] as Prisma.MediaAssetFindManyArgs;
+    expect(findManyArgs).toBeDefined();
+
+    const where = findManyArgs.where as Prisma.MediaAssetWhereInput;
+    const findRelationFilter = (
+      input?: Prisma.MediaAssetWhereInput,
+    ): Prisma.MediaAssetWhereInput | undefined => {
+      if (!input) {
+        return undefined;
+      }
+
+      if ("products" in input || "tags" in input) {
+        return input;
+      }
+
+      if (Array.isArray(input.AND)) {
+        const nested = input.AND.map((clause) =>
+          findRelationFilter(clause as Prisma.MediaAssetWhereInput),
+        ).find(Boolean);
+        if (nested) {
+          return nested;
+        }
+      }
+
+      return undefined;
+    };
+
+    const normalizedWhere = findRelationFilter(where);
+
+    expect(normalizedWhere).toEqual(
+      expect.objectContaining({
+        products: { some: { id: "product-1" } },
+        tags: { has: "hero" },
+      }),
+    );
+  });
+
+  it("MediaRepository.softDeleteAsset delegates to base soft delete", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      mediaAsset: {
+        update: jest.fn().mockResolvedValue({ id: "asset-1" }),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new MediaRepository(prisma);
+
+    await repository.softDeleteAsset("asset-1");
+
+    expect(delegates.mediaAsset.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "asset-1" },
+        data: { deletedAt: expect.any(Date) },
+      }),
+    );
+  });
+
+  it("MediaRepository.findOrphans filters unattached assets", async () => {
+    const delegates: Record<string, MockDelegate> = {
+      mediaAsset: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const prisma = createPrismaStub(delegates);
+    const repository = new MediaRepository(prisma);
+
+    await repository.findOrphans(25);
+
+    const findManyArgs = delegates.mediaAsset.findMany.mock
+      .calls[0]?.[0] as Prisma.MediaAssetFindManyArgs;
+    const where = findManyArgs.where as Prisma.MediaAssetWhereInput;
+    const relationFilter = Array.isArray(where?.AND)
+      ? (where.AND.find(
+          (entry) => "products" in entry || "productVariants" in entry,
+        ) as Prisma.MediaAssetWhereInput)
+      : where;
+
+    expect(relationFilter).toEqual(
+      expect.objectContaining({
+        products: { none: {} },
+        productVariants: { none: {} },
+      }),
+    );
+    expect(findManyArgs.take).toBe(25);
   });
 
   it("AddressRepository.setDefaultAddress toggles default flags", async () => {

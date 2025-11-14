@@ -1,19 +1,82 @@
-import type { Media, Prisma, PrismaClient } from "@prisma/client";
+import type { MediaAsset, Prisma, PrismaClient } from "@prisma/client";
 
-import { BaseRepository, type RepositoryContext } from "@/lib/repository/base.repository.js";
+import {
+  BaseRepository,
+  type PaginatedResult,
+  type PaginationOptions,
+  type RepositoryContext,
+} from "@/lib/repository/base.repository.js";
 
 type MediaRepositoryContext = RepositoryContext<
-  Prisma.MediaDelegate,
-  Prisma.MediaWhereInput,
-  Prisma.MediaOrderByWithRelationInput
+  Prisma.MediaAssetDelegate,
+  Prisma.MediaAssetWhereInput,
+  Prisma.MediaAssetOrderByWithRelationInput
 >;
 
+export interface MediaListFilters {
+  uploadedById?: string;
+  folder?: string;
+  productId?: string;
+  productVariantId?: string;
+  tag?: string;
+  search?: string;
+  includeDeleted?: boolean;
+}
+
+const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWhereInput => {
+  const { uploadedById, folder, productId, productVariantId, tag, search } = filters;
+  const where: Prisma.MediaAssetWhereInput = {};
+
+  if (uploadedById) {
+    where.uploadedById = uploadedById;
+  }
+
+  if (folder) {
+    where.folder = { equals: folder, mode: "insensitive" };
+  }
+
+  if (productId) {
+    where.products = {
+      some: {
+        id: productId,
+      },
+    };
+  }
+
+  if (productVariantId) {
+    where.productVariants = {
+      some: {
+        id: productVariantId,
+      },
+    };
+  }
+
+  if (tag) {
+    where.tags = {
+      has: tag,
+    };
+  }
+
+  if (search) {
+    const normalized = search.trim();
+    if (normalized.length > 0) {
+      where.OR = [
+        { publicId: { contains: normalized, mode: "insensitive" } },
+        { folder: { contains: normalized, mode: "insensitive" } },
+        { tags: { has: normalized } },
+      ];
+    }
+  }
+
+  return where;
+};
+
 export class MediaRepository extends BaseRepository<
-  Prisma.MediaDelegate,
-  Prisma.MediaWhereInput,
-  Prisma.MediaOrderByWithRelationInput,
-  Prisma.MediaSelect,
-  Prisma.MediaInclude
+  Prisma.MediaAssetDelegate,
+  Prisma.MediaAssetWhereInput,
+  Prisma.MediaAssetOrderByWithRelationInput,
+  Prisma.MediaAssetSelect,
+  Prisma.MediaAssetInclude
 > {
   constructor(
     private readonly prisma: PrismaClient,
@@ -21,11 +84,12 @@ export class MediaRepository extends BaseRepository<
   ) {
     super(
       context ?? {
-        modelName: "Media",
-        delegate: prisma.media,
-        getDelegate: (client) => client.media,
+        modelName: "MediaAsset",
+        delegate: prisma.mediaAsset,
+        getDelegate: (client) => client.mediaAsset,
         runInTransaction: (callback) => prisma.$transaction(callback),
         primaryKey: "id",
+        softDeleteField: "deletedAt",
         defaultSort: [{ createdAt: "desc" }],
       },
     );
@@ -36,38 +100,112 @@ export class MediaRepository extends BaseRepository<
     return new MediaRepository(this.prisma, context) as this;
   }
 
-  async findByAssetId(assetId: string) {
-    return this.findFirst({
-      where: { assetId },
-    });
+  async createAsset(data: Prisma.MediaAssetCreateInput): Promise<MediaAsset> {
+    return this.create({
+      data,
+    }) as Promise<MediaAsset>;
   }
 
-  async upsertMedia(data: Prisma.MediaCreateInput): Promise<Media> {
-    return this.withTransaction(async (_repo, tx) => {
-      const existing = await tx.media.findFirst({
-        where: { assetId: data.assetId },
-      });
+  async getById(
+    id: string,
+    args?: Omit<Prisma.MediaAssetFindFirstArgs, "where">,
+  ): Promise<MediaAsset | null> {
+    return (await this.findById(id, args)) as MediaAsset | null;
+  }
 
-      if (existing) {
-        return tx.media.update({
-          where: { id: existing.id },
-          data,
-        });
+  async findByPublicId(publicId: string): Promise<MediaAsset | null> {
+    return (await this.findFirst({
+      where: { publicId },
+    })) as MediaAsset | null;
+  }
+
+  async list(
+    filters: MediaListFilters = {},
+    pagination: Omit<
+      PaginationOptions<
+        Prisma.MediaAssetWhereInput,
+        Prisma.MediaAssetOrderByWithRelationInput,
+        Prisma.MediaAssetSelect,
+        Prisma.MediaAssetInclude
+      >,
+      "where"
+    > = {},
+  ): Promise<PaginatedResult<MediaAsset>> {
+    const where = buildWhereClause(filters);
+
+    if (filters.includeDeleted) {
+      const page = Math.max(pagination.page ?? 1, 1);
+      const pageSize = Math.max(pagination.pageSize ?? 25, 1);
+      const skip = pagination.skip ?? (page - 1) * pageSize;
+      const take = pagination.take ?? pageSize;
+      const cursor = pagination.cursor as Prisma.MediaAssetWhereUniqueInput | undefined;
+
+      const findManyArgs: Prisma.MediaAssetFindManyArgs = {
+        where,
+        orderBy: (pagination.orderBy ??
+          this.context.defaultSort ??
+          ({ createdAt: "desc" } satisfies Prisma.MediaAssetOrderByWithRelationInput)) as
+          | Prisma.MediaAssetOrderByWithRelationInput
+          | Prisma.MediaAssetOrderByWithRelationInput[],
+        select: pagination.select,
+        include: pagination.include,
+        take,
+      };
+      if (cursor) {
+        findManyArgs.cursor = cursor;
+        findManyArgs.skip = 1;
+      } else if (skip > 0) {
+        findManyArgs.skip = skip;
       }
 
-      return tx.media.create({
-        data,
-      });
-    });
-  }
+      const [totalItems, records] = await Promise.all([
+        this.delegate.count({ where }),
+        this.delegate.findMany(findManyArgs),
+      ]);
 
-  async listByIds(ids: string[]): Promise<Media[]> {
-    if (ids.length === 0) {
-      return [];
+      const totalPages = Math.max(Math.ceil(totalItems / pageSize), 1);
+
+      return {
+        items: records as MediaAsset[],
+        meta: {
+          page,
+          pageSize,
+          totalItems,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        },
+      };
     }
 
-    return this.findMany({
-      where: { id: { in: ids } },
-    }) as Promise<Media[]>;
+    return (await this.paginate({
+      ...pagination,
+      where,
+    })) as unknown as PaginatedResult<MediaAsset>;
+  }
+
+  async updateMetadata(id: string, data: Prisma.MediaAssetUpdateInput): Promise<MediaAsset> {
+    return this.update({
+      where: { id },
+      data,
+    }) as Promise<MediaAsset>;
+  }
+
+  async softDeleteAsset(id: string): Promise<MediaAsset> {
+    return (await super.softDelete(id)) as MediaAsset;
+  }
+
+  async restoreAsset(id: string): Promise<MediaAsset> {
+    return (await super.restore(id)) as MediaAsset;
+  }
+
+  async findOrphans(limit = 50): Promise<MediaAsset[]> {
+    return (await this.findMany({
+      where: {
+        products: { none: {} },
+        productVariants: { none: {} },
+      },
+      take: Math.max(1, Math.min(limit, 200)),
+    })) as MediaAsset[];
   }
 }

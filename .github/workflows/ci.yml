@@ -136,6 +136,50 @@ jobs:
           flags: unit
           fail_ci_if_error: false
 
+  database-migrations:
+    name: Database Migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: lumi
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lumi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lumi
+    steps:
+      - *checkout
+      - *setup-pnpm
+      - *setup-node
+      - *restore-pnpm-store
+      - *ensure-pnpm-store
+      - *install-deps
+      - *restore-turbo-cache
+      - name: Wait for database
+        run: |
+          for i in {1..30}; do
+            if nc -z localhost 5432; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready in time" >&2
+          exit 1
+      - name: Apply migrations
+        run: pnpm --filter @lumi/backend exec prisma migrate deploy --schema ../../prisma/schema.prisma
+      - name: Verify migration status
+        run: pnpm --filter @lumi/backend exec prisma migrate status --schema ../../prisma/schema.prisma
+
   build:
     name: Build Artifacts
     runs-on: ubuntu-latest

@@ -138,6 +138,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   preferences             UserPreference?
+  uploadedMediaAssets     MediaAsset[] @relation("UploadedMediaAssets")
 }
 
 model UserSession {
@@ -294,6 +295,7 @@ model Product {
   productMedia ProductMedia[]
   reviews      Review[]
   orderItems   OrderItem[]
+  mediaAssets  MediaAsset[]       @relation("ProductMediaAssets")
 
   @@index([status])
   @@index([status, createdAt])
@@ -321,6 +323,7 @@ model ProductVariant {
   variantMedia     VariantMedia[]
   orderItems       OrderItem[]
   reservationItems InventoryReservationItem[]
+  mediaAssets      MediaAsset[]               @relation("VariantMediaAssets")
 
   @@index([productId])
 }
@@ -464,6 +467,36 @@ model Media {
   reviewMedia  ReviewMedia[]
 
   @@index([assetId])
+}
+
+model MediaAsset {
+  id            String   @id @default(cuid())
+  publicId      String   @unique
+  url           String
+  secureUrl     String
+  format        String
+  resourceType  String   @default("image")
+  type          String   @default("upload")
+  width         Int?
+  height        Int?
+  bytes         Int
+  folder        String?
+  version       Int      @default(1)
+  tags          String[] @default([])
+  metadata      Json?
+  uploadedById  String
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  uploadedBy      User            @relation("UploadedMediaAssets", fields: [uploadedById], references: [id], onDelete: Restrict)
+  products        Product[]       @relation("ProductMediaAssets")
+  productVariants ProductVariant[] @relation("VariantMediaAssets")
+
+  @@index([uploadedById])
+  @@index([folder])
+  @@index([deletedAt])
+  @@map("media_assets")
 }
 
 model ProductMedia {
