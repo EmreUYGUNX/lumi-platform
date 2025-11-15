@@ -88,7 +88,7 @@ const uploadViaXhr = ({
     formData.append("file", file);
     formData.append("folder", payload.folder);
     formData.append("visibility", payload.visibility ?? "public");
-    (payload.tags ?? []).forEach((tag) => formData.append("tags", tag));
+    (payload.tags ?? []).forEach((tag: string) => formData.append("tags", tag));
     if (payload.metadata) {
       formData.append("metadata", JSON.stringify(payload.metadata));
     }

@@ -1,6 +1,8 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import type { InfiniteData } from "@tanstack/react-query";
 
 import { listMediaRequest } from "../api/media.api";
+import type { ListMediaResponse } from "../api/media.api";
 import type { MediaListFilters } from "../types/media.types";
 import { mediaKeys } from "./media.keys";
 
@@ -16,8 +18,14 @@ const pickListRequest = (filters: MediaListFilters, page: number) => ({
   tags: filters.tags,
 });
 
-export const useMediaList = (filters: MediaListFilters, options: { authToken?: string } = {}) =>
-  useInfiniteQuery({
+export const useMediaList = (filters: MediaListFilters, options: { authToken?: string } = {}) => {
+  return useInfiniteQuery<
+    ListMediaResponse,
+    Error,
+    InfiniteData<ListMediaResponse>,
+    ReturnType<typeof mediaKeys.list>,
+    number
+  >({
     queryKey: mediaKeys.list(filters),
     queryFn: ({ pageParam = 1 }) =>
       listMediaRequest(pickListRequest(filters, pageParam), options.authToken),
@@ -25,3 +33,4 @@ export const useMediaList = (filters: MediaListFilters, options: { authToken?: s
       lastPage.meta.hasNextPage ? lastPage.meta.page + 1 : undefined,
     initialPageParam: 1,
   });
+};

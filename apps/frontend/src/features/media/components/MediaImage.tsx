@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentPropsWithoutRef, ReactElement } from "react";
+import type { ComponentPropsWithoutRef, ReactElement, SyntheticEvent } from "react";
 import { useMemo, useState } from "react";
 
 import { ImagePlaceholder } from "@/components/ui/image/ImagePlaceholder";
@@ -18,7 +18,10 @@ import type { MediaAsset } from "../types/media.types";
 export type MediaImageVariant = "thumbnail" | "medium" | "large";
 
 export interface MediaImageProps
-  extends Omit<ComponentPropsWithoutRef<typeof ResponsiveImage>, "src" | "width" | "height"> {
+  extends Omit<
+    ComponentPropsWithoutRef<typeof ResponsiveImage>,
+    "src" | "width" | "height" | "alt"
+  > {
   asset?: MediaAsset | null;
   publicId?: string;
   src?: string;
@@ -29,6 +32,7 @@ export interface MediaImageProps
   fallbackLabel?: string;
   fallbackColor?: string;
   transformations?: string[];
+  alt?: string;
 }
 
 const resolveMetadataColor = (asset?: MediaAsset | null): string | undefined => {
@@ -169,7 +173,7 @@ export function MediaImage({
       blurDataURL={blurDataURL}
       loading={loading ?? (priority ? "eager" : "lazy")}
       priority={priority}
-      onError={(event) => {
+      onError={(event: SyntheticEvent<HTMLImageElement>) => {
         rest.onError?.(event);
         setBroken(true);
       }}

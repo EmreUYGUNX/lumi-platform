@@ -45,10 +45,13 @@ const MediaManagerShell = ({ authToken }: MediaManagerShellProps) => {
   const deleteMutation = useMediaDelete({ authToken });
   const updateMutation = useMediaUpdate({ authToken });
 
-  const assets = useMemo(
-    () => (data?.pages ?? []).flatMap((page) => page.items ?? []),
-    [data?.pages],
-  );
+  const assets = useMemo<MediaAsset[]>(() => {
+    if (!data) {
+      return [];
+    }
+
+    return data.pages.flatMap((page) => page.items ?? []);
+  }, [data]);
 
   const usageBytes = useMemo(
     () => assets.reduce((total, asset) => total + asset.bytes, 0),

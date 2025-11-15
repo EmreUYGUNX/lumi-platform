@@ -9,29 +9,39 @@ interface MediaDeleteVariables {
   id: string;
 }
 
+type MediaListInfiniteData = InfiniteData<ListMediaResponse>;
+type PreviousQueries = [readonly unknown[], MediaListInfiniteData | undefined][];
+
 export const useMediaDelete = ({ authToken }: { authToken?: string } = {}) => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, MediaDeleteVariables, { previous?: [unknown, unknown][] }>({
+  return useMutation<
+    void,
+    Error,
+    MediaDeleteVariables,
+    {
+      previous?: PreviousQueries;
+    }
+  >({
     mutationFn: (variables) => deleteMediaRequest({ id: variables.id }, authToken),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: mediaKeys.all });
-      const previous = queryClient.getQueriesData({ queryKey: [mediaKeys.all[0], "list"] });
+      const previous = queryClient.getQueriesData<MediaListInfiniteData>({
+        queryKey: ["media", "list"],
+      });
 
       previous.forEach(([key, data]) => {
-        const infinite = data as InfiniteData<ListMediaResponse> | undefined;
-        if (!infinite) {
+        if (!data) {
           return;
         }
 
-        const nextPages = infinite.pages.map((page) => ({
+        const nextPages = data.pages.map((page) => ({
           ...page,
           items: page.items.filter((asset) => asset.id !== variables.id),
-          meta: page.meta,
         }));
 
         queryClient.setQueryData(key, {
-          ...infinite,
+          ...data,
           pages: nextPages,
         });
       });
@@ -40,7 +50,9 @@ export const useMediaDelete = ({ authToken }: { authToken?: string } = {}) => {
     },
     onError: (_error, _variables, context) => {
       context?.previous?.forEach(([key, data]) => {
-        queryClient.setQueryData(key, data);
+        if (data) {
+          queryClient.setQueryData(key, data);
+        }
       });
     },
     onSettled: () => {
