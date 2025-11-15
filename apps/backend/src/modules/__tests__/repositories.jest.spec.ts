@@ -434,7 +434,7 @@ describe("Repository layer", () => {
     expect(normalizedWhere).toEqual(
       expect.objectContaining({
         products: { some: { id: "product-1" } },
-        tags: { has: "hero" },
+        tags: { hasEvery: ["hero"] },
       }),
     );
   });
