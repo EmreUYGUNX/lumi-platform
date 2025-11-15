@@ -11,10 +11,10 @@ describe("media cloudinary helpers", () => {
 
   it("returns a defensive copy when read", () => {
     const first = getCloudinaryBreakpoints();
-    // @ts-expect-error -- runtime mutation should not affect the source array.
-    expect(() => {
-      first.push(9999);
-    }).toThrow();
+    const mutate = () => {
+      (first as number[]).push(9999);
+    };
+    expect(mutate).toThrow();
     const second = getCloudinaryBreakpoints();
     expect(second).toEqual(CLOUDINARY_BREAKPOINTS);
     expect(second).not.toBe(first);
