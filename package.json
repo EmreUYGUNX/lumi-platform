@@ -16,7 +16,7 @@
     "lint:fix": "turbo run lint --no-daemon -- --fix",
     "test": "pnpm exec turbo run test --parallel --no-daemon",
     "test:jest": "pnpm exec turbo run test:jest --no-daemon",
-    "test:coverage": "cross-env JEST_EXCLUDE_FRONTEND=1 pnpm exec turbo run test --parallel --no-daemon -- --coverage",
+    "test:coverage": "cross-env JEST_EXCLUDE_FRONTEND=1 pnpm exec turbo run test --parallel --filter='!@lumi/frontend' --no-daemon -- --coverage",
     "typecheck": "turbo run typecheck --no-daemon",
     "format": "turbo run format --no-daemon",
     "clean": "turbo run clean --parallel --no-daemon",
