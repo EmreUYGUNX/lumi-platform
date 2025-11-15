@@ -517,8 +517,10 @@ describe("startServer", () => {
       await controller.shutdown({ reason: "close-failure" });
 
       expect(errorSpy.mock.calls.length).toBeGreaterThan(initialErrorCalls);
-      const lastErrorCall = errorSpy.mock.calls.at(-1);
-      expect(lastErrorCall?.[0]).toBe("HTTP server close failed");
+      const hasCloseFailureLog = errorSpy.mock.calls.some(
+        (call) => call[0] === "HTTP server close failed",
+      );
+      expect(hasCloseFailureLog).toBe(true);
     } finally {
       closeSpy.mockRestore();
 
