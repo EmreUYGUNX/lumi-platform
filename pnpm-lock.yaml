@@ -107,6 +107,9 @@ importers:
       conventional-changelog-cli:
         specifier: ^4.1.0
         version: 4.1.0
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -435,6 +438,12 @@ importers:
       "@next/bundle-analyzer":
         specifier: ^14.2.3
         version: 14.2.33
+      "@tanstack/react-query":
+        specifier: ^5.90.9
+        version: 5.90.9(react@18.3.1)
+      "@tanstack/react-query-devtools":
+        specifier: ^5.90.2
+        version: 5.90.2(@tanstack/react-query@5.90.9(react@18.3.1))(react@18.3.1)
       next:
         specifier: ^14.2.3
         version: 14.2.33(@babel/core@7.28.4)(@opentelemetry/api@1.9.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -444,6 +453,12 @@ importers:
       react-dom:
         specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
+      react-dropzone:
+        specifier: ^14.3.8
+        version: 14.3.8(react@18.3.1)
+      yet-another-react-lightbox:
+        specifier: ^3.25.0
+        version: 3.25.0(@types/react-dom@18.3.7(@types/react@18.3.26))(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       "@jest/globals":
         specifier: ^29.7.0
@@ -1404,6 +1419,12 @@ packages:
     resolution:
       {
         integrity: sha512-WI0DdZ8xFSbgMjR1sFsKABJ/C5OnRrjT06JXbZKexJGrDuPTzZdDYfFlsgcCXCyf+suG5QU2e/y1Wo2V/OapLQ==,
+      }
+
+  "@epic-web/invariant@1.0.0":
+    resolution:
+      {
+        integrity: sha512-lrTPqgvfFQtR/eY/qkIzp98OGdNJu0m5ji3q/nJI8v3SXkRKEnWiOxMmbvcSoAIzv/cGiuvRy57k4suKQSAdwA==,
       }
 
   "@esbuild/aix-ppc64@0.25.11":
@@ -3552,6 +3573,35 @@ packages:
         integrity: sha512-KGYxvIOXcceOAbEk4bi/dVLEK9z8sZ0uBB3Il5b1rhfClSpcX0yfRO0KmTkqR2cnQDymwLB+25ZyMzICg/cm/A==,
       }
 
+  "@tanstack/query-core@5.90.9":
+    resolution:
+      {
+        integrity: sha512-UFOCQzi6pRGeVTVlPNwNdnAvT35zugcIydqjvFUzG62dvz2iVjElmNp/hJkUoM5eqbUPfSU/GJIr/wbvD8bTUw==,
+      }
+
+  "@tanstack/query-devtools@5.90.1":
+    resolution:
+      {
+        integrity: sha512-GtINOPjPUH0OegJExZ70UahT9ykmAhmtNVcmtdnOZbxLwT7R5OmRztR5Ahe3/Cu7LArEmR6/588tAycuaWb1xQ==,
+      }
+
+  "@tanstack/react-query-devtools@5.90.2":
+    resolution:
+      {
+        integrity: sha512-vAXJzZuBXtCQtrY3F/yUNJCV4obT/A/n81kb3+YqLbro5Z2+phdAbceO+deU3ywPw8B42oyJlp4FhO0SoivDFQ==,
+      }
+    peerDependencies:
+      "@tanstack/react-query": ^5.90.2
+      react: 18.3.1
+
+  "@tanstack/react-query@5.90.9":
+    resolution:
+      {
+        integrity: sha512-Zke2AaXiaSfnG8jqPZR52m8SsclKT2d9//AgE/QIzyNvbpj/Q2ln+FsZjb1j69bJZUouBvX2tg9PHirkTm8arw==,
+      }
+    peerDependencies:
+      react: 18.3.1
+
   "@tanstack/react-virtual@3.13.12":
     resolution:
       {
@@ -5001,6 +5051,13 @@ packages:
       }
     engines: { node: ">=8.0.0" }
 
+  attr-accept@2.2.5:
+    resolution:
+      {
+        integrity: sha512-0bDNnY/u6pPwHDMoF0FieU354oBi0a8rD9FcsLwzcGWbc8KS8KPIi7y+s13OlVY+gMWc/9xEMUgNE6Qm8ZllYQ==,
+      }
+    engines: { node: ">=4" }
+
   autocannon@7.15.0:
     resolution:
       {
@@ -6081,6 +6138,14 @@ packages:
       {
         integrity: sha512-YIaY9TR5Nxeb8SMdtrU8asWVM4jqJDNDYlKV21LxtYcfNJhp1kEsgSa6qXwXgzN0WQWGODps0+TlGp2xQSHwOg==,
       }
+
+  cross-env@10.1.0:
+    resolution:
+      {
+        integrity: sha512-GsYosgnACZTADcmEyJctkJIoqAhHjttw7RsFrVoJNXbsWWqaq6Ym+7kZjq6mS45O0jij6vtiReppKQEtqWy6Dw==,
+      }
+    engines: { node: ">=20" }
+    hasBin: true
 
   cross-spawn@7.0.6:
     resolution:
@@ -7521,6 +7586,13 @@ packages:
         integrity: sha512-7Gps/XWymbLk2QLYK4NzpMOrYjMhdIxXuIvy2QBsLE6ljuodKvdkWs/cpyJJ3CVIVpH0Oi1Hvg1ovbMzLdFBBg==,
       }
     engines: { node: ^10.12.0 || >=12.0.0 }
+
+  file-selector@2.1.2:
+    resolution:
+      {
+        integrity: sha512-QgXo+mXTe8ljeqUFaX3QVHc5osSItJ/Km+xpocx0aSqWGMSCf6qYs/VnzZgS864Pjn5iceMRFigeAV7AfTlaig==,
+      }
+    engines: { node: ">= 12" }
 
   file-stream-rotator@0.6.1:
     resolution:
@@ -11141,6 +11213,15 @@ packages:
     peerDependencies:
       react: 18.3.1
 
+  react-dropzone@14.3.8:
+    resolution:
+      {
+        integrity: sha512-sBgODnq+lcA4P296DY4wacOZz3JFpD99fp+hb//iBO2HHnyeZU3FwWyXJ6salNpqQdsZrgMrotuko/BdJMV8Ug==,
+      }
+    engines: { node: ">= 10.13" }
+    peerDependencies:
+      react: 18.3.1
+
   react-is@16.13.1:
     resolution:
       {
@@ -13414,6 +13495,23 @@ packages:
         integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==,
       }
 
+  yet-another-react-lightbox@3.25.0:
+    resolution:
+      {
+        integrity: sha512-NaCeEXCpdwoTvoOpxNK9gdW8+oHs79yVH+D2YeVQWRjH5i32e5CoXndAAFP2p8awzVYfSonherrE9JMTpfD3EA==,
+      }
+    engines: { node: ">=14" }
+    peerDependencies:
+      "@types/react": ^16 || ^17 || ^18 || ^19
+      "@types/react-dom": ^16 || ^17 || ^18 || ^19
+      react: 18.3.1
+      react-dom: 18.3.1
+    peerDependenciesMeta:
+      "@types/react":
+        optional: true
+      "@types/react-dom":
+        optional: true
+
   yocto-queue@0.1.0:
     resolution:
       {
@@ -14283,6 +14381,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  "@epic-web/invariant@1.0.0": {}
 
   "@esbuild/aix-ppc64@0.25.11":
     optional: true
@@ -15977,6 +16077,21 @@ snapshots:
       "@swc/counter": 0.1.3
       tslib: 2.8.1
 
+  "@tanstack/query-core@5.90.9": {}
+
+  "@tanstack/query-devtools@5.90.1": {}
+
+  "@tanstack/react-query-devtools@5.90.2(@tanstack/react-query@5.90.9(react@18.3.1))(react@18.3.1)":
+    dependencies:
+      "@tanstack/query-devtools": 5.90.1
+      "@tanstack/react-query": 5.90.9(react@18.3.1)
+      react: 18.3.1
+
+  "@tanstack/react-query@5.90.9(react@18.3.1)":
+    dependencies:
+      "@tanstack/query-core": 5.90.9
+      react: 18.3.1
+
   "@tanstack/react-virtual@3.13.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)":
     dependencies:
       "@tanstack/virtual-core": 3.13.12
@@ -16940,6 +17055,8 @@ snapshots:
 
   atomic-sleep@1.0.0: {}
 
+  attr-accept@2.2.5: {}
+
   autocannon@7.15.0:
     dependencies:
       chalk: 4.1.2
@@ -17616,6 +17733,11 @@ snapshots:
       - ts-node
 
   cross-argv@2.0.0: {}
+
+  cross-env@10.1.0:
+    dependencies:
+      "@epic-web/invariant": 1.0.0
+      cross-spawn: 7.0.6
 
   cross-spawn@7.0.6:
     dependencies:
@@ -18667,6 +18789,10 @@ snapshots:
   file-entry-cache@6.0.1:
     dependencies:
       flat-cache: 3.2.0
+
+  file-selector@2.1.2:
+    dependencies:
+      tslib: 2.8.1
 
   file-stream-rotator@0.6.1:
     dependencies:
@@ -20968,6 +21094,13 @@ snapshots:
       react: 18.3.1
       scheduler: 0.23.2
 
+  react-dropzone@14.3.8(react@18.3.1):
+    dependencies:
+      attr-accept: 2.2.5
+      file-selector: 2.1.2
+      prop-types: 15.8.1
+      react: 18.3.1
+
   react-is@16.13.1: {}
 
   react-is@17.0.2: {}
@@ -22483,6 +22616,14 @@ snapshots:
     dependencies:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
+
+  yet-another-react-lightbox@3.25.0(@types/react-dom@18.3.7(@types/react@18.3.26))(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    optionalDependencies:
+      "@types/react": 18.3.26
+      "@types/react-dom": 18.3.7(@types/react@18.3.26)
 
   yocto-queue@0.1.0: {}
 
