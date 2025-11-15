@@ -110,6 +110,12 @@ export const createMediaRouter = (
   router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
   registerRoute?.("GET", "/media/:id");
 
+  router.get("/media", requireAuth, requireMediaRole, controller.list);
+  registerRoute?.("GET", "/media");
+
+  router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
+  registerRoute?.("GET", "/media/:id");
+
   router.post(
     "/media/upload",
     requireAuth,
