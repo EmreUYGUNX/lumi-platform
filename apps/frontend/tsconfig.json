@@ -5,7 +5,9 @@
     "paths": {
       "@/app/layout": ["./src/app/layout.tsx"],
       "@/app/page": ["./src/app/page.tsx"],
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lumi/shared": ["../../packages/shared/src/index.ts"],
+      "@lumi/shared/*": ["../../packages/shared/src/*"]
     },
     "module": "ESNext",
     "moduleResolution": "Bundler",
