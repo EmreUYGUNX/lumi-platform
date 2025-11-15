@@ -1,7 +1,7 @@
 /* istanbul ignore file */
 import type { ImageLoaderProps } from "next/image";
 
-import { CLOUDINARY_BREAKPOINTS as SHARED_CLOUDINARY_BREAKPOINTS } from "@lumi/shared";
+import { CLOUDINARY_BREAKPOINTS as SHARED_CLOUDINARY_BREAKPOINTS } from "@lumi/shared/media/cloudinary";
 
 export const CLOUDINARY_BREAKPOINTS = SHARED_CLOUDINARY_BREAKPOINTS;
 

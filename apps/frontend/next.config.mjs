@@ -62,6 +62,26 @@ const nextConfig = {
       config.optimization.runtimeChunk = "single";
     }
 
+    config.resolve = config.resolve || {};
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      ".js": [".js", ".ts", ".tsx"],
+      ".mjs": [".mjs", ".mts"],
+      ".cjs": [".cjs", ".cts"]
+    };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "node:fs": false,
+      "node:path": false,
+      "node:url": false
+    };
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      url: false
+    };
+
     return config;
   }
 };
