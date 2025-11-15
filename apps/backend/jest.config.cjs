@@ -60,7 +60,8 @@ config.modulePathIgnorePatterns = [
 config.moduleNameMapper = {
   "^@/(.*)\\.js$": "<rootDir>/apps/backend/src/$1.ts",
   ...(config.moduleNameMapper || {}),
-  "^@/(.*)$": "<rootDir>/apps/backend/src/$1"
+  "^@/(.*)$": "<rootDir>/apps/backend/src/$1",
+  "^@config/(.*)$": "<rootDir>/config/$1"
 };
 
 module.exports = config;

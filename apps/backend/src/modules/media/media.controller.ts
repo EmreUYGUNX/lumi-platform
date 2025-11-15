@@ -5,6 +5,7 @@ import type { Request, RequestHandler, Response } from "express";
 import { asyncHandler } from "@/lib/asyncHandler.js";
 import { UnauthorizedError, ValidationError } from "@/lib/errors.js";
 import { paginatedResponse, successResponse } from "@/lib/response.js";
+import { mediaMetrics } from "@/observability/media-metrics.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import type {
@@ -18,12 +19,22 @@ import {
   createMediaUpdateSchema,
   createMediaUploadSchema,
   mediaIdParamSchema,
+  mediaLcpMetricSchema,
   mediaListQuerySchema,
 } from "./media.validators.js";
 
 const MAX_FILES_PER_REQUEST = 10;
 
 const AUTH_REQUIRED_MESSAGE = "Authentication required.";
+const FILES_FIELD_NAME = "files";
+const AUDIT_ACTIONS = Object.freeze({
+  update: "media.assets.update",
+  regenerate: "media.assets.regenerate",
+  softDelete: "media.assets.soft-delete",
+  hardDelete: "media.assets.hard-delete",
+});
+const MEDIA_CACHE_HEADER = "private, max-age=300";
+const CACHE_CONTROL_HEADER = "Cache-Control";
 
 const computeEtag = (payload: unknown): string =>
   createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -101,6 +112,8 @@ export class MediaController {
 
   public readonly hardDelete: RequestHandler;
 
+  public readonly recordLcpMetric: RequestHandler;
+
   private readonly service: MediaService;
 
   private readonly uploadSchema: ReturnType<typeof createMediaUploadSchema>;
@@ -141,6 +154,7 @@ export class MediaController {
     this.regenerate = asyncHandler(this.handleRegenerate.bind(this));
     this.softDelete = asyncHandler(this.handleSoftDelete.bind(this));
     this.hardDelete = asyncHandler(this.handleHardDelete.bind(this));
+    this.recordLcpMetric = asyncHandler(MediaController.handleRecordLcpMetric);
   }
 
   private async handleList(req: Request, res: Response): Promise<void> {
@@ -159,7 +173,7 @@ export class MediaController {
     }
 
     res.setHeader("ETag", etag);
-    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader(CACHE_CONTROL_HEADER, MEDIA_CACHE_HEADER);
 
     res.json(
       paginatedResponse(result.items, {
@@ -184,7 +198,7 @@ export class MediaController {
     }
 
     res.setHeader("ETag", etag);
-    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader(CACHE_CONTROL_HEADER, MEDIA_CACHE_HEADER);
     res.json(successResponse(asset));
   }
 
@@ -199,7 +213,7 @@ export class MediaController {
       throw new ValidationError("At least one file must be provided.", {
         issues: [
           {
-            path: "files",
+            path: FILES_FIELD_NAME,
             message: "Select one or more files to upload.",
           },
         ],
@@ -210,7 +224,7 @@ export class MediaController {
       throw new ValidationError(`A maximum of ${MAX_FILES_PER_REQUEST} files can be uploaded.`, {
         issues: [
           {
-            path: "files",
+            path: FILES_FIELD_NAME,
             message: `Reduce the selection to ${MAX_FILES_PER_REQUEST} files or fewer.`,
           },
         ],
@@ -248,7 +262,7 @@ export class MediaController {
     res.locals.audit = {
       entity: this.auditEntity,
       entityId: asset.id,
-      action: "media.assets.update",
+      action: AUDIT_ACTIONS.update,
       after: body,
     };
 
@@ -263,7 +277,7 @@ export class MediaController {
     res.locals.audit = {
       entity: this.auditEntity,
       entityId: asset.id,
-      action: "media.assets.regenerate",
+      action: AUDIT_ACTIONS.regenerate,
     };
 
     res.json(successResponse(asset));
@@ -277,7 +291,7 @@ export class MediaController {
     res.locals.audit = {
       entity: this.auditEntity,
       entityId: asset.id,
-      action: "media.assets.soft-delete",
+      action: AUDIT_ACTIONS.softDelete,
     };
 
     res.json(successResponse(asset));
@@ -291,9 +305,16 @@ export class MediaController {
     res.locals.audit = {
       entity: this.auditEntity,
       entityId: asset.id,
-      action: "media.assets.hard-delete",
+      action: AUDIT_ACTIONS.hardDelete,
     };
 
     res.json(successResponse(asset));
+  }
+
+  private static async handleRecordLcpMetric(req: Request, res: Response): Promise<void> {
+    const payload = mediaLcpMetricSchema.parse(req.body ?? {});
+    mediaMetrics.recordLcp(payload.value, payload.route);
+    res.setHeader(CACHE_CONTROL_HEADER, "no-store");
+    res.status(202).json(successResponse({ recorded: true }));
   }
 }

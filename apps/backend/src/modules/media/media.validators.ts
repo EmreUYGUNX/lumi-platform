@@ -215,3 +215,18 @@ export const mediaListQuerySchema = z
   .strict();
 
 export type MediaListQuery = z.infer<typeof mediaListQuerySchema>;
+
+export const mediaLcpMetricSchema = z.object({
+  value: z.coerce
+    .number()
+    .min(0, "Value must be greater than or equal to 0.")
+    .max(10_000, "Value must be less than 10000 milliseconds."),
+  route: z.string().trim().max(200, "Route must be at most 200 characters.").optional(),
+  viewport: z
+    .string()
+    .trim()
+    .max(50, "Viewport description must be at most 50 characters.")
+    .optional(),
+});
+
+export type MediaLcpMetricBody = z.infer<typeof mediaLcpMetricSchema>;

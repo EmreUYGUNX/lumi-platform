@@ -36,6 +36,7 @@ describe("media.router", () => {
 
     expect(registerRoute).toHaveBeenCalledWith("POST", "/media/upload");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/media/signature");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/media/metrics/lcp");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/media");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/media/:id");
     expect(registerRoute).toHaveBeenCalledWith("PUT", "/admin/media/:id");
@@ -51,6 +52,7 @@ describe("media.router", () => {
     expect(paths).toContain("/media/signature");
     expect(paths).toContain("/media");
     expect(paths).toContain("/media/:id");
+    expect(paths).toContain("/media/metrics/lcp");
     expect(paths).toContain("/admin/media/:id");
     expect(paths).toContain("/admin/media/:id/regenerate");
     expect(paths).toContain("/admin/media/:id/permanent");

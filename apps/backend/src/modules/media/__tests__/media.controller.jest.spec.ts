@@ -202,6 +202,18 @@ describe("media.controller", () => {
     expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
   });
 
+  it("records LCP metrics via telemetry endpoint", async () => {
+    const req = {
+      body: { value: 950, route: "/products/demo" },
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.recordLcpMetric(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.json).toHaveBeenCalledWith(successResponse({ recorded: true }));
+  });
+
   it("bubbles validation errors when too many files are submitted", async () => {
     const req = {
       body: {},

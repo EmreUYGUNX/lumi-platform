@@ -6,6 +6,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   analyzerMode: "static",
   openAnalyzer: false
 });
+const CLOUDINARY_BREAKPOINTS = require("../../packages/shared/media/cloudinary-breakpoints.json");
 
 const nextConfig = {
   reactStrictMode: true,
@@ -38,7 +39,9 @@ const nextConfig = {
     tsconfigPath: "./tsconfig.json"
   },
   images: {
-    formats: ["image/avif", "image/webp"]
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: CLOUDINARY_BREAKPOINTS,
+    minimumCacheTTL: 31536000
   },
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,

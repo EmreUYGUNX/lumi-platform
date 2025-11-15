@@ -85,6 +85,7 @@ describe("MediaService", () => {
   let forceDeleteMock: jest.MockedFunction<MediaRepository["forceDeleteAsset"]>;
   let uploadMock: jest.MockedFunction<CloudinaryClient["upload"]>;
   let deleteAssetMock: jest.MockedFunction<CloudinaryClient["deleteAsset"]>;
+  let fetchMock: jest.MockedFunction<typeof fetch>;
 
   const createService = () =>
     new MediaService({
@@ -146,6 +147,20 @@ describe("MediaService", () => {
     } as unknown as jest.Mocked<MediaScanService>;
 
     config = createTestConfig();
+
+    fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "image/webp",
+      }),
+      arrayBuffer: async () => Buffer.from("placeholder").buffer,
+    } as Response);
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it("rejects unsupported mime types before attempting upload", async () => {
@@ -178,6 +193,7 @@ describe("MediaService", () => {
         metadata: expect.objectContaining({
           originalFilename: "photo.png",
           visibility: "public",
+          blurDataUrl: expect.stringContaining("data:image"),
         }),
       }),
     );
@@ -333,5 +349,31 @@ describe("MediaService", () => {
       invalidate: true,
     });
     expect(forceDeleteMock).toHaveBeenCalledWith("asset_123");
+  });
+
+  it("warms CDN cache for popular assets", async () => {
+    listMock.mockResolvedValueOnce({
+      items: [createMockAsset()],
+      meta: {
+        totalItems: 1,
+        page: 1,
+        pageSize: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({
+        "x-cache": "HIT",
+      }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as Response);
+
+    const service = createService();
+    await service.warmPopularAssets(1);
+    expect(fetchMock).toHaveBeenCalled();
   });
 });

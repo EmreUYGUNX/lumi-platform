@@ -20,7 +20,8 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "strictNullChecks": true
   },
   "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts", "__tests__/**/*"],
   "references": [

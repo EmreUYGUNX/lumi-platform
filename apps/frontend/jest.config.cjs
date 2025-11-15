@@ -16,6 +16,7 @@ module.exports = createProjectJestConfig({
   tsconfig: path.join(__dirname, "tsconfig.json"),
   moduleNameMapper: {
     "^@/(.*)$": path.join(__dirname, "src", "$1"),
+    "^@config/(.*)$": path.join(__dirname, "../../config", "$1"),
   },
   coverageDirectory: path.join(__dirname, "../../coverage/apps/frontend"),
   setupFiles: [],
