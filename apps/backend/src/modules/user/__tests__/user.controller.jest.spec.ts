@@ -19,7 +19,7 @@ const createRequest = (overrides: Partial<Request> = {}): Request =>
 
 const createResponse = (): Response =>
   ({
-    json: jest.fn().mockReturnValue(undefined),
+    json: jest.fn(),
     status: jest.fn().mockReturnThis(),
     send: jest.fn(),
     locals: {},
