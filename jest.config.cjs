@@ -1,4 +1,4 @@
-const coverageIgnorePatterns = ["/apps/frontend/"];
+const coverageIgnorePatterns = ["[\\\\/]apps[\\\\/]frontend[\\\\/]"];
 
 module.exports = {
   projects: [
