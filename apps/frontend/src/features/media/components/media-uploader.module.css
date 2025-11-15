@@ -1,0 +1,159 @@
+.root {
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.subtitle {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.folderRow {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.select,
+.input {
+  display: block;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #d1d5db;
+  min-width: 14rem;
+}
+
+.queueStatus {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.dropzone {
+  border: 2px dashed #94a3b8;
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.dropzone:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.validationErrors {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  list-style: disc;
+  padding-left: 2rem;
+}
+
+.queueList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.queueItem {
+  display: flex;
+  gap: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem;
+  align-items: center;
+  background: #f9fafb;
+}
+
+.preview {
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.queueContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.queueTitleRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.filename {
+  font-weight: 600;
+  color: #111827;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actions button {
+  border: none;
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  background: #e0e7ff;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+
+.progressBar {
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.progressBar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+  border-radius: 9999px;
+  transition: width 0.2s ease;
+}
+
+.status {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.status[data-status="success"] {
+  color: #15803d;
+}
+
+.status[data-status="error"] {
+  color: #b91c1c;
+}
+
+.status[data-status="canceled"] {
+  color: #78350f;
+}
