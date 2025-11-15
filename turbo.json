@@ -40,7 +40,7 @@
       "env": ["PRUNE_STRATEGY"]
     },
     "lint": {
-      "dependsOn": ["^lint"],
+      "dependsOn": ["^build", "^lint"],
       "outputs": [".eslintcache", ".next/cache/eslint/**"],
       "inputs": [
         "$TURBO_DEFAULT$",
