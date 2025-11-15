@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
-import type { UploadApiResponse } from "cloudinary";
+import type { MediaAsset, Prisma, Product, ProductVariant } from "@prisma/client";
+import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 import { getConfig } from "@/config/index.js";
 import { ApiError } from "@/errors/api-error.js";
@@ -9,16 +9,52 @@ import {
 } from "@/integrations/cloudinary/cloudinary.client.js";
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
+import type { PaginatedResult } from "@/lib/repository/base.repository.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { MediaRepository } from "./media.repository.js";
 import { MediaScanService, sanitizeFilename } from "./media.security.js";
-import type { MediaSignatureBody, MediaUploadBody } from "./media.validators.js";
-import { IMAGE_MIME_WHITELIST } from "./media.validators.js";
+import {
+  IMAGE_MIME_WHITELIST,
+  type MediaListQuery,
+  type MediaSignatureBody,
+  type MediaUpdateBody,
+  type MediaUploadBody,
+} from "./media.validators.js";
 
 const MAX_PRODUCT_BYTES = 5 * 1024 * 1024;
 const MAX_BANNER_BYTES = 10 * 1024 * 1024;
 const MAX_CONCURRENT_UPLOADS = 5;
+const PRIVILEGED_ROLES = new Set(["admin", "staff"]);
+const AUDIT_ENTITY = "media.assets";
+
+const NAMED_VARIANTS = [
+  { name: "thumbnail", transformation: { width: 300, height: 300, crop: "fill" } },
+  { name: "medium", transformation: { width: 800, height: 800, crop: "limit" } },
+  { name: "large", transformation: { width: 1920, crop: "limit" } },
+] as const;
+
+type MediaAssetWithUsage = MediaAsset & {
+  products?: Pick<Product, "id" | "title" | "slug">[];
+  productVariants?: Pick<ProductVariant, "id" | "sku" | "productId">[];
+};
+
+const MEDIA_USAGE_INCLUDE = {
+  products: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+    },
+  },
+  productVariants: {
+    select: {
+      id: true,
+      sku: true,
+      productId: true,
+    },
+  },
+} as const;
 
 export interface PreparedUploadFile {
   fieldName: string;
@@ -45,6 +81,7 @@ export interface UploadedMedia {
   transformations: Record<string, string>;
   metadata?: Record<string, unknown>;
   resourceType: string;
+  type: string;
   tags: string[];
   version: number;
 }
@@ -59,6 +96,28 @@ export interface FailedUpload {
 export interface MediaUploadResult {
   uploads: UploadedMedia[];
   failures: FailedUpload[];
+}
+
+export interface MediaUsageSummary {
+  products: { id: string; title: string; slug: string }[];
+  variants: { id: string; sku: string; productId: string }[];
+}
+
+export interface MediaAssetView extends UploadedMedia {
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date;
+  usage: MediaUsageSummary;
+}
+
+export interface MediaListResult {
+  items: MediaAssetView[];
+  meta: PaginatedResult<MediaAsset>["meta"];
+}
+
+export interface MediaActionContext {
+  userId: string;
+  roles: readonly string[];
 }
 
 export interface MediaServiceOptions {
@@ -117,6 +176,54 @@ const normaliseTags = (tags: readonly string[]): string[] => [...new Set(tags)];
 const resolveMimeExtension = (mimeType: string): string | undefined =>
   IMAGE_MIME_WHITELIST.get(mimeType)?.extension;
 
+const resolveResourceType = (value?: string): UploadApiOptions["resource_type"] =>
+  (value as UploadApiOptions["resource_type"]) ?? "image";
+
+const resolveAssetType = (value?: string): UploadApiOptions["type"] =>
+  (value as UploadApiOptions["type"]) ?? "upload";
+
+const isPrivilegedActor = (actor: MediaActionContext): boolean =>
+  actor.roles.some((role) => PRIVILEGED_ROLES.has(role.toLowerCase()));
+
+const assertPrivilegedActor = (actor: MediaActionContext): void => {
+  if (isPrivilegedActor(actor)) {
+    return;
+  }
+
+  throw new ApiError("You do not have permission to manage media assets.", {
+    status: 403,
+    code: "FORBIDDEN",
+  });
+};
+
+const assertOwnerOrPrivileged = (asset: MediaAsset, actor: MediaActionContext): void => {
+  if (asset.uploadedById === actor.userId) {
+    return;
+  }
+
+  assertPrivilegedActor(actor);
+};
+
+const assertAssetNotInUse = (asset: MediaAssetWithUsage): void => {
+  const productUsage = asset.products?.length ?? 0;
+  const variantUsage = asset.productVariants?.length ?? 0;
+  if (productUsage === 0 && variantUsage === 0) {
+    return;
+  }
+
+  throw new ApiError("Media asset is currently assigned to products or variants.", {
+    status: 409,
+    code: "CONFLICT",
+    details: [
+      {
+        message: "Detach all associations before deleting this asset.",
+        products: productUsage,
+        variants: variantUsage,
+      },
+    ],
+  });
+};
+
 /* eslint-disable security/detect-object-injection */
 const buildTransformationMap = (
   uploadResult: UploadApiResponse,
@@ -131,10 +238,9 @@ const buildTransformationMap = (
   }
 
   const eagerEntries = Array.isArray(uploadResult.eager) ? uploadResult.eager : [];
-  const variantNames = ["thumbnail", "medium", "large"];
 
-  eagerEntries.slice(0, variantNames.length).forEach((entry, index) => {
-    const variantName = variantNames[index] ?? `variant_${index}`;
+  eagerEntries.slice(0, NAMED_VARIANTS.length).forEach((entry, index) => {
+    const variantName = NAMED_VARIANTS[index]?.name ?? `variant_${index}`;
     const url = entry.secure_url ?? entry.url;
     if (url) {
       // eslint-disable-next-line security/detect-object-injection -- Variant keys are derived from a fixed allowlist.
@@ -150,8 +256,8 @@ const buildTransformationMap = (
           crop: "limit",
         },
         version: uploadResult.version,
-        resourceType: uploadResult.resource_type,
-        type: uploadResult.type,
+        resourceType: resolveResourceType(uploadResult.resource_type ?? undefined),
+        type: resolveAssetType(uploadResult.type ?? undefined),
       });
 
       // eslint-disable-next-line security/detect-object-injection -- Responsive keys map to controlled breakpoint widths.
@@ -162,6 +268,43 @@ const buildTransformationMap = (
   return Object.fromEntries(entries);
 };
 /* eslint-enable security/detect-object-injection */
+
+const buildTransformationMapFromAsset = (
+  asset: MediaAsset,
+  client: CloudinaryClient,
+  config: ApplicationConfig,
+): Record<string, string> => {
+  const entries: [string, string][] = [];
+  const primaryUrl = asset.secureUrl || asset.url;
+  if (primaryUrl) {
+    entries.push(["original", primaryUrl]);
+  }
+
+  NAMED_VARIANTS.forEach(({ name, transformation }) => {
+    const url = client.generateImageUrl(asset.publicId, {
+      transformation,
+      version: asset.version,
+      resourceType: resolveResourceType(asset.resourceType),
+      type: resolveAssetType(asset.type),
+    });
+    entries.push([name, url]);
+  });
+
+  config.media.cloudinary.responsiveBreakpoints.forEach((width) => {
+    const url = client.generateImageUrl(asset.publicId, {
+      transformation: {
+        width,
+        crop: "limit",
+      },
+      version: asset.version,
+      resourceType: resolveResourceType(asset.resourceType),
+      type: resolveAssetType(asset.type),
+    });
+    entries.push([`responsive_${width}`, url]);
+  });
+
+  return Object.fromEntries(entries);
+};
 
 const extractDominantColor = (uploadResult: UploadApiResponse): string | undefined => {
   if (!Array.isArray(uploadResult.colors) || uploadResult.colors.length === 0) {
@@ -188,6 +331,33 @@ const calculateAspectRatio = (width?: number, height?: number): number | undefin
 
   return Number((width / height).toFixed(3));
 };
+
+const normaliseRecordMetadata = (
+  metadata?: Prisma.JsonValue | null,
+): Record<string, unknown> | undefined => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return undefined;
+  }
+
+  return metadata as Record<string, unknown>;
+};
+
+const mapUsage = (record: MediaAssetWithUsage): MediaUsageSummary => ({
+  products: Array.isArray(record.products)
+    ? record.products.map((product) => ({
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+      }))
+    : [],
+  variants: Array.isArray(record.productVariants)
+    ? record.productVariants.map((variant) => ({
+        id: variant.id,
+        sku: variant.sku,
+        productId: variant.productId,
+      }))
+    : [],
+});
 
 const normaliseMetadataValues = (
   metadata?: Record<string, unknown>,
@@ -274,12 +444,131 @@ export class MediaService {
 
   private readonly config: ApplicationConfig;
 
+  private readonly auditEntityToken = AUDIT_ENTITY;
+
   constructor(options: MediaServiceOptions = {}) {
     this.repository = options.repository ?? new MediaRepository(getPrismaClient());
     this.cloudinary = options.cloudinaryClient ?? getCloudinaryClient();
     this.logger = options.logger ?? createChildLogger("media:service");
     this.scanner = options.scanService ?? new MediaScanService();
     this.config = options.config ?? getConfig();
+  }
+
+  getAuditEntity(): string {
+    return this.auditEntityToken;
+  }
+
+  async listAssets(query: MediaListQuery = {}): Promise<MediaListResult> {
+    const result = await this.repository.list(
+      {
+        uploadedById: query.uploadedById,
+        folder: query.folder,
+        productId: query.productId,
+        productVariantId: query.productVariantId,
+        tags: query.tags,
+        tag: query.tag,
+        resourceType: query.resourceType,
+        search: query.search,
+        includeDeleted: query.includeDeleted,
+      },
+      {
+        page: query.page,
+        pageSize: query.perPage,
+      },
+    );
+
+    return {
+      items: result.items.map((record) => this.toAssetView(record as MediaAssetWithUsage)),
+      meta: result.meta,
+    };
+  }
+
+  async getAsset(id: string): Promise<MediaAssetView> {
+    const asset = await this.loadAsset(id, { includeUsage: true });
+    return this.toAssetView(asset);
+  }
+
+  async updateAsset(
+    id: string,
+    payload: MediaUpdateBody,
+    actor: MediaActionContext,
+  ): Promise<MediaAssetView> {
+    const asset = await this.loadAsset(id, { includeUsage: true });
+    assertOwnerOrPrivileged(asset, actor);
+
+    const data: Prisma.MediaAssetUpdateInput = {};
+    if (payload.folder) {
+      data.folder = payload.folder;
+    }
+    if (payload.tags) {
+      data.tags = payload.tags;
+    }
+    if (payload.metadata !== undefined) {
+      data.metadata = payload.metadata;
+    }
+
+    if (Object.keys(data).length > 0) {
+      await this.repository.updateMetadata(id, data);
+    }
+
+    const refreshed = await this.loadAsset(id, { includeUsage: true });
+    return this.toAssetView(refreshed);
+  }
+
+  async regenerateAsset(id: string, actor: MediaActionContext): Promise<MediaAssetView> {
+    const asset = await this.loadAsset(id, { includeUsage: true });
+    assertPrivilegedActor(actor);
+
+    const response = await this.cloudinary.regenerateAsset(asset.publicId, {
+      resourceType: resolveResourceType(asset.resourceType),
+      type: resolveAssetType(asset.type),
+      invalidate: true,
+    });
+
+    await this.repository.updateMetadata(id, {
+      version: response.version ?? asset.version,
+      width: response.width ?? asset.width ?? undefined,
+      height: response.height ?? asset.height ?? undefined,
+      bytes: response.bytes ?? asset.bytes,
+      url: response.url ?? asset.url,
+      secureUrl: response.secure_url ?? asset.secureUrl,
+      format: response.format ?? asset.format,
+    });
+
+    const refreshed = await this.loadAsset(id, { includeUsage: true });
+    return this.toAssetView(refreshed, response);
+  }
+
+  async softDeleteAsset(id: string, actor: MediaActionContext): Promise<MediaAssetView> {
+    const asset = await this.loadAsset(id, { includeUsage: true });
+    assertPrivilegedActor(actor);
+    assertAssetNotInUse(asset);
+
+    await this.repository.softDeleteAsset(id);
+    const deleted = await this.loadAsset(id, { includeUsage: true, includeDeleted: true });
+    return this.toAssetView(deleted);
+  }
+
+  async hardDeleteAsset(id: string, actor: MediaActionContext): Promise<MediaAssetView> {
+    const asset = await this.loadAsset(id, { includeUsage: true, includeDeleted: true });
+    assertPrivilegedActor(actor);
+
+    if (!asset.deletedAt) {
+      throw new ApiError("Media asset must be soft deleted before permanent removal.", {
+        status: 409,
+        code: "CONFLICT",
+      });
+    }
+
+    assertAssetNotInUse(asset);
+
+    await this.cloudinary.deleteAsset(asset.publicId, {
+      resourceType: resolveResourceType(asset.resourceType),
+      invalidate: true,
+    });
+
+    await this.repository.forceDeleteAsset(id);
+    return this.toAssetView(asset);
   }
 
   async upload(files: PreparedUploadFile[], context: UploadContext): Promise<MediaUploadResult> {
@@ -341,6 +630,59 @@ export class MediaService {
       tags: payload.tags,
       eager: payload.eager,
     });
+  }
+
+  private async loadAsset(
+    id: string,
+    options: { includeUsage?: boolean; includeDeleted?: boolean } = {},
+  ): Promise<MediaAssetWithUsage> {
+    const args: Omit<Prisma.MediaAssetFindFirstArgs, "where"> | undefined = options.includeUsage
+      ? { include: MEDIA_USAGE_INCLUDE }
+      : undefined;
+
+    const record = options.includeDeleted
+      ? await this.repository.getByIdIncludingDeleted(id, args)
+      : await this.repository.getById(id, args);
+
+    if (!record) {
+      throw new ApiError("Media asset not found.", {
+        status: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    return record as MediaAssetWithUsage;
+  }
+
+  private toAssetView(
+    record: MediaAssetWithUsage,
+    uploadResult?: UploadApiResponse,
+  ): MediaAssetView {
+    const transformations = uploadResult
+      ? buildTransformationMap(uploadResult, this.cloudinary, this.config)
+      : buildTransformationMapFromAsset(record, this.cloudinary, this.config);
+
+    return {
+      id: record.id,
+      publicId: record.publicId,
+      folder: record.folder,
+      format: record.format,
+      width: record.width ?? undefined,
+      height: record.height ?? undefined,
+      bytes: record.bytes,
+      url: record.url,
+      secureUrl: record.secureUrl,
+      metadata: normaliseRecordMetadata(record.metadata ?? undefined),
+      resourceType: record.resourceType,
+      type: record.type,
+      tags: record.tags,
+      version: record.version,
+      transformations,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      deletedAt: record.deletedAt ?? undefined,
+      usage: mapUsage(record),
+    };
   }
 
   private async processSingleUpload(file: PreparedUploadFile, context: UploadContext) {
@@ -453,8 +795,9 @@ export class MediaService {
       bytes: record.bytes,
       url: record.url,
       secureUrl: record.secureUrl,
-      metadata: record.metadata as Record<string, unknown> | undefined,
+      metadata: normaliseRecordMetadata(record.metadata ?? undefined),
       resourceType: record.resourceType,
+      type: record.type,
       tags: record.tags,
       version: record.version,
       transformations,
@@ -486,9 +829,12 @@ export const mediaServiceInternals = {
   normaliseTags,
   resolveMimeExtension,
   buildTransformationMap,
+  buildTransformationMapFromAsset,
   extractDominantColor,
   calculateAspectRatio,
   normaliseMetadataValues,
+  normaliseRecordMetadata,
+  mapUsage,
   buildPersistenceMetadata,
   ensureMimeTypeSupported,
   enforceFileSizeLimit,

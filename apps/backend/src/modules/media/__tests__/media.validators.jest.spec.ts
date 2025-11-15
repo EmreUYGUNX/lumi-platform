@@ -4,7 +4,9 @@ import { createTestConfig } from "../../../testing/config.js";
 import {
   IMAGE_MIME_WHITELIST,
   createMediaSignatureSchema,
+  createMediaUpdateSchema,
   createMediaUploadSchema,
+  mediaListQuerySchema,
 } from "../media.validators.js";
 
 const config = createTestConfig();
@@ -17,6 +19,11 @@ describe("media.validators", () => {
   });
 
   const signatureSchema = createMediaSignatureSchema({
+    allowedFolders,
+    defaultFolder: config.media.cloudinary.folders.products,
+  });
+
+  const updateSchema = createMediaUpdateSchema({
     allowedFolders,
     defaultFolder: config.media.cloudinary.folders.products,
   });
@@ -103,5 +110,34 @@ describe("media.validators", () => {
   it("confirms MIME whitelist contains expected formats", () => {
     expect(IMAGE_MIME_WHITELIST.get("image/png")).toEqual({ extension: "png" });
     expect(IMAGE_MIME_WHITELIST.has("image/webp")).toBe(true);
+  });
+
+  it("parses list queries with tag filtering and pagination", () => {
+    const query = mediaListQuerySchema.parse({
+      page: "2",
+      perPage: "10",
+      tags: "primary,hero",
+      productId: "ckv1234567890abcd12345678",
+      includeDeleted: "true",
+    });
+
+    expect(query.page).toBe(2);
+    expect(query.perPage).toBe(10);
+    expect(query.tags).toEqual(["primary", "hero"]);
+    expect(query.includeDeleted).toBe(true);
+  });
+
+  it("validates update payloads against allowed folders", () => {
+    const result = updateSchema.parse({
+      tags: [" hero "],
+      metadata: { featured: true },
+    });
+    expect(result.tags).toEqual(["hero"]);
+
+    expect(() =>
+      updateSchema.parse({
+        folder: "secret",
+      }),
+    ).toThrow(/Folder is not allowed/);
   });
 });

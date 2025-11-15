@@ -1,14 +1,43 @@
+import { createHash } from "node:crypto";
+
 import type { Request, RequestHandler, Response } from "express";
 
 import { asyncHandler } from "@/lib/asyncHandler.js";
 import { UnauthorizedError, ValidationError } from "@/lib/errors.js";
-import { successResponse } from "@/lib/response.js";
+import { paginatedResponse, successResponse } from "@/lib/response.js";
 import type { ApplicationConfig } from "@lumi/types";
 
-import type { MediaService, MediaUploadResult, PreparedUploadFile } from "./media.service.js";
-import { createMediaSignatureSchema, createMediaUploadSchema } from "./media.validators.js";
+import type {
+  MediaActionContext,
+  MediaService,
+  MediaUploadResult,
+  PreparedUploadFile,
+} from "./media.service.js";
+import {
+  createMediaSignatureSchema,
+  createMediaUpdateSchema,
+  createMediaUploadSchema,
+  mediaIdParamSchema,
+  mediaListQuerySchema,
+} from "./media.validators.js";
 
 const MAX_FILES_PER_REQUEST = 10;
+
+const AUTH_REQUIRED_MESSAGE = "Authentication required.";
+
+const computeEtag = (payload: unknown): string =>
+  createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const resolveActorContext = (req: Request): MediaActionContext => {
+  if (!req.user) {
+    throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
+  }
+
+  return {
+    userId: req.user.id,
+    roles: (req.user.roles ?? []).map((role) => role.name.toLowerCase()),
+  };
+};
 
 const normaliseFiles = (input: unknown): Express.Multer.File[] => {
   if (!input) {
@@ -56,15 +85,31 @@ export interface MediaControllerOptions {
 }
 
 export class MediaController {
+  public readonly list: RequestHandler;
+
+  public readonly get: RequestHandler;
+
   public readonly upload: RequestHandler;
 
   public readonly signature: RequestHandler;
+
+  public readonly update: RequestHandler;
+
+  public readonly regenerate: RequestHandler;
+
+  public readonly softDelete: RequestHandler;
+
+  public readonly hardDelete: RequestHandler;
 
   private readonly service: MediaService;
 
   private readonly uploadSchema: ReturnType<typeof createMediaUploadSchema>;
 
   private readonly signatureSchema: ReturnType<typeof createMediaSignatureSchema>;
+
+  private readonly updateSchema: ReturnType<typeof createMediaUpdateSchema>;
+
+  private readonly auditEntity: string;
 
   constructor(options: MediaControllerOptions) {
     this.service = options.service;
@@ -81,13 +126,71 @@ export class MediaController {
       defaultFolder: options.config.media.cloudinary.folders.products,
     });
 
+    this.updateSchema = createMediaUpdateSchema({
+      allowedFolders: folders,
+      defaultFolder: options.config.media.cloudinary.folders.products,
+    });
+
+    this.auditEntity = this.service.getAuditEntity();
+
+    this.list = asyncHandler(this.handleList.bind(this));
+    this.get = asyncHandler(this.handleGet.bind(this));
     this.upload = asyncHandler(this.handleUpload.bind(this));
     this.signature = asyncHandler(this.handleSignature.bind(this));
+    this.update = asyncHandler(this.handleUpdate.bind(this));
+    this.regenerate = asyncHandler(this.handleRegenerate.bind(this));
+    this.softDelete = asyncHandler(this.handleSoftDelete.bind(this));
+    this.hardDelete = asyncHandler(this.handleHardDelete.bind(this));
+  }
+
+  private async handleList(req: Request, res: Response): Promise<void> {
+    const query = mediaListQuerySchema.parse(req.query ?? {});
+    const result = await this.service.listAssets(query);
+
+    const etagPayload = {
+      meta: result.meta,
+      updatedAt: result.items.map((item) => item.updatedAt.getTime()),
+    };
+    const etag = computeEtag(etagPayload);
+
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, max-age=300");
+
+    res.json(
+      paginatedResponse(result.items, {
+        totalItems: result.meta.totalItems,
+        page: result.meta.page,
+        pageSize: result.meta.pageSize,
+        totalPages: result.meta.totalPages,
+        hasNextPage: result.meta.hasNextPage,
+        hasPreviousPage: result.meta.hasPreviousPage,
+      }),
+    );
+  }
+
+  private async handleGet(req: Request, res: Response): Promise<void> {
+    const assetId = mediaIdParamSchema.parse(req.params.id);
+    const asset = await this.service.getAsset(assetId);
+
+    const etag = computeEtag({ id: asset.id, updatedAt: asset.updatedAt.getTime() });
+    if (req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.json(successResponse(asset));
   }
 
   private async handleUpload(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const rawFiles = normaliseFiles((req as Request & { files?: unknown }).files);
@@ -127,12 +230,70 @@ export class MediaController {
 
   private async handleSignature(req: Request, res: Response): Promise<void> {
     if (!req.user) {
-      throw new UnauthorizedError("Authentication required.");
+      throw new UnauthorizedError(AUTH_REQUIRED_MESSAGE);
     }
 
     const payload = this.signatureSchema.parse(req.body);
 
     const signature = await this.service.generateUploadSignature(payload);
     res.json(successResponse(signature));
+  }
+
+  private async handleUpdate(req: Request, res: Response): Promise<void> {
+    const assetId = mediaIdParamSchema.parse(req.params.id);
+    const actor = resolveActorContext(req);
+    const body = this.updateSchema.parse(req.body ?? {});
+    const asset = await this.service.updateAsset(assetId, body, actor);
+
+    res.locals.audit = {
+      entity: this.auditEntity,
+      entityId: asset.id,
+      action: "media.assets.update",
+      after: body,
+    };
+
+    res.json(successResponse(asset));
+  }
+
+  private async handleRegenerate(req: Request, res: Response): Promise<void> {
+    const assetId = mediaIdParamSchema.parse(req.params.id);
+    const actor = resolveActorContext(req);
+    const asset = await this.service.regenerateAsset(assetId, actor);
+
+    res.locals.audit = {
+      entity: this.auditEntity,
+      entityId: asset.id,
+      action: "media.assets.regenerate",
+    };
+
+    res.json(successResponse(asset));
+  }
+
+  private async handleSoftDelete(req: Request, res: Response): Promise<void> {
+    const assetId = mediaIdParamSchema.parse(req.params.id);
+    const actor = resolveActorContext(req);
+    const asset = await this.service.softDeleteAsset(assetId, actor);
+
+    res.locals.audit = {
+      entity: this.auditEntity,
+      entityId: asset.id,
+      action: "media.assets.soft-delete",
+    };
+
+    res.json(successResponse(asset));
+  }
+
+  private async handleHardDelete(req: Request, res: Response): Promise<void> {
+    const assetId = mediaIdParamSchema.parse(req.params.id);
+    const actor = resolveActorContext(req);
+    const asset = await this.service.hardDeleteAsset(assetId, actor);
+
+    res.locals.audit = {
+      entity: this.auditEntity,
+      entityId: asset.id,
+      action: "media.assets.hard-delete",
+    };
+
+    res.json(successResponse(asset));
   }
 }

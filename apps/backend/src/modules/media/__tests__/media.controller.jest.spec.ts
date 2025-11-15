@@ -13,6 +13,10 @@ const config = createTestConfig();
 const createMockResponse = () => {
   const res = {
     json: jest.fn().mockImplementation((payload) => payload),
+    setHeader: jest.fn(),
+    status: jest.fn().mockReturnThis(),
+    end: jest.fn(),
+    locals: {},
   } as Partial<Response>;
   return res as Response;
 };
@@ -31,6 +35,28 @@ const createExpressFile = (): Express.Multer.File =>
     stream: undefined,
   }) as unknown as Express.Multer.File;
 
+const buildAssetView = () => ({
+  id: "cktestasset000000000000000",
+  publicId: "lumi/products/demo",
+  folder: "lumi/products",
+  format: "png",
+  width: 800,
+  height: 600,
+  bytes: 1024,
+  url: "http://cdn/image.jpg",
+  secureUrl: "https://cdn/image.jpg",
+  metadata: {},
+  resourceType: "image",
+  type: "upload",
+  tags: ["hero"],
+  version: 1,
+  transformations: {},
+  createdAt: new Date("2025-01-01T00:00:00Z"),
+  updatedAt: new Date("2025-01-02T00:00:00Z"),
+  deletedAt: undefined,
+  usage: { products: [], variants: [] },
+});
+
 describe("media.controller", () => {
   let service: jest.Mocked<MediaService>;
   let controller: MediaController;
@@ -39,6 +65,13 @@ describe("media.controller", () => {
     service = {
       upload: jest.fn(),
       generateUploadSignature: jest.fn(),
+      listAssets: jest.fn(),
+      getAsset: jest.fn(),
+      updateAsset: jest.fn(),
+      regenerateAsset: jest.fn(),
+      softDeleteAsset: jest.fn(),
+      hardDeleteAsset: jest.fn(),
+      getAuditEntity: jest.fn().mockReturnValue("media.assets"),
     } as unknown as jest.Mocked<MediaService>;
     controller = new MediaController({
       service,
@@ -67,6 +100,7 @@ describe("media.controller", () => {
           secureUrl: "https://example.com",
           metadata: {},
           resourceType: "image",
+          type: "upload",
           tags: ["hero"],
           version: 1,
           transformations: {},
@@ -118,6 +152,7 @@ describe("media.controller", () => {
           secureUrl: "https://example.com/success",
           metadata: {},
           resourceType: "image",
+          type: "upload",
           tags: ["hero"],
           version: 1,
           transformations: {},
@@ -229,5 +264,138 @@ describe("media.controller", () => {
       expect.objectContaining({ folder: config.media.cloudinary.folders.products }),
     );
     expect(res.json).toHaveBeenCalled();
+  });
+
+  it("lists media assets with pagination metadata and caching headers", async () => {
+    const asset = buildAssetView();
+    service.listAssets.mockResolvedValue({
+      items: [asset],
+      meta: {
+        totalItems: 1,
+        page: 1,
+        pageSize: 25,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    });
+
+    const req = {
+      query: { page: "1" },
+      headers: {},
+    } as unknown as Request;
+
+    const res = createMockResponse();
+
+    await controller.list(req, res, jest.fn());
+    expect(service.listAssets).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }));
+    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "private, max-age=300");
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: expect.arrayContaining([asset]),
+      }),
+    );
+  });
+
+  it("returns asset detail with cache headers", async () => {
+    const asset = buildAssetView();
+    service.getAsset.mockResolvedValue(asset);
+    const req = {
+      params: { id: asset.id },
+      headers: {},
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.get(req, res, jest.fn());
+
+    expect(service.getAsset).toHaveBeenCalledWith(asset.id);
+    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "private, max-age=300");
+    expect(res.json).toHaveBeenCalledWith(successResponse(asset));
+  });
+
+  it("updates asset metadata and records audit trail", async () => {
+    const asset = buildAssetView();
+    service.updateAsset.mockResolvedValue(asset);
+    const req = {
+      params: { id: asset.id },
+      body: { tags: ["hero"] },
+      user: { id: "user_1", roles: [{ name: "admin" }] },
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.update(req, res, jest.fn());
+
+    expect(service.updateAsset).toHaveBeenCalledWith(
+      asset.id,
+      { tags: ["hero"] },
+      {
+        userId: "user_1",
+        roles: ["admin"],
+      },
+    );
+    expect(res.locals.audit).toMatchObject({
+      entity: "media.assets",
+      entityId: asset.id,
+      action: "media.assets.update",
+    });
+    expect(res.json).toHaveBeenCalledWith(successResponse(asset));
+  });
+
+  it("regenerates asset transformations", async () => {
+    const asset = buildAssetView();
+    service.regenerateAsset.mockResolvedValue(asset);
+    const req = {
+      params: { id: asset.id },
+      user: { id: "user_1", roles: [{ name: "admin" }] },
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.regenerate(req, res, jest.fn());
+
+    expect(service.regenerateAsset).toHaveBeenCalledWith(asset.id, {
+      userId: "user_1",
+      roles: ["admin"],
+    });
+    expect(res.locals.audit).toMatchObject({ action: "media.assets.regenerate" });
+    expect(res.json).toHaveBeenCalledWith(successResponse(asset));
+  });
+
+  it("soft deletes assets and returns the deleted record", async () => {
+    const asset = buildAssetView();
+    service.softDeleteAsset.mockResolvedValue({ ...asset, deletedAt: new Date() });
+    const req = {
+      params: { id: asset.id },
+      user: { id: "user_1", roles: [{ name: "staff" }] },
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.softDelete(req, res, jest.fn());
+
+    expect(service.softDeleteAsset).toHaveBeenCalledWith(asset.id, {
+      userId: "user_1",
+      roles: ["staff"],
+    });
+    expect(res.locals.audit).toMatchObject({ action: "media.assets.soft-delete" });
+    expect(res.json).toHaveBeenCalled();
+  });
+
+  it("hard deletes assets and records audit metadata", async () => {
+    const asset = buildAssetView();
+    service.hardDeleteAsset.mockResolvedValue(asset);
+    const req = {
+      params: { id: asset.id },
+      user: { id: "user_1", roles: [{ name: "admin" }] },
+    } as unknown as Request;
+
+    const res = createMockResponse();
+    await controller.hardDelete(req, res, jest.fn());
+
+    expect(service.hardDeleteAsset).toHaveBeenCalledWith(asset.id, {
+      userId: "user_1",
+      roles: ["admin"],
+    });
+    expect(res.locals.audit).toMatchObject({ action: "media.assets.hard-delete" });
+    expect(res.json).toHaveBeenCalledWith(successResponse(asset));
   });
 });

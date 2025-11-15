@@ -19,12 +19,15 @@ export interface MediaListFilters {
   productId?: string;
   productVariantId?: string;
   tag?: string;
+  tags?: string[];
+  resourceType?: string;
   search?: string;
   includeDeleted?: boolean;
 }
 
 const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWhereInput => {
-  const { uploadedById, folder, productId, productVariantId, tag, search } = filters;
+  const { uploadedById, folder, productId, productVariantId, tag, tags, resourceType, search } =
+    filters;
   const where: Prisma.MediaAssetWhereInput = {};
 
   if (uploadedById) {
@@ -33,6 +36,10 @@ const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWher
 
   if (folder) {
     where.folder = { equals: folder, mode: "insensitive" };
+  }
+
+  if (resourceType) {
+    where.resourceType = { equals: resourceType, mode: "insensitive" };
   }
 
   if (productId) {
@@ -51,9 +58,13 @@ const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWher
     };
   }
 
-  if (tag) {
+  const resolvedTags = [...new Set([...(tags ?? []), ...(tag ? [tag] : [])])].filter(
+    (entry) => entry && entry.length > 0,
+  );
+
+  if (resolvedTags.length > 0) {
     where.tags = {
-      has: tag,
+      hasEvery: resolvedTags,
     };
   }
 
@@ -115,6 +126,19 @@ export class MediaRepository extends BaseRepository<
     args?: Omit<Prisma.MediaAssetFindFirstArgs, "where">,
   ): Promise<MediaAsset | null> {
     return (await this.findById(id, args)) as MediaAsset | null;
+  }
+
+  async getByIdIncludingDeleted(
+    id: string,
+    args?: Omit<Prisma.MediaAssetFindFirstArgs, "where">,
+  ): Promise<MediaAsset | null> {
+    const baseArgs = args ? { ...(args as Record<string, unknown>) } : {};
+    return (await this.executeOperation("findByIdIncludingDeleted", () =>
+      this.delegate.findFirst({
+        ...baseArgs,
+        where: { id },
+      }),
+    )) as MediaAsset | null;
   }
 
   async findByPublicId(publicId: string): Promise<MediaAsset | null> {
@@ -211,5 +235,11 @@ export class MediaRepository extends BaseRepository<
       },
       take: Math.max(1, Math.min(limit, 200)),
     })) as MediaAsset[];
+  }
+
+  async forceDeleteAsset(id: string): Promise<MediaAsset> {
+    return (await this.executeOperation("forceDelete", () =>
+      this.prisma.mediaAsset.delete({ where: { id } }),
+    )) as MediaAsset;
   }
 }
