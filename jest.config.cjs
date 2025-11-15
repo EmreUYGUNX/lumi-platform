@@ -1,8 +1,8 @@
 const coverageIgnorePatterns = [
-  "<rootDir>/apps/frontend/src/features/media",
-  "<rootDir>/apps/frontend/src/components/ui/image",
-  "<rootDir>/apps/frontend/src/lib/cloudinary.ts",
-  "<rootDir>/apps/frontend/src/lib/image-loader.ts"
+  "/apps/frontend/src/features/media/",
+  "/apps/frontend/src/components/ui/image/",
+  "/apps/frontend/src/lib/cloudinary\\.ts$",
+  "/apps/frontend/src/lib/image-loader\\.ts$"
 ];
 
 module.exports = {
