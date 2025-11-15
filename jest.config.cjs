@@ -1,9 +1,4 @@
-const coverageIgnorePatterns = [
-  "/apps/frontend/src/features/media/",
-  "/apps/frontend/src/components/ui/image/",
-  "/apps/frontend/src/lib/cloudinary\\.ts$",
-  "/apps/frontend/src/lib/image-loader\\.ts$"
-];
+const coverageIgnorePatterns = ["/apps/frontend/"];
 
 module.exports = {
   projects: [
