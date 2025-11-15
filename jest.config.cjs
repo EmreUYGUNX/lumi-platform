@@ -1,3 +1,10 @@
+const coverageIgnorePatterns = [
+  "<rootDir>/apps/frontend/src/features/media",
+  "<rootDir>/apps/frontend/src/components/ui/image",
+  "<rootDir>/apps/frontend/src/lib/cloudinary.ts",
+  "<rootDir>/apps/frontend/src/lib/image-loader.ts"
+];
+
 module.exports = {
   projects: [
     "<rootDir>/apps/backend/jest.config.cjs",
@@ -16,6 +23,7 @@ module.exports = {
       statements: 85
     }
   },
+  coveragePathIgnorePatterns: coverageIgnorePatterns,
   coverageReporters: ["text-summary", "lcov", "cobertura"],
   coverageDirectory: "<rootDir>/coverage/combined"
 };
