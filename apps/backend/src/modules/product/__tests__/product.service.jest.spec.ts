@@ -2,7 +2,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Prisma, ProductStatus } from "@prisma/client";
 
-import { NotFoundError } from "@/lib/errors.js";
+import { NotFoundError, ValidationError } from "@/lib/errors.js";
 import type { CursorPaginatedResult, PaginatedResult } from "@/lib/repository/base.repository.js";
 import type { ProductWithRelations } from "@lumi/shared/dto";
 
@@ -401,6 +401,129 @@ describe("ProductService", () => {
       }),
     });
     expect(repository.searchWithCursor).toHaveBeenCalled();
+  });
+
+  it("validates attribute filters and maps parsed attributes", async () => {
+    const baseMeta = {
+      page: 1,
+      pageSize: 24,
+      totalItems: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    };
+
+    const searchMock = jest.fn<RepositorySearch>().mockResolvedValue({ items: [], meta: baseMeta });
+
+    const repository = createRepository({ search: searchMock });
+    const service = new ProductService(repository as never);
+
+    await expect(
+      service.search({
+        attributes: "{invalid-json",
+      }),
+    ).rejects.toThrow("Attribute filters must be valid JSON.");
+
+    await expect(
+      service.search({
+        attributes: 42,
+      }),
+    ).rejects.toThrow("Attribute filters must be an object.");
+
+    await service.search({
+      attributes: JSON.stringify({
+        colour: "matte-black",
+        sizes: ["S", "M"],
+      }),
+    });
+
+    expect(searchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attributes: {
+          colour: "matte-black",
+          sizes: ["S", "M"],
+        },
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("derives sanitized filters when input already contains filter objects", async () => {
+    const cursorPayload = { id: "ckproductcursor000000000000", createdAt: "2024-02-01T00:00:00Z" };
+    const cursorToken = Buffer.from(JSON.stringify(cursorPayload), "utf8").toString("base64url");
+
+    const searchWithCursorMock = jest.fn<RepositorySearchWithCursor>().mockResolvedValue({
+      items: [],
+      hasMore: true,
+      nextCursor: { after: "cursor" },
+    });
+
+    const repository = createRepository({
+      searchWithCursor: searchWithCursorMock,
+    });
+
+    const service = new ProductService(repository as never);
+
+    await service.search({
+      filter: {
+        search: "Lumen",
+        cursor: cursorToken,
+        take: 50,
+        includeDeleted: false,
+      },
+    });
+
+    expect(searchWithCursorMock).toHaveBeenCalledTimes(1);
+    const [filters, options] = searchWithCursorMock.mock.calls[0] ?? [];
+    expect(filters).toMatchObject({ term: "Lumen" });
+    expect(filters).not.toHaveProperty("cursor");
+    expect(options).toMatchObject({
+      cursor: cursorPayload,
+      take: 50,
+    });
+  });
+
+  it("expands pagination page size when cursor take is provided without cursor tokens", async () => {
+    const searchMock = jest.fn<RepositorySearch>().mockResolvedValue({
+      items: [],
+      meta: {
+        page: 1,
+        pageSize: 50,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    });
+
+    const repository = createRepository({ search: searchMock });
+    const service = new ProductService(repository as never);
+
+    await service.search({
+      filter: {
+        take: 50,
+      },
+      pagination: {
+        pageSize: 25,
+      },
+    });
+
+    const [, options] = searchMock.mock.calls.at(-1) ?? [];
+    expect(options).toMatchObject({
+      pageSize: 50,
+    });
+  });
+
+  it("validates pagination payloads and rejects invalid page numbers", async () => {
+    const repository = createRepository();
+    const service = new ProductService(repository as never);
+
+    await expect(
+      service.search({
+        page: 0,
+        pageSize: -5,
+      }),
+    ).rejects.toThrow(ValidationError);
   });
 });
 

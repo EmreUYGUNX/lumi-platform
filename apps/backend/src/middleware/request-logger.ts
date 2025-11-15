@@ -171,3 +171,12 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
 
   next();
 };
+
+export const requestLoggerInternals = {
+  maskSensitive,
+  resolveLogLevel,
+  isAdminRoute,
+  isMutationMethod,
+  resolveAuditEntity,
+  sanitiseForLog,
+};

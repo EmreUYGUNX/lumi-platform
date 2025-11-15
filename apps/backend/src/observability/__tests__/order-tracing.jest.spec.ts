@@ -1,98 +1,108 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 import { traceOrderOperation } from "../order-tracing.js";
+import { getSentryInstance, isSentryEnabled } from "../sentry.js";
 
-jest.mock("../sentry.js", () => {
-  const spanMock = {
-    setAttribute: jest.fn().mockReturnThis(),
-    setStatus: jest.fn().mockReturnThis(),
-    end: jest.fn(),
-  };
+jest.mock("../sentry.js", () => ({
+  isSentryEnabled: jest.fn(),
+  getSentryInstance: jest.fn(),
+}));
 
-  const startSpan = jest.fn((_context: unknown, callback: (span: typeof spanMock) => unknown) =>
-    callback(spanMock),
-  );
+const isSentryEnabledMock = isSentryEnabled as jest.MockedFunction<typeof isSentryEnabled>;
+const getSentryInstanceMock = getSentryInstance as jest.MockedFunction<typeof getSentryInstance>;
 
-  return {
-    getSentryInstance: jest.fn(() => ({
-      startSpan,
-    })),
-    isSentryEnabled: jest.fn(() => true),
-    __mocks: {
-      spanMock,
-      startSpan,
-    },
-  };
-});
+interface MockSpan {
+  setStatus: jest.Mock;
+  setAttribute: jest.Mock;
+  end: jest.Mock;
+}
 
-const { isSentryEnabled, __mocks: sentryMocks } = jest.requireMock("../sentry.js") as {
-  isSentryEnabled: jest.Mock;
-  __mocks: {
-    spanMock: {
-      setAttribute: jest.Mock;
-      setStatus: jest.Mock;
-      end: jest.Mock;
-    };
-    startSpan: jest.Mock;
-  };
-};
-
-describe("traceOrderOperation", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    isSentryEnabled.mockReturnValue(true);
-  });
-
-  it("executes the handler immediately when Sentry is disabled", async () => {
-    isSentryEnabled.mockReturnValue(false);
-
-    const handler = jest.fn(async () => "ok");
-    const result = await traceOrderOperation("create", { userId: "user-1" }, handler);
-
-    expect(result).toBe("ok");
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(sentryMocks.startSpan).not.toHaveBeenCalled();
-  });
-
-  it("records attributes and marks the span as successful", async () => {
+describe("order tracing", () => {
+  it("executes operation immediately when Sentry is disabled", async () => {
+    isSentryEnabledMock.mockReturnValue(false);
     const result = await traceOrderOperation(
-      "create",
-      { userId: "user-1", cartId: "cart-9" },
+      "checkout",
+      { orderId: "ord_1" },
       async ({ setContext }) => {
-        setContext({ orderId: "order-123", reference: "REF-001" });
-        return "success";
+        setContext({ operationStage: "payment" });
+        return "ok";
       },
     );
 
-    expect(result).toBe("success");
-    expect(sentryMocks.startSpan).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "order.create",
-        op: "order",
-        attributes: { "order.operation": "create" },
-      }),
-      expect.any(Function),
-    );
-    expect(sentryMocks.spanMock.setAttribute).toHaveBeenCalledWith("order.id", "order-123");
-    expect(sentryMocks.spanMock.setAttribute).toHaveBeenCalledWith("order.reference", "REF-001");
-    expect(sentryMocks.spanMock.setStatus).toHaveBeenCalledWith({ code: 1 });
-    expect(sentryMocks.spanMock.end).toHaveBeenCalledTimes(1);
+    expect(result).toBe("ok");
+    expect(getSentryInstanceMock).not.toHaveBeenCalled();
   });
 
-  it("marks the span as failed and rethrows errors", async () => {
-    const error = new Error("payment failed");
+  it("captures span attributes and errors when Sentry is enabled", async () => {
+    isSentryEnabledMock.mockReturnValue(true);
+
+    const errorSpan: MockSpan = {
+      setStatus: jest.fn(),
+      setAttribute: jest.fn(),
+      end: jest.fn(),
+    };
+
+    const startSpan = async (
+      _options: unknown,
+      callback: (span: MockSpan) => Promise<void>,
+    ): Promise<void> => callback(errorSpan);
+
+    getSentryInstanceMock.mockReturnValue({
+      startSpan,
+    } as never);
 
     await expect(
-      traceOrderOperation("refund", { orderId: "order-x" }, async () => {
-        throw error;
-      }),
-    ).rejects.toThrow("payment failed");
+      traceOrderOperation(
+        "fulfill",
+        { orderId: "ord_1", cartId: "cart_2" },
+        async ({ setContext }) => {
+          setContext({ reference: "REF-1" });
+          throw new Error("fulfillment failure");
+        },
+      ),
+    ).rejects.toThrow("fulfillment failure");
 
-    expect(sentryMocks.spanMock.setStatus).toHaveBeenCalledWith({
+    expect(errorSpan.setStatus).toHaveBeenCalledWith({
       code: 2,
-      message: "payment failed",
+      message: "fulfillment failure",
     });
-    expect(sentryMocks.spanMock.setAttribute).toHaveBeenCalledWith("order.error", true);
-    expect(sentryMocks.spanMock.end).toHaveBeenCalledTimes(1);
+    expect(errorSpan.setAttribute).toHaveBeenCalledWith("order.error", true);
+    expect(errorSpan.setAttribute).toHaveBeenCalledWith(
+      "order.error_message",
+      "fulfillment failure",
+    );
+    expect(errorSpan.setAttribute).toHaveBeenCalledWith("order.id", "ord_1");
+    expect(errorSpan.setAttribute).toHaveBeenCalledWith("order.cart_id", "cart_2");
+    expect(errorSpan.setAttribute).toHaveBeenCalledWith("order.reference", "REF-1");
+    expect(errorSpan.end).toHaveBeenCalled();
+  });
+
+  it("marks spans as successful when no errors occur", async () => {
+    isSentryEnabledMock.mockReturnValue(true);
+
+    const successSpan: MockSpan = {
+      setStatus: jest.fn(),
+      setAttribute: jest.fn(),
+      end: jest.fn(),
+    };
+
+    getSentryInstanceMock.mockReturnValue({
+      startSpan: async (_options: unknown, callback: (span: MockSpan) => Promise<void>) =>
+        callback(successSpan),
+    } as never);
+
+    const result = await traceOrderOperation(
+      "ship",
+      { orderId: "ord_2" },
+      async ({ setContext }) => {
+        setContext({ operationStage: "dispatch" });
+        return "done";
+      },
+    );
+
+    expect(result).toBe("done");
+    expect(successSpan.setStatus).toHaveBeenCalledWith({ code: 1 });
+    expect(successSpan.setAttribute).toHaveBeenCalledWith("order.operation_stage", "dispatch");
+    expect(successSpan.end).toHaveBeenCalled();
   });
 });

@@ -174,6 +174,28 @@ describe("rate limiter middleware", () => {
     expect(third.body.success).toBe(true);
   });
 
+  it("supports custom key generators for user-scoped throttling", async () => {
+    const { createRateLimiter } = await import("../rate-limiter.js");
+    const app = express();
+    app.use(responseFormatter);
+    app.use(
+      createRateLimiter({
+        identifier: "media-upload",
+        max: 1,
+        windowSeconds: 60,
+        keyGenerator: (req) => req.header("x-test-user") ?? undefined,
+      }),
+    );
+    app.get("/resource", respondOk);
+
+    const agent = createApiClient(app);
+    await agent.get("/resource").set("X-Test-User", "user-a").expect(200);
+    await agent.get("/resource").set("X-Test-User", "user-a").expect(429);
+    // Different user should have its own bucket
+    const otherUser = await agent.get("/resource").set("X-Test-User", "user-b").expect(200);
+    expect(otherUser.body.success).toBe(true);
+  });
+
   it("does not enforce limits when disabled", async () => {
     const mockConfig = getMockConfig();
     mockConfig.security.rateLimit.enabled = false;

@@ -130,6 +130,13 @@ const escapeCsvValue = (value: string | number | boolean): string => {
   return `"${raw.replaceAll('"', '""')}"`;
 };
 
+export const userServiceInternals = {
+  buildAddressCreatePayload,
+  buildAddressUpdatePayload,
+  buildAdminUserWhereClause,
+  escapeCsvValue,
+};
+
 export interface UserProfileResult {
   user: UserDetailDTO;
   addresses: AddressDTO[];

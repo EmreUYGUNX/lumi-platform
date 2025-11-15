@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+
 import { parse } from "yaml";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +88,7 @@ const allowedPatterns = [
   /^jsonpath-plus$/,
   /^layout-base$/,
   /^media-typer$/,
+  /^mkdirp$/,
   /^lines-and-columns$/,
   /^locate-path$/,
   /^local-pkg$/,

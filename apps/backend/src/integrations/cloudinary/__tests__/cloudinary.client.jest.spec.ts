@@ -46,6 +46,7 @@ jest.mock("cloudinary", () => {
   const destroy = jest.fn();
   const url = jest.fn(() => "https://res.cloudinary.com/lumi-test/image/upload/sample");
   const config = jest.fn();
+  const apiSignRequest = jest.fn(() => "mock-signature");
 
   return {
     v2: {
@@ -55,6 +56,12 @@ jest.mock("cloudinary", () => {
       },
       url,
       config,
+      utils: {
+        api_sign_request: apiSignRequest,
+      },
+    },
+    utils: {
+      api_sign_request: apiSignRequest,
     },
   };
 });
@@ -62,6 +69,7 @@ jest.mock("cloudinary", () => {
 const uploadMock = jest.mocked(cloudinaryV2.uploader.upload);
 const destroyMock = jest.mocked(cloudinaryV2.uploader.destroy);
 const urlMock = jest.mocked(cloudinaryV2.url);
+const signMock = jest.mocked(cloudinaryV2.utils.api_sign_request);
 const configMock = jest.mocked(cloudinaryV2.config);
 
 interface ConfigModuleMock {
@@ -171,6 +179,32 @@ describe("CloudinaryClient", () => {
         ],
       }),
     );
+  });
+
+  it("generates upload signatures with folder overrides and metadata", () => {
+    const client = new CloudinaryClient();
+
+    const result = client.generateUploadSignature({
+      folder: "lumi/banners",
+      tags: ["product:123", "primary"],
+    });
+
+    expect(result.folder).toBe("lumi/banners");
+    expect(result.apiKey).toBe("cloudinary-api-key");
+    expect(result.cloudName).toBe("lumi-test");
+    expect(result.signature).toBe("mock-signature");
+    expect(result.params).toMatchObject({
+      folder: "lumi/banners",
+      tags: "product:123,primary",
+    });
+    expect(signMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folder: "lumi/banners",
+        tags: "product:123,primary",
+      }),
+      "cloudinary-api-secret",
+    );
+    expect(result.expiresAt).toBeTruthy();
   });
 
   it("re-applies SDK configuration when the application config changes", () => {

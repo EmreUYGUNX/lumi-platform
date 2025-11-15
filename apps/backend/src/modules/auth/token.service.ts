@@ -151,6 +151,13 @@ const createAuthState = (
   accessToken,
 });
 
+export const tokenServiceInternals = {
+  isAccessTokenClaims,
+  isRefreshTokenClaims,
+  createAuthState,
+  toGeneratedToken,
+};
+
 export class TokenService {
   private readonly prisma: PrismaClient;
 
