@@ -71,6 +71,10 @@ const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWher
   return where;
 };
 
+export const mediaRepositoryInternals = {
+  buildWhereClause,
+};
+
 export class MediaRepository extends BaseRepository<
   Prisma.MediaAssetDelegate,
   Prisma.MediaAssetWhereInput,

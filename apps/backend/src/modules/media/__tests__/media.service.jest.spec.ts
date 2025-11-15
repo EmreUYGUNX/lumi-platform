@@ -181,4 +181,53 @@ describe("MediaService", () => {
       invalidate: true,
     });
   });
+
+  it("requires at least one file before attempting upload", async () => {
+    const service = createService();
+    await expect(
+      service.upload([], {
+        folder: config.media.cloudinary.folders.products,
+        tags: [],
+        visibility: "public",
+        uploadedById: "user_1",
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "NO_FILES",
+    });
+  });
+
+  it("enforces folder-specific file size limits", async () => {
+    const service = createService();
+    const oversized = {
+      ...file("hero.png"),
+      size: 11 * 1024 * 1024,
+    };
+
+    await expect(
+      service.upload([oversized], {
+        folder: config.media.cloudinary.folders.banners,
+        tags: [],
+        visibility: "public",
+        uploadedById: "user_1",
+      }),
+    ).rejects.toMatchObject({
+      status: 413,
+    });
+    expect(cloudinary.upload).not.toHaveBeenCalled();
+  });
+
+  it("throws when every upload in the batch fails", async () => {
+    uploadMock.mockRejectedValue(new ApiError("ingest-failed", { status: 502 }));
+    const service = createService();
+
+    await expect(
+      service.upload([file("one.png"), file("two.png")], {
+        folder: config.media.cloudinary.folders.products,
+        tags: [],
+        visibility: "public",
+        uploadedById: "user_1",
+      }),
+    ).rejects.toThrow("ingest-failed");
+  });
 });

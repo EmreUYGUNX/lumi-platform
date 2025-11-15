@@ -1296,3 +1296,14 @@ export const resetEnvironmentCache = () => {
   cachedEnv = undefined;
   stopWatching();
 };
+
+export const envInternals = {
+  booleanTransformer,
+  csvTransformer,
+  optionalString,
+  parseResponsiveBreakpointList,
+  parseDurationToSeconds,
+  normaliseRedactFields,
+  parseOptionalPort,
+  applyTestEnvironmentDefaults,
+};

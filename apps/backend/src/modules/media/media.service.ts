@@ -480,3 +480,16 @@ export class MediaService {
     }
   }
 }
+
+export const mediaServiceInternals = {
+  chunk,
+  normaliseTags,
+  resolveMimeExtension,
+  buildTransformationMap,
+  extractDominantColor,
+  calculateAspectRatio,
+  normaliseMetadataValues,
+  buildPersistenceMetadata,
+  ensureMimeTypeSupported,
+  enforceFileSizeLimit,
+};

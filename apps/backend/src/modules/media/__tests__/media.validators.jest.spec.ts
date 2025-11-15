@@ -66,6 +66,40 @@ describe("media.validators", () => {
     expect(result.eager?.[0]).toEqual({ width: 300, crop: "fill" });
   });
 
+  it("deduplicates tag arrays and applies defaults when folder omitted", () => {
+    const parsed = uploadSchema.parse({
+      tags: [" Primary ", "SPLIT,Entry", 123],
+    });
+
+    expect(parsed.folder).toBe(config.media.cloudinary.folders.products);
+    expect(parsed.tags).toEqual(["primary", "split", "entry", "123"]);
+  });
+
+  it("coerces metadata objects with mixed primitives", () => {
+    const parsed = uploadSchema.parse({
+      metadata: {
+        priority: 1,
+        featured: true,
+        // eslint-disable-next-line unicorn/no-null -- Null metadata values should normalise to empty strings.
+        nullable: null,
+      },
+    });
+
+    expect(parsed.metadata).toEqual({
+      priority: "1",
+      featured: "true",
+      nullable: "",
+    });
+  });
+
+  it("rejects signature payloads targeting disallowed folders", () => {
+    expect(() =>
+      signatureSchema.parse({
+        folder: "secret",
+      }),
+    ).toThrow(/Folder is not allowed/);
+  });
+
   it("confirms MIME whitelist contains expected formats", () => {
     expect(IMAGE_MIME_WHITELIST.get("image/png")).toEqual({ extension: "png" });
     expect(IMAGE_MIME_WHITELIST.has("image/webp")).toBe(true);
