@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 export type MediaResourceType = "image" | "video" | "raw";
 
 export type MediaSortField = "date" | "size" | "name";

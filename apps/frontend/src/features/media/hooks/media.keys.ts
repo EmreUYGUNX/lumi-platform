@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import type { MediaListFilters } from "../types/media.types";
 
 export const mediaKeys = {

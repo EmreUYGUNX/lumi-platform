@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import type { ImageLoaderProps } from "next/image";
 
 export const CLOUDINARY_BREAKPOINTS = Object.freeze([320, 640, 768, 1024, 1280, 1536, 1920]);

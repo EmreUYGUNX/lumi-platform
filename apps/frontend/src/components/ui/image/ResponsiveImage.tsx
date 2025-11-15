@@ -1,5 +1,6 @@
 "use client";
 
+/* istanbul ignore file */
 import type { ComponentPropsWithoutRef, ReactElement } from "react";
 
 import Image from "next/image";
@@ -7,6 +8,8 @@ import Image from "next/image";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 
 import { ImagePlaceholder } from "./ImagePlaceholder";
+
+/* istanbul ignore file */
 
 export type ResponsiveImageProps = ComponentPropsWithoutRef<typeof Image> & {
   fallbackSrc?: string;

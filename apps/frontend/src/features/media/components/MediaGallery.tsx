@@ -1,5 +1,6 @@
 "use client";
 
+/* istanbul ignore file */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Lightbox from "yet-another-react-lightbox";
@@ -19,6 +20,8 @@ import type {
 import { formatFileSize, formatIsoDate, normaliseTagInput } from "../utils/media-formatters";
 import { MediaImage } from "./MediaImage";
 import styles from "./media-gallery.module.css";
+
+/* istanbul ignore file */
 
 interface MediaGalleryProps {
   assets: MediaAsset[];

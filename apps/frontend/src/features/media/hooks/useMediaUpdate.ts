@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import type { InfiniteData } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 

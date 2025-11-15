@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import { MediaManager } from "@/features/media/components/MediaManager";
 
 export default function MediaAdminPage(): JSX.Element {

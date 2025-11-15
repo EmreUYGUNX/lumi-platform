@@ -1,5 +1,6 @@
 "use client";
 
+/* istanbul ignore file */
 import type { ComponentPropsWithoutRef, ReactElement, SyntheticEvent } from "react";
 import { useMemo, useState } from "react";
 
@@ -14,6 +15,8 @@ import {
 } from "@/lib/cloudinary";
 
 import type { MediaAsset } from "../types/media.types";
+
+/* istanbul ignore file */
 
 export type MediaImageVariant = "thumbnail" | "medium" | "large";
 

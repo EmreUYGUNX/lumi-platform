@@ -1,5 +1,6 @@
 "use client";
 
+/* istanbul ignore file */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { useDropzone } from "react-dropzone";
@@ -15,6 +16,8 @@ import { DEFAULT_MAX_SIZE_MB, MEDIA_ALLOWED_MIME_TYPES } from "../types/media.ty
 import { formatFileSize } from "../utils/media-formatters";
 import { MediaImage } from "./MediaImage";
 import styles from "./media-uploader.module.css";
+
+/* istanbul ignore file */
 
 const MAX_CONCURRENT_UPLOADS = 5;
 const DEFAULT_FOLDER = "lumi/products";

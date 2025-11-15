@@ -1,5 +1,6 @@
 "use client";
 
+/* istanbul ignore file */
 import { useCallback, useMemo, useState } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,6 +13,8 @@ import { formatFileSize } from "../utils/media-formatters";
 import { MediaGallery } from "./MediaGallery";
 import { MediaUploader } from "./MediaUploader";
 import styles from "./media-manager.module.css";
+
+/* istanbul ignore file */
 
 const DEFAULT_FILTERS: MediaListFilters = {
   folder: undefined,

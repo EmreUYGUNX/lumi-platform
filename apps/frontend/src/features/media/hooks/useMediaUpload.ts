@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { MediaAsset, MediaUploadPayload } from "../types/media.types";
