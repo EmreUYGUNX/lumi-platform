@@ -13,11 +13,13 @@ describe("media.repository buildWhereClause", () => {
       uploadedById: "user_1",
       folder: "lumi/products",
       tag: "hero",
+      resourceType: "image",
     });
 
     expect(where.uploadedById).toBe("user_1");
     expect(where.folder).toEqual({ equals: "lumi/products", mode: "insensitive" });
-    expect(where.tags).toEqual({ has: "hero" });
+    expect(where.resourceType).toEqual({ equals: "image", mode: "insensitive" });
+    expect(where.tags).toEqual({ hasEvery: ["hero"] });
   });
 
   it("supports product and variant relations", () => {
@@ -100,5 +102,45 @@ describe("media.repository list", () => {
       hasNextPage: true,
       hasPreviousPage: true,
     });
+  });
+});
+
+describe("media.repository mutations", () => {
+  it("fetches records including soft-deleted entries", async () => {
+    const findFirst = jest.fn().mockResolvedValue({ id: "asset_1" } as never);
+    const prisma = {
+      mediaAsset: {
+        findFirst,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({ mediaAsset: { findFirst } } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    const result = await repository.getByIdIncludingDeleted("asset_1");
+
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: "asset_1" } });
+    expect(result).toEqual({ id: "asset_1" });
+  });
+
+  it("force deletes records regardless of soft delete state", async () => {
+    const deleteMock = jest.fn().mockResolvedValue({ id: "asset_1" } as never);
+    const prisma = {
+      mediaAsset: {
+        delete: deleteMock,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({
+          mediaAsset: {
+            delete: deleteMock,
+          },
+        } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    const result = await repository.forceDeleteAsset("asset_1");
+
+    expect(deleteMock).toHaveBeenCalledWith({ where: { id: "asset_1" } });
+    expect(result).toEqual({ id: "asset_1" });
   });
 });

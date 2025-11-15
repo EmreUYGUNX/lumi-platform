@@ -77,6 +77,12 @@ describe("MediaService", () => {
   let scanner: jest.Mocked<MediaScanService>;
   let config: ApplicationConfig;
   let createAssetMock: jest.MockedFunction<MediaRepository["createAsset"]>;
+  let listMock: jest.MockedFunction<MediaRepository["list"]>;
+  let getByIdMock: jest.MockedFunction<MediaRepository["getById"]>;
+  let getByIdIncludingDeletedMock: jest.MockedFunction<MediaRepository["getByIdIncludingDeleted"]>;
+  let updateMetadataMock: jest.MockedFunction<MediaRepository["updateMetadata"]>;
+  let softDeleteMock: jest.MockedFunction<MediaRepository["softDeleteAsset"]>;
+  let forceDeleteMock: jest.MockedFunction<MediaRepository["forceDeleteAsset"]>;
   let uploadMock: jest.MockedFunction<CloudinaryClient["upload"]>;
   let deleteAssetMock: jest.MockedFunction<CloudinaryClient["deleteAsset"]>;
 
@@ -90,8 +96,30 @@ describe("MediaService", () => {
 
   beforeEach(() => {
     createAssetMock = jest.fn(async () => createMockAsset());
+    listMock = jest.fn(async () => ({
+      items: [createMockAsset()],
+      meta: {
+        totalItems: 1,
+        page: 1,
+        pageSize: 25,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    }));
+    getByIdMock = jest.fn(async () => createMockAsset());
+    getByIdIncludingDeletedMock = jest.fn(async () => createMockAsset());
+    updateMetadataMock = jest.fn(async () => createMockAsset());
+    softDeleteMock = jest.fn(async () => createMockAsset());
+    forceDeleteMock = jest.fn(async () => createMockAsset());
     repository = {
       createAsset: createAssetMock,
+      list: listMock,
+      getById: getByIdMock,
+      getByIdIncludingDeleted: getByIdIncludingDeletedMock,
+      updateMetadata: updateMetadataMock,
+      softDeleteAsset: softDeleteMock,
+      forceDeleteAsset: forceDeleteMock,
     } as unknown as MediaRepository;
 
     uploadMock = jest.fn(async () => createUploadResponse());
@@ -100,6 +128,7 @@ describe("MediaService", () => {
     cloudinary = {
       upload: uploadMock,
       deleteAsset: deleteAssetMock,
+      regenerateAsset: jest.fn(async () => createUploadResponse()),
       generateImageUrl: jest.fn(() => "https://cdn/responsive.jpg"),
       generateUploadSignature: jest.fn(() => ({
         signature: "signature",
@@ -229,5 +258,80 @@ describe("MediaService", () => {
         uploadedById: "user_1",
       }),
     ).rejects.toThrow("ingest-failed");
+  });
+
+  it("lists media assets and maps repository payloads", async () => {
+    const service = createService();
+    const result = await service.listAssets({ page: 1 });
+
+    expect(listMock).toHaveBeenCalledWith(
+      expect.objectContaining({ includeDeleted: undefined }),
+      expect.objectContaining({ page: 1 }),
+    );
+    expect(result.items[0]?.transformations.original).toBe("https://cdn/image.jpg");
+  });
+
+  it("throws when requesting a missing asset", async () => {
+    // eslint-disable-next-line unicorn/no-null -- Repository returns null when record missing
+    getByIdMock.mockResolvedValueOnce(null);
+    const service = createService();
+    await expect(service.getAsset("missing")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("updates asset metadata when actor is uploader", async () => {
+    const service = createService();
+    await service.updateAsset(
+      "asset_123",
+      { tags: ["hero"] },
+      {
+        userId: "user_1",
+        roles: ["customer"],
+      },
+    );
+
+    expect(updateMetadataMock).toHaveBeenCalledWith(
+      "asset_123",
+      expect.objectContaining({ tags: ["hero"] }),
+    );
+  });
+
+  it("regenerates assets via Cloudinary explicit API", async () => {
+    const service = createService();
+    const asset = await service.regenerateAsset("asset_123", {
+      userId: "admin_1",
+      roles: ["admin"],
+    });
+
+    expect(cloudinary.regenerateAsset).toHaveBeenCalledWith(
+      "lumi/products/test",
+      expect.any(Object),
+    );
+    expect(asset.transformations.thumbnail).toBeDefined();
+  });
+
+  it("prevents soft delete when asset is in use", async () => {
+    getByIdMock.mockResolvedValueOnce({
+      ...createMockAsset(),
+      products: [{ id: "prod", title: "Demo", slug: "demo" }],
+    } as never);
+    const service = createService();
+    await expect(
+      service.softDeleteAsset("asset_123", { userId: "admin", roles: ["admin"] }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("hard deletes assets that were previously soft deleted", async () => {
+    getByIdIncludingDeletedMock.mockResolvedValueOnce({
+      ...createMockAsset(),
+      deletedAt: new Date(),
+    });
+    const service = createService();
+    await service.hardDeleteAsset("asset_123", { userId: "admin", roles: ["admin"] });
+
+    expect(cloudinary.deleteAsset).toHaveBeenCalledWith("lumi/products/test", {
+      resourceType: "image",
+      invalidate: true,
+    });
+    expect(forceDeleteMock).toHaveBeenCalledWith("asset_123");
   });
 });

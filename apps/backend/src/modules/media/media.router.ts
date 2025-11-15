@@ -13,6 +13,7 @@ import { MediaService } from "./media.service.js";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_UPLOADS_PER_REQUEST = 10;
+const ADMIN_MEDIA_ROUTE = "/admin/media/:id";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
@@ -86,6 +87,12 @@ export const createMediaRouter = (
   const uploadLimiter = createUploadRateLimiter();
   const uploadParser = createUploadParser();
 
+  router.get("/media", requireAuth, requireMediaRole, controller.list);
+  registerRoute?.("GET", "/media");
+
+  router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
+  registerRoute?.("GET", "/media/:id");
+
   router.post(
     "/media/upload",
     requireAuth,
@@ -98,6 +105,28 @@ export const createMediaRouter = (
 
   router.post("/media/signature", requireAuth, requireMediaRole, controller.signature);
   registerRoute?.("POST", "/media/signature");
+
+  router.put(ADMIN_MEDIA_ROUTE, requireAuth, requireMediaRole, controller.update);
+  registerRoute?.("PUT", ADMIN_MEDIA_ROUTE);
+
+  router.post(
+    `${ADMIN_MEDIA_ROUTE}/regenerate`,
+    requireAuth,
+    requireMediaRole,
+    controller.regenerate,
+  );
+  registerRoute?.("POST", `${ADMIN_MEDIA_ROUTE}/regenerate`);
+
+  router.delete(ADMIN_MEDIA_ROUTE, requireAuth, requireMediaRole, controller.softDelete);
+  registerRoute?.("DELETE", ADMIN_MEDIA_ROUTE);
+
+  router.delete(
+    `${ADMIN_MEDIA_ROUTE}/permanent`,
+    requireAuth,
+    requireMediaRole,
+    controller.hardDelete,
+  );
+  registerRoute?.("DELETE", `${ADMIN_MEDIA_ROUTE}/permanent`);
 
   return router;
 };

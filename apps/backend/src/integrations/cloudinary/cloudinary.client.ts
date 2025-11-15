@@ -36,6 +36,13 @@ export interface CloudinaryDeleteOptions {
   invalidate?: boolean;
 }
 
+export interface CloudinaryExplicitOptions {
+  resourceType?: UploadApiOptions["resource_type"];
+  type?: UploadApiOptions["type"];
+  eager?: UploadApiOptions["eager"];
+  invalidate?: boolean;
+}
+
 export interface GenerateImageUrlOptions {
   transformation?: TransformationDefinition;
   secure?: boolean;
@@ -108,6 +115,20 @@ export class CloudinaryClient {
       });
     } catch (error) {
       throw CloudinaryClient.toIntegrationError("delete", error);
+    }
+  }
+
+  async regenerateAsset(publicId: string, options: CloudinaryExplicitOptions = {}) {
+    this.ensureConfiguration();
+    try {
+      return await cloudinary.uploader.explicit(publicId, {
+        resource_type: options.resourceType ?? "image",
+        type: options.type ?? "upload",
+        eager: options.eager ?? this.activeConfig.eagerTransformations,
+        invalidate: options.invalidate ?? true,
+      });
+    } catch (error) {
+      throw CloudinaryClient.toIntegrationError("explicit", error);
     }
   }
 

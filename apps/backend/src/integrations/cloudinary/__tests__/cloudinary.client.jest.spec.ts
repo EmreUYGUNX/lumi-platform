@@ -44,6 +44,7 @@ jest.mock("../../../config/index.js", () => {
 jest.mock("cloudinary", () => {
   const upload = jest.fn();
   const destroy = jest.fn();
+  const explicit = jest.fn();
   const url = jest.fn(() => "https://res.cloudinary.com/lumi-test/image/upload/sample");
   const config = jest.fn();
   const apiSignRequest = jest.fn(() => "mock-signature");
@@ -53,6 +54,7 @@ jest.mock("cloudinary", () => {
       uploader: {
         upload,
         destroy,
+        explicit,
       },
       url,
       config,
@@ -68,6 +70,7 @@ jest.mock("cloudinary", () => {
 
 const uploadMock = jest.mocked(cloudinaryV2.uploader.upload);
 const destroyMock = jest.mocked(cloudinaryV2.uploader.destroy);
+const explicitMock = jest.mocked(cloudinaryV2.uploader.explicit);
 const urlMock = jest.mocked(cloudinaryV2.url);
 const signMock = jest.mocked(cloudinaryV2.utils.api_sign_request);
 const configMock = jest.mocked(cloudinaryV2.config);
@@ -86,6 +89,7 @@ describe("CloudinaryClient", () => {
     type DestroyResult = Awaited<ReturnType<typeof cloudinaryV2.uploader.destroy>>;
     uploadMock.mockResolvedValue({ public_id: "lumi/products/demo" } as UploadApiResponse);
     destroyMock.mockResolvedValue({ result: "ok" } as DestroyResult);
+    explicitMock.mockResolvedValue({ public_id: "lumi/products/demo" } as UploadApiResponse);
   });
 
   it("uploads buffers using secure defaults", async () => {
@@ -150,6 +154,23 @@ describe("CloudinaryClient", () => {
 
     expect(destroyMock).toHaveBeenCalledWith("lumi/products/demo", {
       resource_type: "video",
+      invalidate: true,
+    });
+  });
+
+  it("regenerates assets using the Cloudinary explicit API", async () => {
+    const client = new CloudinaryClient();
+
+    await client.regenerateAsset("lumi/products/demo", {
+      resourceType: "image",
+      type: "upload",
+      invalidate: true,
+    });
+
+    expect(explicitMock).toHaveBeenCalledWith("lumi/products/demo", {
+      resource_type: "image",
+      type: "upload",
+      eager: expect.any(Array),
       invalidate: true,
     });
   });

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { cuidSchema } from "@lumi/shared/dto";
+
+export { cuidSchema as mediaIdParamSchema } from "@lumi/shared/dto";
+
 export const IMAGE_MIME_WHITELIST: ReadonlyMap<string, { extension: string }> = new Map([
   ["image/jpeg", { extension: "jpg" }],
   ["image/png", { extension: "png" }],
@@ -12,7 +16,7 @@ export type SupportedImageMimeType =
 
 const MAX_TAGS = 25;
 
-const normaliseTags = (input: unknown): string[] => {
+export const normaliseTags = (input: unknown): string[] => {
   if (Array.isArray(input)) {
     return input
       .flatMap((value) => {
@@ -40,7 +44,7 @@ const normaliseTags = (input: unknown): string[] => {
   return [];
 };
 
-const tagSchema = z
+export const tagSchema = z
   .string()
   .trim()
   .min(2, "Tags must be at least 2 characters")
@@ -56,7 +60,7 @@ const metadataRecordSchema = z.record(
     ),
 );
 
-const metadataSchema = z
+export const metadataSchema = z
   .union([
     metadataRecordSchema,
     z
@@ -90,6 +94,8 @@ const metadataSchema = z
 
 const normaliseFolder = (value: string): string => value.replace(/^\/*/u, "").replace(/\/*$/u, "");
 
+const FOLDER_NOT_ALLOWED_MESSAGE = "Folder is not allowed.";
+
 const baseUploadSchema = z.object({
   folder: z
     .string()
@@ -110,6 +116,8 @@ export interface MediaUploadValidationOptions {
   defaultFolder: string;
 }
 
+type MediaUpdateValidationOptions = MediaUploadValidationOptions;
+
 export const createMediaUploadSchema = ({
   allowedFolders,
   defaultFolder,
@@ -122,7 +130,7 @@ export const createMediaUploadSchema = ({
       if (!allowedFolders.includes(data.folder)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Folder is not allowed.",
+          message: FOLDER_NOT_ALLOWED_MESSAGE,
           path: ["folder"],
         });
       }
@@ -156,10 +164,54 @@ export const createMediaSignatureSchema = ({
       if (!allowedFolders.includes(data.folder)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Folder is not allowed.",
+          message: FOLDER_NOT_ALLOWED_MESSAGE,
           path: ["folder"],
         });
       }
     });
 
 export type MediaSignatureBody = z.infer<ReturnType<typeof createMediaSignatureSchema>>;
+
+export const createMediaUpdateSchema = ({ allowedFolders }: MediaUpdateValidationOptions) =>
+  z
+    .object({
+      folder: baseUploadSchema.shape.folder.optional(),
+      tags: baseUploadSchema.shape.tags.optional(),
+      metadata: metadataSchema,
+    })
+    .superRefine((data, ctx) => {
+      if (data.folder && !allowedFolders.includes(data.folder)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: FOLDER_NOT_ALLOWED_MESSAGE,
+          path: ["folder"],
+        });
+      }
+    });
+
+export type MediaUpdateBody = z.infer<ReturnType<typeof createMediaUpdateSchema>>;
+
+const resourceTypeSchema = z.enum(["image", "video", "raw"]);
+
+export const mediaListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).optional(),
+    perPage: z.coerce.number().int().min(1).max(200).optional(),
+    folder: baseUploadSchema.shape.folder.optional(),
+    resourceType: resourceTypeSchema.optional(),
+    tags: z.preprocess(normaliseTags, z.array(tagSchema).max(MAX_TAGS)).optional(),
+    tag: tagSchema.optional(),
+    search: z
+      .string()
+      .trim()
+      .min(2, "Search query must be at least 2 characters")
+      .max(120, "Search query must be at most 120 characters")
+      .optional(),
+    productId: cuidSchema.optional(),
+    productVariantId: cuidSchema.optional(),
+    includeDeleted: z.coerce.boolean().optional(),
+    uploadedById: cuidSchema.optional(),
+  })
+  .strict();
+
+export type MediaListQuery = z.infer<typeof mediaListQuerySchema>;
