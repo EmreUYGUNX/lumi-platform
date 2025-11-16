@@ -6,6 +6,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   analyzerMode: "static",
   openAnalyzer: false
 });
+const CLOUDINARY_BREAKPOINTS = require("../../packages/shared/media/cloudinary-breakpoints.json");
 
 const nextConfig = {
   reactStrictMode: true,
@@ -38,7 +39,9 @@ const nextConfig = {
     tsconfigPath: "./tsconfig.json"
   },
   images: {
-    formats: ["image/avif", "image/webp"]
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: CLOUDINARY_BREAKPOINTS,
+    minimumCacheTTL: 31536000
   },
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,
@@ -58,6 +61,26 @@ const nextConfig = {
       };
       config.optimization.runtimeChunk = "single";
     }
+
+    config.resolve = config.resolve || {};
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      ".js": [".js", ".ts", ".tsx"],
+      ".mjs": [".mjs", ".mts"],
+      ".cjs": [".cjs", ".cts"]
+    };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "node:fs": false,
+      "node:path": false,
+      "node:url": false
+    };
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      url: false
+    };
 
     return config;
   }

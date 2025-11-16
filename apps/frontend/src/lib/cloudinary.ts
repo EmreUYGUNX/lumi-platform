@@ -1,7 +1,9 @@
 /* istanbul ignore file */
 import type { ImageLoaderProps } from "next/image";
 
-export const CLOUDINARY_BREAKPOINTS = Object.freeze([320, 640, 768, 1024, 1280, 1536, 1920]);
+import { CLOUDINARY_BREAKPOINTS as SHARED_CLOUDINARY_BREAKPOINTS } from "@lumi/shared/media/cloudinary";
+
+export const CLOUDINARY_BREAKPOINTS = SHARED_CLOUDINARY_BREAKPOINTS;
 
 const DEFAULT_TRANSFORMATIONS = Object.freeze({
   format: "f_auto",
@@ -143,13 +145,73 @@ export const buildCloudinaryUrl = (options: CloudinaryUrlOptions): string => {
   return `${baseUrl}/${transformation}/${encodedId}`;
 };
 
-export const buildSizesAttribute = (preset?: CloudinaryDisplayPreset, custom?: string): string => {
+const normaliseWidths = (widths?: readonly number[]): number[] => {
+  if (!widths || widths.length === 0) {
+    return [...CLOUDINARY_BREAKPOINTS];
+  }
+
+  const unique = new Set<number>();
+  return widths
+    .map((width) => Math.max(1, Math.round(width)))
+    .filter((width) => {
+      if (unique.has(width)) {
+        return false;
+      }
+      unique.add(width);
+      return true;
+    })
+    .sort((left, right) => left - right);
+};
+
+const buildSizesFromBreakpoints = (targetWidth: number): string => {
+  const clampedWidth = Math.max(1, Math.round(targetWidth));
+  const descriptors = CLOUDINARY_BREAKPOINTS.map(
+    (breakpoint) => `(max-width: ${breakpoint}px) ${Math.min(breakpoint, clampedWidth)}px`,
+  );
+
+  return `${descriptors.join(", ")}, ${clampedWidth}px`;
+};
+
+export const buildSizesAttribute = (
+  preset?: CloudinaryDisplayPreset,
+  custom?: string,
+  targetWidth?: number,
+): string => {
   if (custom) {
     return custom;
   }
 
+  if (targetWidth) {
+    return buildSizesFromBreakpoints(targetWidth);
+  }
+
   const resolvedPreset = preset ?? "gallery";
   return resolveSizeTemplate(resolvedPreset);
+};
+
+export interface CloudinarySrcSetOptions extends CloudinaryUrlOptions {
+  widths?: readonly number[];
+}
+
+export const buildSrcSet = (options: CloudinarySrcSetOptions): string => {
+  const selectedWidths = normaliseWidths(options.widths);
+  const source = resolveSource(options);
+
+  if (!source && !options.publicId) {
+    return "";
+  }
+
+  return selectedWidths
+    .map((width) => {
+      const url = buildCloudinaryUrl({
+        ...options,
+        width,
+      });
+
+      return url ? `${url} ${width}w` : "";
+    })
+    .filter((entry) => entry.length > 0)
+    .join(", ");
 };
 
 const encodeSvg = (svg: string): string => {

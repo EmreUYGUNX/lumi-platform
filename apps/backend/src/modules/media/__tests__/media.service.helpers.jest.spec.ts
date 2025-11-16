@@ -121,12 +121,14 @@ describe("media.service internals", () => {
         uploadedById: "user_1",
       },
       { originalName: "Demo.PNG" } as never,
+      "data:image/png;base64,placeholder",
     );
 
     expect(persistence).toMatchObject({
       dominantColor: "#ff0000",
       visibility: "public",
       originalFilename: "Demo.PNG",
+      blurDataUrl: "data:image/png;base64,placeholder",
     });
   });
 

@@ -6,6 +6,7 @@ import { config as loadEnvFile } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
 
+import { CLOUDINARY_BREAKPOINTS } from "@lumi/shared";
 import type { FeatureFlagMap, ResolvedEnvironment, RuntimeEnvironment } from "@lumi/types";
 
 const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
@@ -52,7 +53,7 @@ const MAX_QUERY_TIMEOUT_MS = 120 * 1e3;
 const DEFAULT_QUERY_TIMEOUT_MS = 5 * 1e3;
 const DEFAULT_SLOW_QUERY_THRESHOLD_MS = 100;
 const MIN_SLOW_QUERY_THRESHOLD_MS = 50;
-const DEFAULT_CLOUDINARY_BREAKPOINTS = [320, 640, 768, 1024, 1280, 1536, 1920] as const;
+const DEFAULT_CLOUDINARY_BREAKPOINTS = CLOUDINARY_BREAKPOINTS;
 
 const booleanTransformer = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") {

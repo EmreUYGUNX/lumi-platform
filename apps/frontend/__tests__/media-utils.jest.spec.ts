@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { formatFileSize, normaliseTagInput } from "@/features/media/utils/media-formatters";
-import { buildCloudinaryUrl, buildSizesAttribute } from "@/lib/cloudinary";
+import { buildCloudinaryUrl, buildSizesAttribute, buildSrcSet } from "@/lib/cloudinary";
 
 describe("media utility formatters", () => {
   it("formats bytes into human readable strings", () => {
@@ -16,7 +16,10 @@ describe("media utility formatters", () => {
 
 describe("cloudinary helpers", () => {
   it("builds a url for a public id", () => {
-    expect(buildCloudinaryUrl({ publicId: "lumi/products/test", width: 200 })).toContain("w_200");
+    const url = buildCloudinaryUrl({ publicId: "lumi/products/test", width: 200 });
+    expect(url).toContain("w_200");
+    expect(url).toContain("f_auto");
+    expect(url).toContain("q_auto:good");
   });
 
   it("passes through remote sources", () => {
@@ -26,5 +29,20 @@ describe("cloudinary helpers", () => {
 
   it("builds sizes attribute presets", () => {
     expect(buildSizesAttribute("thumbnail")).toContain("180px");
+  });
+
+  it("builds responsive sizes when width is provided", () => {
+    const sizes = buildSizesAttribute(undefined, undefined, 1200);
+    expect(sizes).toContain("1200px");
+    expect(sizes).toContain("(max-width: 320px)");
+  });
+
+  it("builds srcset descriptors for multiple widths", () => {
+    const srcSet = buildSrcSet({
+      publicId: "lumi/products/example",
+      widths: [320, 640],
+    });
+    expect(srcSet).toContain("320w");
+    expect(srcSet).toContain("640w");
   });
 });

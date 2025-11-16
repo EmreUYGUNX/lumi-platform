@@ -3,6 +3,7 @@ import { Router } from "express";
 import multer, { MulterError } from "multer";
 
 import { ApiError } from "@/errors/api-error.js";
+import { createChildLogger } from "@/lib/logger.js";
 import { createRequireAuthMiddleware } from "@/middleware/auth/requireAuth.js";
 import { createRequireRoleMiddleware } from "@/middleware/auth/requireRole.js";
 import { createRateLimiter } from "@/middleware/rate-limiter.js";
@@ -14,6 +15,7 @@ import { MediaService } from "./media.service.js";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_UPLOADS_PER_REQUEST = 10;
 const ADMIN_MEDIA_ROUTE = "/admin/media/:id";
+const routerLogger = createChildLogger("media:router");
 
 type RouteRegistrar = (method: string, path: string) => void;
 
@@ -72,6 +74,14 @@ const createUploadRateLimiter = () =>
     keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : undefined),
   });
 
+const createMetricsRateLimiter = () =>
+  createRateLimiter({
+    identifier: "media-metrics",
+    max: 60,
+    windowSeconds: 300,
+    allowInternalBypass: true,
+  });
+
 export const createMediaRouter = (
   config: ApplicationConfig,
   options: MediaRouterOptions = {},
@@ -86,6 +96,19 @@ export const createMediaRouter = (
   const requireMediaRole = createRequireRoleMiddleware(["admin", "staff"]);
   const uploadLimiter = createUploadRateLimiter();
   const uploadParser = createUploadParser();
+  const metricsLimiter = createMetricsRateLimiter();
+
+  if (!options.service && !options.controller) {
+    service
+      .warmPopularAssets()
+      .catch((error) => routerLogger.warn("Media cache warmup trigger failed", { error }));
+  }
+
+  router.get("/media", requireAuth, requireMediaRole, controller.list);
+  registerRoute?.("GET", "/media");
+
+  router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
+  registerRoute?.("GET", "/media/:id");
 
   router.get("/media", requireAuth, requireMediaRole, controller.list);
   registerRoute?.("GET", "/media");
@@ -105,6 +128,9 @@ export const createMediaRouter = (
 
   router.post("/media/signature", requireAuth, requireMediaRole, controller.signature);
   registerRoute?.("POST", "/media/signature");
+
+  router.post("/media/metrics/lcp", metricsLimiter, controller.recordLcpMetric);
+  registerRoute?.("POST", "/media/metrics/lcp");
 
   router.put(ADMIN_MEDIA_ROUTE, requireAuth, requireMediaRole, controller.update);
   registerRoute?.("PUT", ADMIN_MEDIA_ROUTE);

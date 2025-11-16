@@ -10,6 +10,7 @@ import {
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
 import type { PaginatedResult } from "@/lib/repository/base.repository.js";
+import { mediaMetrics } from "@/observability/media-metrics.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { MediaRepository } from "./media.repository.js";
@@ -33,6 +34,39 @@ const NAMED_VARIANTS = [
   { name: "medium", transformation: { width: 800, height: 800, crop: "limit" } },
   { name: "large", transformation: { width: 1920, crop: "limit" } },
 ] as const;
+
+const BLUR_PLACEHOLDER_TRANSFORMATION = {
+  width: 20,
+  crop: "fill",
+  effect: "blur:1000",
+  quality: "auto:low",
+} as const;
+
+const CACHE_STATUS_HEADER_KEYS = ["x-cache", "cf-cache-status", "x-cld-cache"] as const;
+const CACHE_PREFETCH_CONCURRENCY = 4;
+
+const detectCacheStatus = (headers: Headers): "hit" | "miss" | "unknown" => {
+  // eslint-disable-next-line no-restricted-syntax -- Finite iteration over a fixed header allowlist.
+  for (const headerKey of CACHE_STATUS_HEADER_KEYS) {
+    const value = headers.get(headerKey);
+    if (value) {
+      const normalised = value.toLowerCase();
+      if (normalised.includes("hit")) {
+        return "hit";
+      }
+      if (normalised.includes("miss")) {
+        return "miss";
+      }
+    }
+  }
+
+  const ageHeader = headers.get("age");
+  if (ageHeader && Number.parseInt(ageHeader, 10) > 0) {
+    return "hit";
+  }
+
+  return "unknown";
+};
 
 type MediaAssetWithUsage = MediaAsset & {
   products?: Pick<Product, "id" | "title" | "slug">[];
@@ -385,6 +419,7 @@ const buildPersistenceMetadata = (
   uploadResult: UploadApiResponse,
   context: UploadContext,
   file: PreparedUploadFile,
+  blurDataUrl?: string,
 ): Prisma.InputJsonValue => {
   const metadata = {
     ...context.metadata,
@@ -395,6 +430,7 @@ const buildPersistenceMetadata = (
     ),
     visibility: context.visibility,
     originalFilename: file.originalName,
+    blurDataUrl,
   };
 
   return Object.fromEntries(
@@ -632,6 +668,79 @@ export class MediaService {
     });
   }
 
+  async warmPopularAssets(limit = 24): Promise<void> {
+    try {
+      const result = await this.repository.list(
+        {
+          includeDeleted: false,
+        },
+        {
+          page: 1,
+          pageSize: limit,
+        },
+      );
+
+      const urls = new Set<string>();
+
+      result.items.forEach((record) => {
+        const view = this.toAssetView(record as MediaAssetWithUsage);
+        [view.secureUrl, view.url].forEach((value) => {
+          if (value) {
+            urls.add(value);
+          }
+        });
+
+        Object.values(view.transformations ?? {}).forEach((value) => {
+          if (value) {
+            urls.add(value);
+          }
+        });
+      });
+
+      if (urls.size === 0) {
+        return;
+      }
+
+      await this.prefetchUrls([...urls]);
+      this.logger.info("Media cache warmup complete", { warmedTargets: urls.size });
+    } catch (error) {
+      this.logger.warn("Media cache warmup failed", { error });
+    }
+  }
+
+  private async prefetchUrls(urls: readonly string[]): Promise<void> {
+    const candidates = urls.filter(
+      (url): url is string => typeof url === "string" && url.trim().length > 0,
+    );
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const batches = chunk([...new Set(candidates)], CACHE_PREFETCH_CONCURRENCY);
+
+    // eslint-disable-next-line no-restricted-syntax -- Sequential processing respects concurrency limits.
+    for (const batch of batches) {
+      if (!Array.isArray(batch) || batch.length === 0) {
+        // eslint-disable-next-line no-continue -- Skip empty batches without additional branching.
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- Batches must resolve sequentially to respect throttling.
+      await Promise.all(
+        batch.map(async (url) => {
+          try {
+            const response = await fetch(url, { method: "HEAD" });
+            const status = detectCacheStatus(response.headers);
+            mediaMetrics.recordCdnPrefetch(status);
+          } catch (error) {
+            this.logger.debug("Media cache prefetch failed", { error, url });
+            mediaMetrics.recordCdnPrefetch("error");
+          }
+        }),
+      );
+    }
+  }
+
   private async loadAsset(
     id: string,
     options: { includeUsage?: boolean; includeDeleted?: boolean } = {},
@@ -703,6 +812,7 @@ export class MediaService {
 
     try {
       uploadResponse = await this.performCloudinaryUpload(file, context, safeFileName, folder);
+      const blurDataUrl = await this.generateBlurPlaceholder(uploadResponse);
 
       const dbRecord = await this.persistUploadedAsset(
         uploadResponse,
@@ -710,6 +820,7 @@ export class MediaService {
         file,
         folder,
         extension,
+        blurDataUrl,
       );
 
       this.logger.info("Media asset uploaded", {
@@ -735,7 +846,10 @@ export class MediaService {
     safeFileName: string,
     folder: string,
   ): Promise<UploadApiResponse> {
-    return this.cloudinary.upload(file.buffer, {
+    const options: UploadApiOptions & {
+      cdn_cache_control?: string;
+      cache_control?: string;
+    } = {
       folder,
       tags: context.tags,
       filenameOverride: safeFileName,
@@ -747,7 +861,51 @@ export class MediaService {
         uploader: context.uploadedById,
       },
       metadata: normaliseMetadataValues(context.metadata ?? undefined),
+    };
+
+    options.cdn_cache_control = "public, max-age=31536000, immutable";
+    options.cache_control = "public, max-age=31536000, immutable";
+
+    return this.cloudinary.upload(file.buffer, options);
+  }
+
+  private async generateBlurPlaceholder(
+    uploadResponse: UploadApiResponse,
+  ): Promise<string | undefined> {
+    if (!uploadResponse.public_id) {
+      return undefined;
+    }
+
+    const placeholderUrl = this.cloudinary.generateImageUrl(uploadResponse.public_id, {
+      transformation: BLUR_PLACEHOLDER_TRANSFORMATION,
+      resourceType: resolveResourceType(uploadResponse.resource_type ?? undefined),
+      type: resolveAssetType(uploadResponse.type ?? undefined),
+      version: uploadResponse.version,
     });
+
+    try {
+      const response = await fetch(placeholderUrl, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        this.logger.warn("Blur placeholder fetch failed", {
+          status: response.status,
+          publicId: uploadResponse.public_id,
+        });
+        return undefined;
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const mimeType = response.headers.get("content-type") ?? "image/webp";
+      return `data:${mimeType};base64,${buffer.toString("base64")}`;
+    } catch (error) {
+      this.logger.warn("Unable to generate blur placeholder", {
+        error,
+        publicId: uploadResponse.public_id,
+      });
+      return undefined;
+    }
   }
 
   private async persistUploadedAsset(
@@ -756,8 +914,9 @@ export class MediaService {
     file: PreparedUploadFile,
     folder: string,
     extension: string,
+    blurDataUrl?: string,
   ): Promise<Awaited<ReturnType<MediaRepository["createAsset"]>>> {
-    return this.repository.createAsset({
+    const record = await this.repository.createAsset({
       publicId: uploadResponse.public_id,
       url: uploadResponse.url ?? "",
       secureUrl: uploadResponse.secure_url ?? uploadResponse.url ?? "",
@@ -770,13 +929,16 @@ export class MediaService {
       folder: uploadResponse.folder ?? folder,
       version: uploadResponse.version ?? 1,
       tags: uploadResponse.tags ?? normaliseTags(context.tags),
-      metadata: buildPersistenceMetadata(uploadResponse, context, file),
+      metadata: buildPersistenceMetadata(uploadResponse, context, file, blurDataUrl),
       uploadedBy: {
         connect: {
           id: context.uploadedById,
         },
       },
     });
+
+    mediaMetrics.recordUploadFormat(uploadResponse.format ?? extension);
+    return record;
   }
 
   private toUploadPayload(

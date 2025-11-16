@@ -11,6 +11,7 @@ export {
   buildSecurityHeadersRecord,
   type SecurityHeaderEntry,
 } from "./security/headers.js";
+export { CLOUDINARY_BREAKPOINTS, getCloudinaryBreakpoints } from "./media/cloudinary.js";
 export {
   createValidator,
   sanitizeValue,

@@ -183,6 +183,7 @@ module.exports = {
       rules: {
         "react/react-in-jsx-scope": "off",
         "react/require-default-props": "off",
+        "@next/next/no-html-link-for-pages": "off",
       },
     },
     {
