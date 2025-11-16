@@ -142,4 +142,47 @@ describe("Cloudinary webhook handler", () => {
 
     expect(queue.enqueueWebhookEvent).not.toHaveBeenCalled();
   });
+
+  it("responds with 503 when webhook secret missing", async () => {
+    const queue: Pick<MediaQueueController, "enqueueWebhookEvent"> = {
+      enqueueWebhookEvent: jest.fn(),
+    };
+
+    const handler = createCloudinaryWebhookHandler(createTestConfig(), {
+      queue: queue as MediaQueueController,
+    });
+
+    await request(createApp(handler))
+      .post("/webhooks/cloudinary")
+      .send({ notification_type: "upload" })
+      .expect(503);
+
+    expect(queue.enqueueWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests with missing headers", async () => {
+    const queue: Pick<MediaQueueController, "enqueueWebhookEvent"> = {
+      enqueueWebhookEvent: jest.fn(),
+    };
+
+    const handler = createCloudinaryWebhookHandler(
+      createTestConfig({
+        media: {
+          cloudinary: {
+            webhook: {
+              signingSecret: SIGNING_SECRET,
+            },
+          },
+        },
+      }),
+      { queue: queue as MediaQueueController },
+    );
+
+    await request(createApp(handler))
+      .post("/webhooks/cloudinary")
+      .send({ notification_type: "upload" })
+      .expect(401);
+
+    expect(queue.enqueueWebhookEvent).not.toHaveBeenCalled();
+  });
 });
