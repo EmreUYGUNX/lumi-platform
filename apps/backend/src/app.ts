@@ -10,12 +10,14 @@ import type { ApplicationConfig } from "@lumi/types";
 
 import { getConfig } from "./config/index.js";
 import { createOpenApiDocument, getSwaggerUiOptions } from "./config/swagger.js";
+import { createChildLogger } from "./lib/logger.js";
 import {
   attachErrorHandlerAutoRefresh,
   registerErrorHandlers,
   resolveRouter,
 } from "./middleware/errorHandler.js";
 import { registerMiddleware } from "./middleware/index.js";
+import { getMediaQueueController } from "./queues/media.queue.js";
 import { createApiRouter } from "./routes/index.js";
 import {
   createInternalRouter,
@@ -28,6 +30,7 @@ import {
   createRouteRegistrar,
   createRouteRegistry,
 } from "./routes/registry.js";
+import { createWebhookRouter } from "./routes/webhooks.js";
 
 export interface CreateAppOptions {
   /**
@@ -44,6 +47,18 @@ export const createApp = ({
   const config = providedConfig ?? getConfig();
   const app = express();
   const routeRegistry = createRouteRegistry();
+  const queueLogger = createChildLogger("media:queue:init");
+  const mediaQueue = getMediaQueueController(config);
+
+  mediaQueue.scheduleDailyCleanup().catch((error) => {
+    queueLogger.warn("Failed to schedule media cleanup job", { error });
+  });
+
+  mediaQueue.scheduleWeeklyTransformationRegeneration().catch((error) => {
+    queueLogger.warn("Failed to schedule media transformation job", { error });
+  });
+
+  app.set("mediaQueueCleanup", () => mediaQueue.shutdown());
 
   attachRouteRegistry(app, routeRegistry);
 
@@ -114,9 +129,17 @@ export const createApp = ({
 
   const registerApiRoute = createRouteRegistrar(routeRegistry, "/api");
   const registerInternalRoute = createRouteRegistrar(routeRegistry, "/internal");
+  const registerWebhookRoute = createRouteRegistrar(routeRegistry, "/webhooks");
 
   app.use("/api", createApiRouter(config, { registerRoute: registerApiRoute, ...apiOptions }));
   app.use("/internal", createInternalRouter(config, { registerRoute: registerInternalRoute }));
+  app.use(
+    "/webhooks",
+    createWebhookRouter(config, {
+      registerRoute: registerWebhookRoute,
+      queue: mediaQueue,
+    }),
+  );
 
   const metricsPath = normalisePath(config.observability.metrics.endpoint);
   app.get(metricsPath, createMetricsAuthMiddleware(config), metricsHandler);
