@@ -1,4 +1,4 @@
-import type { MediaAsset, PrismaClient } from "@prisma/client";
+import type { MediaAsset, MediaVisibility, PrismaClient } from "@prisma/client";
 
 import type { CloudinaryClient } from "@/integrations/cloudinary/cloudinary.client.js";
 import { runMediaTransformationJob } from "@/jobs/media-transformation.job.js";
@@ -20,6 +20,7 @@ const createAsset = (overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
+  visibility: "PUBLIC" as MediaVisibility,
   // eslint-disable-next-line unicorn/no-null -- testing null persistence.
   deletedAt: null,
   createdAt: new Date(),

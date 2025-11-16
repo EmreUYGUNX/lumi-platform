@@ -6,7 +6,7 @@ import { successResponse } from "@/lib/response.js";
 
 import { createTestConfig } from "../../../testing/config.js";
 import { MediaController } from "../media.controller.js";
-import type { MediaService, MediaUploadResult } from "../media.service.js";
+import type { MediaAssetView, MediaService, MediaUploadResult } from "../media.service.js";
 
 const config = createTestConfig();
 
@@ -35,7 +35,7 @@ const createExpressFile = (): Express.Multer.File =>
     stream: undefined,
   }) as unknown as Express.Multer.File;
 
-const buildAssetView = () => ({
+const buildAssetView = (): MediaAssetView => ({
   id: "cktestasset000000000000000",
   publicId: "lumi/products/demo",
   folder: "lumi/products",
@@ -50,6 +50,7 @@ const buildAssetView = () => ({
   type: "upload",
   tags: ["hero"],
   version: 1,
+  visibility: "public",
   transformations: {},
   createdAt: new Date("2025-01-01T00:00:00Z"),
   updatedAt: new Date("2025-01-02T00:00:00Z"),
@@ -84,6 +85,8 @@ describe("media.controller", () => {
       body: { tags: " hero " },
       files: [createExpressFile()],
       user: { id: "user_1" },
+      ip: "127.0.0.1",
+      get: jest.fn().mockReturnValue("jest-agent"),
     } as unknown as Request;
 
     const responsePayload: MediaUploadResult = {
@@ -104,6 +107,7 @@ describe("media.controller", () => {
           tags: ["hero"],
           version: 1,
           transformations: {},
+          visibility: "public",
         },
       ],
       failures: [],
@@ -116,7 +120,11 @@ describe("media.controller", () => {
     await controller.upload(req, res, next);
     expect(service.upload).toHaveBeenCalledWith(
       [expect.objectContaining({ originalName: "product.png" })],
-      expect.objectContaining({ uploadedById: "user_1" }),
+      expect.objectContaining({
+        uploadedById: "user_1",
+        ipAddress: "127.0.0.1",
+        userAgent: "jest-agent",
+      }),
     );
 
     expect(res.json).toHaveBeenCalledWith(
@@ -136,6 +144,8 @@ describe("media.controller", () => {
         gallery: createExpressFile(),
       },
       user: { id: "user_2" },
+      ip: "10.0.0.5",
+      get: jest.fn().mockReturnValue("jest-agent"),
     } as unknown as Request;
 
     const partial: MediaUploadResult = {
@@ -156,6 +166,7 @@ describe("media.controller", () => {
           tags: ["hero"],
           version: 1,
           transformations: {},
+          visibility: "public",
         },
       ],
       failures: [
@@ -177,7 +188,7 @@ describe("media.controller", () => {
         expect.objectContaining({ originalName: "product.png" }),
         expect.objectContaining({ originalName: "product.png" }),
       ]),
-      expect.objectContaining({ uploadedById: "user_2" }),
+      expect.objectContaining({ uploadedById: "user_2", ipAddress: "10.0.0.5" }),
     );
 
     expect(res.json).toHaveBeenCalledWith(
@@ -279,7 +290,7 @@ describe("media.controller", () => {
   });
 
   it("lists media assets with pagination metadata and caching headers", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.listAssets.mockResolvedValue({
       items: [asset],
       meta: {
@@ -295,12 +306,16 @@ describe("media.controller", () => {
     const req = {
       query: { page: "1" },
       headers: {},
+      user: { id: "user_1", roles: [{ name: "staff" }] },
     } as unknown as Request;
 
     const res = createMockResponse();
 
     await controller.list(req, res, jest.fn());
-    expect(service.listAssets).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }));
+    expect(service.listAssets).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }), {
+      userId: "user_1",
+      roles: ["staff"],
+    });
     expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "private, max-age=300");
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -311,23 +326,27 @@ describe("media.controller", () => {
   });
 
   it("returns asset detail with cache headers", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.getAsset.mockResolvedValue(asset);
     const req = {
       params: { id: asset.id },
       headers: {},
+      user: { id: "user_1", roles: [{ name: "customer" }] },
     } as unknown as Request;
 
     const res = createMockResponse();
     await controller.get(req, res, jest.fn());
 
-    expect(service.getAsset).toHaveBeenCalledWith(asset.id);
+    expect(service.getAsset).toHaveBeenCalledWith(asset.id, {
+      userId: "user_1",
+      roles: ["customer"],
+    });
     expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "private, max-age=300");
     expect(res.json).toHaveBeenCalledWith(successResponse(asset));
   });
 
   it("updates asset metadata and records audit trail", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.updateAsset.mockResolvedValue(asset);
     const req = {
       params: { id: asset.id },
@@ -355,7 +374,7 @@ describe("media.controller", () => {
   });
 
   it("regenerates asset transformations", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.regenerateAsset.mockResolvedValue(asset);
     const req = {
       params: { id: asset.id },
@@ -374,7 +393,7 @@ describe("media.controller", () => {
   });
 
   it("soft deletes assets and returns the deleted record", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.softDeleteAsset.mockResolvedValue({ ...asset, deletedAt: new Date() });
     const req = {
       params: { id: asset.id },
@@ -393,7 +412,7 @@ describe("media.controller", () => {
   });
 
   it("hard deletes assets and records audit metadata", async () => {
-    const asset = buildAssetView();
+    const asset: MediaAssetView = buildAssetView();
     service.hardDeleteAsset.mockResolvedValue(asset);
     const req = {
       params: { id: asset.id },

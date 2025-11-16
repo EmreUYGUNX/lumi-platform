@@ -141,6 +141,7 @@ export const updateMediaRequest = async (
       folder: payload.folder,
       tags: payload.tags,
       metadata: payload.metadata,
+      visibility: payload.visibility,
     }),
     credentials: "include",
   });

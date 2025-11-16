@@ -1,4 +1,5 @@
 import type { MediaAsset, Prisma, Product, ProductVariant } from "@prisma/client";
+import { MediaVisibility as PrismaMediaVisibility } from "@prisma/client";
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 import { getConfig } from "@/config/index.js";
@@ -13,8 +14,10 @@ import type { PaginatedResult } from "@/lib/repository/base.repository.js";
 import { mediaMetrics } from "@/observability/media-metrics.js";
 import type { ApplicationConfig } from "@lumi/types";
 
+import type { MediaAccessFilter, MediaListFilters } from "./media.repository.js";
 import { MediaRepository } from "./media.repository.js";
 import { MediaScanService, sanitizeFilename } from "./media.security.js";
+import { MediaThreatService } from "./media.threats.js";
 import {
   IMAGE_MIME_WHITELIST,
   type MediaListQuery,
@@ -42,12 +45,34 @@ const BLUR_PLACEHOLDER_TRANSFORMATION = {
   quality: "auto:low",
 } as const;
 
+type VisibilityInput = MediaUploadBody["visibility"];
+
+const VISIBILITY_TO_PRISMA: Record<VisibilityInput, PrismaMediaVisibility> = {
+  public: PrismaMediaVisibility.PUBLIC,
+  private: PrismaMediaVisibility.PRIVATE,
+  internal: PrismaMediaVisibility.INTERNAL,
+} as const;
+
+const PRISMA_TO_VISIBILITY = new Map<PrismaMediaVisibility, VisibilityInput>([
+  [PrismaMediaVisibility.PUBLIC, "public"],
+  [PrismaMediaVisibility.PRIVATE, "private"],
+  [PrismaMediaVisibility.INTERNAL, "internal"],
+]);
+
+const resolvePrismaVisibility = (value: VisibilityInput): PrismaMediaVisibility =>
+  // eslint-disable-next-line security/detect-object-injection -- visibility map is a sealed constant.
+  VISIBILITY_TO_PRISMA[value] ?? PrismaMediaVisibility.PUBLIC;
+
+const resolveOutputVisibility = (value?: PrismaMediaVisibility | null): VisibilityInput =>
+  PRISMA_TO_VISIBILITY.get(value ?? PrismaMediaVisibility.PUBLIC) ?? "public";
+
 const CACHE_STATUS_HEADER_KEYS = ["x-cache", "cf-cache-status", "x-cld-cache"] as const;
 const CACHE_PREFETCH_CONCURRENCY = 4;
 
 const detectCacheStatus = (headers: Headers): "hit" | "miss" | "unknown" => {
   // eslint-disable-next-line no-restricted-syntax -- Finite iteration over a fixed header allowlist.
   for (const headerKey of CACHE_STATUS_HEADER_KEYS) {
+    // eslint-disable-next-line security/detect-object-injection -- header names come from a fixed allowlist.
     const value = headers.get(headerKey);
     if (value) {
       const normalised = value.toLowerCase();
@@ -100,6 +125,8 @@ export interface PreparedUploadFile {
 
 export interface UploadContext extends MediaUploadBody {
   uploadedById: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 export interface UploadedMedia {
@@ -118,6 +145,7 @@ export interface UploadedMedia {
   type: string;
   tags: string[];
   version: number;
+  visibility: MediaUploadBody["visibility"];
 }
 
 export interface FailedUpload {
@@ -159,6 +187,7 @@ export interface MediaServiceOptions {
   cloudinaryClient?: CloudinaryClient;
   logger?: ReturnType<typeof createChildLogger>;
   scanService?: MediaScanService;
+  threatService?: MediaThreatService;
   config?: ApplicationConfig;
 }
 
@@ -256,6 +285,51 @@ const assertAssetNotInUse = (asset: MediaAssetWithUsage): void => {
       },
     ],
   });
+};
+
+const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionContext): void => {
+  if (!actor) {
+    if (asset.visibility !== PrismaMediaVisibility.PUBLIC) {
+      throw new ApiError("You do not have permission to view this media asset.", {
+        status: 403,
+        code: "FORBIDDEN",
+      });
+    }
+    return;
+  }
+
+  if (isPrivilegedActor(actor) || asset.uploadedById === actor.userId) {
+    return;
+  }
+
+  if (
+    asset.visibility === PrismaMediaVisibility.INTERNAL ||
+    asset.visibility === PrismaMediaVisibility.PUBLIC
+  ) {
+    return;
+  }
+
+  throw new ApiError("You do not have permission to view this media asset.", {
+    status: 403,
+    code: "FORBIDDEN",
+  });
+};
+
+const buildAccessFilter = (actor?: MediaActionContext): MediaAccessFilter | undefined => {
+  if (!actor) {
+    return {
+      visibilities: [PrismaMediaVisibility.PUBLIC],
+    } satisfies MediaAccessFilter;
+  }
+
+  if (isPrivilegedActor(actor)) {
+    return undefined;
+  }
+
+  return {
+    ownerId: actor.userId,
+    visibilities: [PrismaMediaVisibility.PUBLIC, PrismaMediaVisibility.INTERNAL],
+  } satisfies MediaAccessFilter;
 };
 
 /* eslint-disable security/detect-object-injection */
@@ -478,6 +552,8 @@ export class MediaService {
 
   private readonly scanner: MediaScanService;
 
+  private readonly threats: MediaThreatService;
+
   private readonly config: ApplicationConfig;
 
   private readonly auditEntityToken = AUDIT_ENTITY;
@@ -487,6 +563,7 @@ export class MediaService {
     this.cloudinary = options.cloudinaryClient ?? getCloudinaryClient();
     this.logger = options.logger ?? createChildLogger("media:service");
     this.scanner = options.scanService ?? new MediaScanService();
+    this.threats = options.threatService ?? new MediaThreatService();
     this.config = options.config ?? getConfig();
   }
 
@@ -494,33 +571,44 @@ export class MediaService {
     return this.auditEntityToken;
   }
 
-  async listAssets(query: MediaListQuery = {}): Promise<MediaListResult> {
-    const result = await this.repository.list(
-      {
-        uploadedById: query.uploadedById,
-        folder: query.folder,
-        productId: query.productId,
-        productVariantId: query.productVariantId,
-        tags: query.tags,
-        tag: query.tag,
-        resourceType: query.resourceType,
-        search: query.search,
-        includeDeleted: query.includeDeleted,
-      },
-      {
-        page: query.page,
-        pageSize: query.perPage,
-      },
-    );
+  async listAssets(query?: MediaListQuery, actor?: MediaActionContext): Promise<MediaListResult> {
+    const resolvedQuery = query ?? {};
+    const privileged = actor ? isPrivilegedActor(actor) : false;
+    const filters: MediaListFilters = {
+      uploadedById: resolvedQuery.uploadedById,
+      folder: resolvedQuery.folder,
+      productId: resolvedQuery.productId,
+      productVariantId: resolvedQuery.productVariantId,
+      tags: resolvedQuery.tags,
+      tag: resolvedQuery.tag,
+      resourceType: resolvedQuery.resourceType,
+      search: resolvedQuery.search,
+      includeDeleted: privileged ? resolvedQuery.includeDeleted : undefined,
+    };
+
+    const accessFilter = buildAccessFilter(actor);
+    if (accessFilter) {
+      filters.access = accessFilter;
+    }
+
+    const result = await this.repository.list(filters, {
+      page: resolvedQuery.page,
+      pageSize: resolvedQuery.perPage,
+    });
 
     return {
-      items: result.items.map((record) => this.toAssetView(record as MediaAssetWithUsage)),
+      items: result.items.map((record) => {
+        const typed = record as MediaAssetWithUsage;
+        assertVisibilityAccess(typed, actor);
+        return this.toAssetView(typed);
+      }),
       meta: result.meta,
     };
   }
 
-  async getAsset(id: string): Promise<MediaAssetView> {
+  async getAsset(id: string, actor?: MediaActionContext): Promise<MediaAssetView> {
     const asset = await this.loadAsset(id, { includeUsage: true });
+    assertVisibilityAccess(asset, actor);
     return this.toAssetView(asset);
   }
 
@@ -541,6 +629,9 @@ export class MediaService {
     }
     if (payload.metadata !== undefined) {
       data.metadata = payload.metadata;
+    }
+    if (payload.visibility) {
+      data.visibility = resolvePrismaVisibility(payload.visibility);
     }
 
     if (Object.keys(data).length > 0) {
@@ -741,6 +832,33 @@ export class MediaService {
     }
   }
 
+  private async handleScanFailure(
+    error: unknown,
+    file: PreparedUploadFile,
+    context: UploadContext,
+    safeFileName: string,
+  ): Promise<void> {
+    if (error instanceof ApiError && error.code === "MALWARE_DETECTED") {
+      try {
+        await this.threats.quarantineUpload(file, context, error.message, {
+          code: error.code,
+          safeFileName,
+        });
+      } catch (quarantineError) {
+        this.logger.error("Failed to quarantine malicious upload", {
+          error: quarantineError,
+          safeFileName,
+        });
+      }
+      return;
+    }
+
+    this.logger.warn("Media scan failed", {
+      error,
+      safeFileName,
+    });
+  }
+
   private async loadAsset(
     id: string,
     options: { includeUsage?: boolean; includeDeleted?: boolean } = {},
@@ -786,6 +904,7 @@ export class MediaService {
       type: record.type,
       tags: record.tags,
       version: record.version,
+      visibility: resolveOutputVisibility(record.visibility),
       transformations,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -803,10 +922,15 @@ export class MediaService {
 
     const safeFileName = sanitizeFilename(file.originalName || "upload", extension);
 
-    await this.scanner.scan({
-      buffer: file.buffer,
-      filename: safeFileName,
-    });
+    try {
+      await this.scanner.scan({
+        buffer: file.buffer,
+        filename: safeFileName,
+      });
+    } catch (error) {
+      await this.handleScanFailure(error, file, context, safeFileName);
+      throw error;
+    }
 
     let uploadResponse: UploadApiResponse | undefined;
 
@@ -930,6 +1054,7 @@ export class MediaService {
       version: uploadResponse.version ?? 1,
       tags: uploadResponse.tags ?? normaliseTags(context.tags),
       metadata: buildPersistenceMetadata(uploadResponse, context, file, blurDataUrl),
+      visibility: resolvePrismaVisibility(context.visibility),
       uploadedBy: {
         connect: {
           id: context.uploadedById,
@@ -962,6 +1087,7 @@ export class MediaService {
       type: record.type,
       tags: record.tags,
       version: record.version,
+      visibility: resolveOutputVisibility(record.visibility),
       transformations,
     };
   }

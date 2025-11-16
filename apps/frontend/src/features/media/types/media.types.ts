@@ -32,6 +32,7 @@ export interface MediaAsset {
   usage: MediaUsageSummary;
   isOptimistic?: boolean;
   placeholderId?: string;
+  visibility: "public" | "private" | "internal";
 }
 
 export interface PaginatedResponse<TItem> {
@@ -108,6 +109,7 @@ export interface MediaUpdatePayload {
   folder?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  visibility?: "public" | "private" | "internal";
 }
 
 export const MEDIA_ALLOWED_MIME_TYPES = [

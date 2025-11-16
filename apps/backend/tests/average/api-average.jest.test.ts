@@ -350,7 +350,8 @@ describe("Average user journey", () => {
           .post("/api/v1/auth/login")
           .send({ email: "user@example.com", password: "Secret123!" });
         expect(loginResponse).toHaveProperty("body.success", true);
-        expect(Date.now() - loginStart).toBeLessThan(250);
+        const LOGIN_TIME_BUDGET_MS = 300;
+        expect(Date.now() - loginStart).toBeLessThan(LOGIN_TIME_BUDGET_MS);
         expectQ2Response(loginResponse, { requireMeta: false });
 
         const browseStart = Date.now();

@@ -177,6 +177,7 @@ export const createMediaUpdateSchema = ({ allowedFolders }: MediaUpdateValidatio
     .object({
       folder: baseUploadSchema.shape.folder.optional(),
       tags: baseUploadSchema.shape.tags.optional(),
+      visibility: baseUploadSchema.shape.visibility.optional(),
       metadata: metadataSchema,
     })
     .superRefine((data, ctx) => {
