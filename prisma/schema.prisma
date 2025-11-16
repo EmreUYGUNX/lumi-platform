@@ -53,6 +53,12 @@ enum MediaProvider {
   S3
 }
 
+enum MediaVisibility {
+  PUBLIC
+  PRIVATE
+  INTERNAL
+}
+
 enum CartStatus {
   ACTIVE
   CHECKED_OUT
@@ -485,6 +491,7 @@ model MediaAsset {
   tags          String[] @default([])
   metadata      Json?
   uploadedById  String
+  visibility    MediaVisibility @default(PUBLIC)
   deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

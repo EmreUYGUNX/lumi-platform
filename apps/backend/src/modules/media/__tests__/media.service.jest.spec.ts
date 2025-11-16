@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { MediaAsset } from "@prisma/client";
+import { type MediaAsset, MediaVisibility } from "@prisma/client";
 import type { UploadApiResponse } from "cloudinary";
 
 import { ApiError } from "@/errors/api-error.js";
@@ -10,6 +10,7 @@ import { createTestConfig } from "../../../testing/config.js";
 import type { MediaRepository } from "../media.repository.js";
 import type { MediaScanService } from "../media.security.js";
 import { MediaService, type PreparedUploadFile } from "../media.service.js";
+import type { MediaThreatService } from "../media.threats.js";
 
 const createMockAsset = (): MediaAsset => ({
   id: "asset_123",
@@ -27,6 +28,7 @@ const createMockAsset = (): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
+  visibility: MediaVisibility.PUBLIC,
   // eslint-disable-next-line unicorn/no-null -- Prisma models use null to represent soft deletions
   deletedAt: null,
   createdAt: new Date(),
@@ -75,6 +77,7 @@ describe("MediaService", () => {
   let repository: MediaRepository;
   let cloudinary: jest.Mocked<CloudinaryClient>;
   let scanner: jest.Mocked<MediaScanService>;
+  let threatService: jest.Mocked<MediaThreatService>;
   let config: ApplicationConfig;
   let createAssetMock: jest.MockedFunction<MediaRepository["createAsset"]>;
   let listMock: jest.MockedFunction<MediaRepository["list"]>;
@@ -92,6 +95,7 @@ describe("MediaService", () => {
       repository,
       cloudinaryClient: cloudinary,
       scanService: scanner,
+      threatService,
       config,
     });
 
@@ -145,6 +149,10 @@ describe("MediaService", () => {
     scanner = {
       scan: jest.fn(async () => {}),
     } as unknown as jest.Mocked<MediaScanService>;
+
+    threatService = {
+      quarantineUpload: jest.fn(async () => ({ storedAt: "/tmp/quarantine" })),
+    } as unknown as jest.Mocked<MediaThreatService>;
 
     config = createTestConfig();
 
@@ -227,6 +235,32 @@ describe("MediaService", () => {
     });
   });
 
+  it("quarantines and reports files flagged by malware scanner", async () => {
+    const error = new ApiError("Potential malware detected", {
+      status: 422,
+      code: "MALWARE_DETECTED",
+    });
+    scanner.scan.mockRejectedValueOnce(error);
+    const service = createService();
+
+    await expect(
+      service.upload([file("suspicious.png")], {
+        folder: config.media.cloudinary.folders.products,
+        tags: [],
+        visibility: "public",
+        uploadedById: "user_1",
+      }),
+    ).rejects.toThrow("Potential malware detected");
+
+    expect(threatService.quarantineUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ originalName: "suspicious.png" }),
+      expect.objectContaining({ uploadedById: "user_1" }),
+      "Potential malware detected",
+      expect.objectContaining({ code: "MALWARE_DETECTED" }),
+    );
+    expect(cloudinary.upload).not.toHaveBeenCalled();
+  });
+
   it("requires at least one file before attempting upload", async () => {
     const service = createService();
     await expect(
@@ -281,10 +315,24 @@ describe("MediaService", () => {
     const result = await service.listAssets({ page: 1 });
 
     expect(listMock).toHaveBeenCalledWith(
-      expect.objectContaining({ includeDeleted: undefined }),
+      expect.objectContaining({
+        includeDeleted: undefined,
+        access: {
+          visibilities: [MediaVisibility.PUBLIC],
+        },
+      }),
       expect.objectContaining({ page: 1 }),
     );
     expect(result.items[0]?.transformations.original).toBe("https://cdn/image.jpg");
+  });
+
+  it("allows privileged actors to include deleted assets without access filters", async () => {
+    const service = createService();
+    await service.listAssets({ includeDeleted: true }, { userId: "admin", roles: ["admin"] });
+
+    const filtersArg = listMock.mock.calls.at(-1)?.[0];
+    expect(filtersArg).toMatchObject({ includeDeleted: true });
+    expect(filtersArg?.access).toBeUndefined();
   });
 
   it("throws when requesting a missing asset", async () => {
@@ -292,6 +340,31 @@ describe("MediaService", () => {
     getByIdMock.mockResolvedValueOnce(null);
     const service = createService();
     await expect(service.getAsset("missing")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("prevents non-owners from viewing private assets", async () => {
+    getByIdMock.mockResolvedValueOnce({
+      ...createMockAsset(),
+      uploadedById: "owner_1",
+      visibility: MediaVisibility.PRIVATE,
+    });
+
+    const service = createService();
+    await expect(
+      service.getAsset("asset_123", { userId: "other", roles: ["customer"] }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("allows asset owners to view their private uploads", async () => {
+    getByIdMock.mockResolvedValueOnce({
+      ...createMockAsset(),
+      uploadedById: "owner_1",
+      visibility: MediaVisibility.PRIVATE,
+    });
+
+    const service = createService();
+    const asset = await service.getAsset("asset_123", { userId: "owner_1", roles: ["customer"] });
+    expect(asset.visibility).toBe("private");
   });
 
   it("updates asset metadata when actor is uploader", async () => {

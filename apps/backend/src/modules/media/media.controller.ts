@@ -158,8 +158,9 @@ export class MediaController {
   }
 
   private async handleList(req: Request, res: Response): Promise<void> {
+    const actor = resolveActorContext(req);
     const query = mediaListQuerySchema.parse(req.query ?? {});
-    const result = await this.service.listAssets(query);
+    const result = await this.service.listAssets(query, actor);
 
     const etagPayload = {
       meta: result.meta,
@@ -189,7 +190,8 @@ export class MediaController {
 
   private async handleGet(req: Request, res: Response): Promise<void> {
     const assetId = mediaIdParamSchema.parse(req.params.id);
-    const asset = await this.service.getAsset(assetId);
+    const actor = resolveActorContext(req);
+    const asset = await this.service.getAsset(assetId, actor);
 
     const etag = computeEtag({ id: asset.id, updatedAt: asset.updatedAt.getTime() });
     if (req.headers["if-none-match"] === etag) {
@@ -231,12 +233,15 @@ export class MediaController {
       });
     }
 
+    const actor = resolveActorContext(req);
     const body = this.uploadSchema.parse(req.body);
     const preparedFiles = toPreparedFiles(rawFiles);
 
     const result = await this.service.upload(preparedFiles, {
       ...body,
-      uploadedById: req.user.id,
+      uploadedById: actor.userId,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
     });
 
     respondWithUploads(res, result, preparedFiles.length);

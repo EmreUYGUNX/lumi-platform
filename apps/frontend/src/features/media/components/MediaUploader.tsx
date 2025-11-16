@@ -94,6 +94,7 @@ const createPlaceholderAsset = (
   usage: { products: [], variants: [] },
   isOptimistic: true,
   placeholderId: item.id,
+  visibility: payload.visibility ?? "public",
 });
 
 const buildAcceptConfig = (): Record<string, string[]> =>

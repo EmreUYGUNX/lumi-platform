@@ -50,6 +50,7 @@ const PRODUCT_STATUS_VALUES = ["DRAFT", "ACTIVE", "ARCHIVED"] as const;
 const INVENTORY_POLICY_VALUES = ["TRACK", "CONTINUE", "DENY"] as const;
 const MEDIA_TYPE_VALUES = ["IMAGE", "VIDEO", "DOCUMENT"] as const;
 const MEDIA_PROVIDER_VALUES = ["CLOUDINARY", "S3"] as const;
+const MEDIA_VISIBILITY_VALUES = ["PUBLIC", "PRIVATE", "INTERNAL"] as const;
 const CART_STATUS_VALUES = ["ACTIVE", "CHECKED_OUT", "ABANDONED"] as const;
 const ORDER_STATUS_VALUES = [
   "PENDING",
@@ -1109,7 +1110,16 @@ const standardComponents = {
         },
         {
           type: "object",
-          required: ["id", "assetId", "url", "type", "provider", "mimeType", "sizeBytes"],
+          required: [
+            "id",
+            "assetId",
+            "url",
+            "type",
+            "provider",
+            "mimeType",
+            "sizeBytes",
+            "visibility",
+          ],
           properties: {
             id: {
               type: "string",
@@ -1130,6 +1140,10 @@ const standardComponents = {
             provider: {
               type: "string",
               enum: [...MEDIA_PROVIDER_VALUES],
+            },
+            visibility: {
+              type: "string",
+              enum: [...MEDIA_VISIBILITY_VALUES],
             },
             mimeType: {
               type: "string",

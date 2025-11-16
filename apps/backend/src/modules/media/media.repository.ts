@@ -1,4 +1,4 @@
-import type { MediaAsset, Prisma, PrismaClient } from "@prisma/client";
+import type { MediaAsset, MediaVisibility, Prisma, PrismaClient } from "@prisma/client";
 
 import {
   BaseRepository,
@@ -13,6 +13,11 @@ type MediaRepositoryContext = RepositoryContext<
   Prisma.MediaAssetOrderByWithRelationInput
 >;
 
+export interface MediaAccessFilter {
+  ownerId?: string;
+  visibilities?: MediaVisibility[];
+}
+
 export interface MediaListFilters {
   uploadedById?: string;
   folder?: string;
@@ -23,61 +28,95 @@ export interface MediaListFilters {
   resourceType?: string;
   search?: string;
   includeDeleted?: boolean;
+  access?: MediaAccessFilter;
 }
 
+const createInsensitiveEquals = (value?: string) =>
+  value ? ({ equals: value, mode: "insensitive" } as const) : undefined;
+
+const normaliseTagFilters = (tag?: string, tags?: string[]): string[] =>
+  [...new Set([...(tags ?? []), ...(tag ? [tag] : [])])].filter((entry) => entry?.length);
+
+const appendAccessFilters = (
+  where: Prisma.MediaAssetWhereInput,
+  access?: MediaAccessFilter,
+): Prisma.MediaAssetWhereInput => {
+  if (!access) {
+    return where;
+  }
+
+  const clauses: Prisma.MediaAssetWhereInput[] = [];
+  if (access.ownerId) {
+    clauses.push({ uploadedById: access.ownerId });
+  }
+
+  if (access.visibilities?.length) {
+    clauses.push({ visibility: { in: access.visibilities } });
+  }
+
+  if (clauses.length === 0) {
+    return where;
+  }
+
+  const existing = where.AND ? (Array.isArray(where.AND) ? [...where.AND] : [where.AND]) : [];
+  existing.push({ OR: clauses });
+  return {
+    ...where,
+    AND: existing,
+  };
+};
+
+const appendSearchFilters = (
+  where: Prisma.MediaAssetWhereInput,
+  search?: string,
+): Prisma.MediaAssetWhereInput => {
+  const normalized = search?.trim();
+  if (!normalized) {
+    return where;
+  }
+
+  return {
+    ...where,
+    OR: [
+      { publicId: { contains: normalized, mode: "insensitive" } },
+      { folder: { contains: normalized, mode: "insensitive" } },
+      { tags: { has: normalized } },
+    ],
+  };
+};
+
 const buildWhereClause = (filters: MediaListFilters = {}): Prisma.MediaAssetWhereInput => {
-  const { uploadedById, folder, productId, productVariantId, tag, tags, resourceType, search } =
-    filters;
-  const where: Prisma.MediaAssetWhereInput = {};
+  let where: Prisma.MediaAssetWhereInput = {};
 
-  if (uploadedById) {
-    where.uploadedById = uploadedById;
+  if (filters.uploadedById) {
+    where = { ...where, uploadedById: filters.uploadedById };
   }
 
-  if (folder) {
-    where.folder = { equals: folder, mode: "insensitive" };
+  const folderFilter = createInsensitiveEquals(filters.folder);
+  if (folderFilter) {
+    where = { ...where, folder: folderFilter };
   }
 
-  if (resourceType) {
-    where.resourceType = { equals: resourceType, mode: "insensitive" };
+  const resourceFilter = createInsensitiveEquals(filters.resourceType);
+  if (resourceFilter) {
+    where = { ...where, resourceType: resourceFilter };
   }
 
-  if (productId) {
-    where.products = {
-      some: {
-        id: productId,
-      },
-    };
+  if (filters.productId) {
+    where = { ...where, products: { some: { id: filters.productId } } };
   }
 
-  if (productVariantId) {
-    where.productVariants = {
-      some: {
-        id: productVariantId,
-      },
-    };
+  if (filters.productVariantId) {
+    where = { ...where, productVariants: { some: { id: filters.productVariantId } } };
   }
 
-  const resolvedTags = [...new Set([...(tags ?? []), ...(tag ? [tag] : [])])].filter(
-    (entry) => entry && entry.length > 0,
-  );
-
+  const resolvedTags = normaliseTagFilters(filters.tag, filters.tags);
   if (resolvedTags.length > 0) {
-    where.tags = {
-      hasEvery: resolvedTags,
-    };
+    where = { ...where, tags: { hasEvery: resolvedTags } };
   }
 
-  if (search) {
-    const normalized = search.trim();
-    if (normalized.length > 0) {
-      where.OR = [
-        { publicId: { contains: normalized, mode: "insensitive" } },
-        { folder: { contains: normalized, mode: "insensitive" } },
-        { tags: { has: normalized } },
-      ];
-    }
-  }
+  where = appendSearchFilters(where, filters.search);
+  where = appendAccessFilters(where, filters.access);
 
   return where;
 };

@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import { MediaVisibility } from "@prisma/client";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import { MediaRepository, mediaRepositoryInternals } from "../media.repository.js";
@@ -44,6 +45,28 @@ describe("media.repository buildWhereClause", () => {
   it("ignores blank search parameters", () => {
     const where = buildWhere({ search: "   " });
     expect(where.OR).toBeUndefined();
+  });
+
+  it("applies access filters for owner and visibility allowlists", () => {
+    const where = buildWhere({
+      access: {
+        ownerId: "user_1",
+        visibilities: [MediaVisibility.PUBLIC, MediaVisibility.INTERNAL],
+      },
+    });
+
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { uploadedById: "user_1" },
+          {
+            visibility: {
+              in: [MediaVisibility.PUBLIC, MediaVisibility.INTERNAL],
+            },
+          },
+        ],
+      },
+    ]);
   });
 });
 

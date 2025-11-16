@@ -1,4 +1,4 @@
-import type { MediaAsset, PrismaClient } from "@prisma/client";
+import type { MediaAsset, MediaVisibility, PrismaClient } from "@prisma/client";
 
 import type { MediaRepository } from "@/modules/media/media.repository.js";
 import { CloudinaryWebhookProcessor } from "@/webhooks/cloudinary.processor.js";
@@ -20,6 +20,7 @@ const createAsset = (overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
+  visibility: "PUBLIC" as MediaVisibility,
   // eslint-disable-next-line unicorn/no-null -- tests rely on null state for soft delete.
   deletedAt: null,
   createdAt: new Date(),

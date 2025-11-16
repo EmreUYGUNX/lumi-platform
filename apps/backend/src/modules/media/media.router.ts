@@ -86,7 +86,7 @@ const MEDIA_COLLECTION_PATH = "/media";
 const MEDIA_RESOURCE_PATH = "/media/:id";
 const MEDIA_UPLOAD_PATH = "/media/upload";
 const MEDIA_SIGNATURE_PATH = "/media/signature";
-const MEDIA_METRICS_PATH = "/media/metrics/lcp";
+const MEDIA_LCP_PATH = "/media/metrics/lcp";
 
 export const createMediaRouter = (
   config: ApplicationConfig,
@@ -110,30 +110,20 @@ export const createMediaRouter = (
       .catch((error) => routerLogger.warn("Media cache warmup trigger failed", { error }));
   }
 
-  router.get(MEDIA_COLLECTION_PATH, requireAuth, requireMediaRole, controller.list);
+  router.get(MEDIA_COLLECTION_PATH, requireAuth, controller.list);
   registerRoute?.("GET", MEDIA_COLLECTION_PATH);
 
-  router.get(MEDIA_RESOURCE_PATH, requireAuth, requireMediaRole, controller.get);
+  router.get(MEDIA_RESOURCE_PATH, requireAuth, controller.get);
   registerRoute?.("GET", MEDIA_RESOURCE_PATH);
 
-  router.post(
-    MEDIA_UPLOAD_PATH,
-    requireAuth,
-    uploadLimiter,
-    requireMediaRole,
-    uploadParser,
-    controller.upload,
-  );
+  router.post(MEDIA_UPLOAD_PATH, requireAuth, uploadLimiter, uploadParser, controller.upload);
   registerRoute?.("POST", MEDIA_UPLOAD_PATH);
 
-  router.post(MEDIA_SIGNATURE_PATH, requireAuth, requireMediaRole, controller.signature);
+  router.post(MEDIA_SIGNATURE_PATH, requireAuth, controller.signature);
   registerRoute?.("POST", MEDIA_SIGNATURE_PATH);
 
-  router.post(MEDIA_METRICS_PATH, metricsLimiter, controller.recordLcpMetric);
-  registerRoute?.("POST", MEDIA_METRICS_PATH);
-
-  router.post("/media/metrics/lcp", metricsLimiter, controller.recordLcpMetric);
-  registerRoute?.("POST", "/media/metrics/lcp");
+  router.post(MEDIA_LCP_PATH, metricsLimiter, controller.recordLcpMetric);
+  registerRoute?.("POST", MEDIA_LCP_PATH);
 
   router.put(ADMIN_MEDIA_ROUTE, requireAuth, requireMediaRole, controller.update);
   registerRoute?.("PUT", ADMIN_MEDIA_ROUTE);
