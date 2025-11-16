@@ -24,7 +24,7 @@
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",
-    "test:jest": "jest --config jest.config.cjs --runInBand",
+    "test:jest": "jest --config jest.config.cjs --maxWorkers=50%",
     "test:quick": "pnpm run test:jest -- --runTestsByPath src/middleware/__tests__/error-handler.jest.spec.ts src/middleware/__tests__/rate-limiter.jest.spec.ts src/middleware/__tests__/request-logger.jest.spec.ts src/middleware/__tests__/response-formatter.jest.spec.ts src/routes/admin/__tests__/audit.jest.spec.ts",
     "test:vitest": "vitest run --passWithNoTests",
     "test:performance": "tsx src/__tests__/performance/health.performance.ts",
