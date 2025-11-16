@@ -2,10 +2,10 @@ import { createWebhookIdempotencyStore } from "@/webhooks/cloudinary.idempotency
 
 jest.mock("@/lib/redis.js", () => {
   const mockClient = {
-    connect: jest.fn().mockResolvedValue(),
+    connect: jest.fn(async () => undefined),
     exists: jest.fn().mockResolvedValue(0),
-    set: jest.fn().mockResolvedValue(),
-    disconnect: jest.fn().mockResolvedValue(),
+    set: jest.fn(async () => undefined),
+    disconnect: jest.fn(async () => undefined),
   };
 
   return {
