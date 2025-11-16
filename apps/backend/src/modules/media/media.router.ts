@@ -132,6 +132,9 @@ export const createMediaRouter = (
   router.post(MEDIA_METRICS_PATH, metricsLimiter, controller.recordLcpMetric);
   registerRoute?.("POST", MEDIA_METRICS_PATH);
 
+  router.post("/media/metrics/lcp", metricsLimiter, controller.recordLcpMetric);
+  registerRoute?.("POST", "/media/metrics/lcp");
+
   router.put(ADMIN_MEDIA_ROUTE, requireAuth, requireMediaRole, controller.update);
   registerRoute?.("PUT", ADMIN_MEDIA_ROUTE);
 
