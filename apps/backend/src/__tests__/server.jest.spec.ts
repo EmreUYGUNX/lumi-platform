@@ -224,6 +224,24 @@ describe("startServer", () => {
     });
   });
 
+  it("logs a warning when media queue cleanup fails during shutdown", async () => {
+    const controller = await getStartServer()({
+      config: createTestConfig(),
+      port: 0,
+      enableSignalHandlers: false,
+    });
+
+    controller.app.set("mediaQueueCleanup", async () => {
+      throw new Error("queue cleanup failure");
+    });
+
+    await controller.shutdown({ reason: "media-cleanup" });
+
+    expect(warnSpy).toHaveBeenCalledWith("Media queue cleanup failed during shutdown", {
+      error: expect.any(Error),
+    });
+  });
+
   it("forces lingering sockets to be destroyed when shutdown times out", async () => {
     jest.useFakeTimers();
 

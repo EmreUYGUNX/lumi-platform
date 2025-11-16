@@ -63,4 +63,84 @@ describe("runMediaTransformationJob", () => {
     expect(result.processed).toBe(2);
     expect(result.succeeded).toBe(2);
   });
+
+  it("records failures when Cloudinary regeneration throws errors", async () => {
+    const assets = [createAsset({ id: "asset_err", publicId: "p_err" })];
+    const prisma = {
+      mediaAsset: {
+        findMany: jest.fn().mockResolvedValueOnce(assets).mockResolvedValueOnce([]),
+      },
+    } as unknown as PrismaClient;
+
+    const repository: Partial<MediaRepository> = {
+      updateMetadata: jest.fn(),
+    };
+
+    const cloudinary: Partial<CloudinaryClient> = {
+      regenerateAsset: jest.fn().mockRejectedValue(new Error("regen failure")),
+    };
+
+    const loggerModule = await import("@/lib/logger.js");
+    const loggerStub = {
+      error: jest.fn(),
+      info: jest.fn(),
+    };
+    const childLoggerSpy = jest
+      .spyOn(loggerModule, "createChildLogger")
+      .mockReturnValue(loggerStub as unknown as ReturnType<typeof loggerModule.createChildLogger>);
+
+    try {
+      const result = await runMediaTransformationJob(
+        { batchSize: 1 },
+        {
+          prisma,
+          repository: repository as MediaRepository,
+          cloudinary: cloudinary as CloudinaryClient,
+        },
+      );
+
+      expect(result.failed).toBe(1);
+      expect(repository.updateMetadata).not.toHaveBeenCalled();
+      expect(loggerStub.error).toHaveBeenCalledWith(
+        "Failed to regenerate media transformations",
+        expect.objectContaining({
+          assetId: "asset_err",
+          publicId: "p_err",
+        }),
+      );
+    } finally {
+      childLoggerSpy.mockRestore();
+    }
+  });
+
+  it("stops processing when the cursor cannot be determined", async () => {
+    const assets = [createAsset({ id: "" as unknown as string })];
+    const prisma = {
+      mediaAsset: {
+        findMany: jest.fn().mockResolvedValueOnce(assets),
+      },
+    } as unknown as PrismaClient;
+
+    const repository: Partial<MediaRepository> = {
+      updateMetadata: jest.fn(),
+    };
+
+    const cloudinary: Partial<CloudinaryClient> = {
+      regenerateAsset: jest.fn().mockResolvedValue({
+        version: 3,
+      }),
+    };
+
+    const result = await runMediaTransformationJob(
+      { batchSize: 1, maxBatches: 5 },
+      {
+        prisma,
+        repository: repository as MediaRepository,
+        cloudinary: cloudinary as CloudinaryClient,
+      },
+    );
+
+    expect(prisma.mediaAsset.findMany).toHaveBeenCalledTimes(1);
+    expect(result.batches).toBe(1);
+  });
 });

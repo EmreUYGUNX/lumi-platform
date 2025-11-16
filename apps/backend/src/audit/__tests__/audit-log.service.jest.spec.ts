@@ -110,6 +110,47 @@ describe("audit log service", () => {
     });
   });
 
+  it("scrubs array payloads and serialises unsupported values", async () => {
+    // @ts-expect-error -- jest mock test double
+    (prismaMock.auditLog.create as jest.Mock).mockResolvedValue({ id: "audit-array" });
+
+    const uniqueSymbol = Symbol("metadata");
+
+    await recordAuditLog({
+      action: "media.transform",
+      entity: "media",
+      entityId: "asset-array",
+      after: {
+        variants: [
+          { token: "abc" },
+          { nested: [undefined, { secret: "hidden" }] },
+          "ready",
+          undefined,
+          uniqueSymbol,
+        ] as unknown[],
+      },
+      metadata: {
+        correlation: uniqueSymbol,
+      },
+    });
+
+    const call = prismaMock.auditLog.create.mock.calls[0]?.[0] as
+      | { data: { after?: Record<string, unknown> } }
+      | undefined;
+    expect(call).toBeDefined();
+    const afterPayload = call!.data.after as Record<string, unknown>;
+    expect(afterPayload.after).toBeDefined();
+    expect(afterPayload.metadata).toBeDefined();
+    expect((afterPayload.after as Record<string, unknown>).variants).toEqual([
+      { token: "[REDACTED]" },
+      { nested: ["[NULL]", { secret: "[REDACTED]" }] },
+      "ready",
+      "[NULL]",
+      "Symbol(metadata)",
+    ]);
+    expect((afterPayload.metadata as Record<string, unknown>).correlation).toBe("Symbol(metadata)");
+  });
+
   it("defaults actor type to SYSTEM when no user context is provided", async () => {
     // @ts-expect-error -- jest mock test double
     (prismaMock.auditLog.create as jest.Mock).mockResolvedValue({ id: "audit-2" });
@@ -209,5 +250,30 @@ describe("audit log service", () => {
       hasPreviousPage: false,
     });
     expect(result.data).toHaveLength(1);
+  });
+
+  it("normalises pagination boundaries before querying audit logs", async () => {
+    // @ts-expect-error -- jest mock test double
+    (prismaMock.auditLog.findMany as jest.Mock).mockResolvedValue([]);
+    // @ts-expect-error -- jest mock test double
+    (prismaMock.auditLog.count as jest.Mock).mockResolvedValue(0);
+
+    const result = await queryAuditLogs({
+      entity: "media",
+      page: 5.75,
+      perPage: 0,
+    });
+
+    expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith({
+      where: {
+        entity: "media",
+      },
+      orderBy: { createdAt: "desc" },
+      skip: 80,
+      take: 20,
+    });
+    expect(result.pagination.page).toBe(5);
+    expect(result.pagination.pageSize).toBe(20);
+    expect(result.pagination.hasPreviousPage).toBe(true);
   });
 });
