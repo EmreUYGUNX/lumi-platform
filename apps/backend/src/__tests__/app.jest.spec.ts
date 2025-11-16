@@ -3,10 +3,10 @@ import { createApiClient } from "@lumi/testing";
 import type * as AppModule from "../app.js";
 import { withTemporaryEnvironment } from "../config/testing.js";
 import type { createChildLogger } from "../lib/logger.js";
-import type { resolveRouter as resolveRouterType } from "../middleware/errorHandler.js";
 import { createTestConfig } from "../testing/config.js";
 
 type ChildLoggerFactory = typeof createChildLogger;
+type ResolveRouter = (app: unknown) => { stack?: unknown[] } | undefined;
 
 const queueLoggerDouble = {
   warn: jest.fn(),
@@ -243,7 +243,7 @@ describe("createApp", () => {
     Reflect.set(appWithRouter, "lazyrouter", lazyrouterMock);
 
     const errorHandlerModule = jest.requireActual("../middleware/errorHandler.js") as {
-      resolveRouter: resolveRouterType;
+      resolveRouter: ResolveRouter;
     };
     const originalResolveRouter = errorHandlerModule.resolveRouter;
     const resolveRouterSpy = jest
