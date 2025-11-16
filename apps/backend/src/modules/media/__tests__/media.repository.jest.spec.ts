@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-null */
 import { describe, expect, it, jest } from "@jest/globals";
 import { MediaVisibility } from "@prisma/client";
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -129,6 +130,49 @@ describe("media.repository list", () => {
 });
 
 describe("media.repository mutations", () => {
+  it("creates assets via Prisma delegate", async () => {
+    const create = jest.fn().mockResolvedValue({ id: "asset_1", publicId: "demo" } as never);
+    const prisma = {
+      mediaAsset: {
+        create,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({ mediaAsset: { create } } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    const result = await repository.createAsset({
+      publicId: "demo",
+    } as Prisma.MediaAssetCreateInput);
+
+    expect(create).toHaveBeenCalledWith({ data: { publicId: "demo" } });
+    expect(result).toEqual({ id: "asset_1", publicId: "demo" });
+  });
+
+  it("updates metadata with provided fields", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "asset_1", tags: ["hero"] } as never);
+    const prisma = {
+      mediaAsset: {
+        update,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({ mediaAsset: { update } } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    const result = await repository.updateMetadata("asset_1", { tags: ["hero"] });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { tags: ["hero"] },
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([{ deletedAt: null }, { id: "asset_1" }]),
+        }),
+      }),
+    );
+    expect(result).toEqual({ id: "asset_1", tags: ["hero"] });
+  });
+
   it("fetches records including soft-deleted entries", async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: "asset_1" } as never);
     const prisma = {
@@ -165,5 +209,54 @@ describe("media.repository mutations", () => {
 
     expect(deleteMock).toHaveBeenCalledWith({ where: { id: "asset_1" } });
     expect(result).toEqual({ id: "asset_1" });
+  });
+
+  it("soft deletes assets by stamping deletedAt", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "asset_1", deletedAt: new Date() } as never);
+    const prisma = {
+      mediaAsset: {
+        update,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({ mediaAsset: { update } } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    await repository.softDeleteAsset("asset_1");
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "asset_1" },
+      data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+    });
+  });
+
+  it("finds orphan assets with capped batch size", async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: "orphan_1" }] as never);
+    const prisma = {
+      mediaAsset: {
+        findMany,
+      },
+      $transaction: async (callback: (client: PrismaClient) => Promise<unknown>) =>
+        callback({ mediaAsset: { findMany } } as unknown as PrismaClient),
+    };
+
+    const repository = new MediaRepository(prisma as unknown as PrismaClient);
+    const result = await repository.findOrphans(500);
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { deletedAt: null },
+            expect.objectContaining({
+              products: { none: {} },
+              productVariants: { none: {} },
+            }),
+          ]),
+        }),
+        take: 200,
+      }),
+    );
+    expect(result).toEqual([{ id: "orphan_1" }]);
   });
 });
