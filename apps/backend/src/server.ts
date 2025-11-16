@@ -355,6 +355,14 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Ser
         logger.warn("Rate limiter cleanup failed during shutdown", { error: cleanupError });
       }
     }
+    const mediaQueueCleanup = app.get("mediaQueueCleanup") as (() => Promise<void>) | undefined;
+    if (typeof mediaQueueCleanup === "function") {
+      try {
+        await mediaQueueCleanup();
+      } catch (cleanupError) {
+        logger.warn("Media queue cleanup failed during shutdown", { error: cleanupError });
+      }
+    }
     await waitForServerClose(closePromise);
     await disconnectPrismaClient();
 

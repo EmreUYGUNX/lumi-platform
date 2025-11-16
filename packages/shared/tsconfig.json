@@ -5,9 +5,9 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "rootDirs": ["src", "../types/src"],
-    "baseUrl": ".",
+    "baseUrl": "../../",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["packages/shared/src/*"]
     }
   },
   "include": ["src/**/*"],

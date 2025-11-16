@@ -30,6 +30,10 @@ declare global {
         "x-request-id"?: string;
         "x-internal-service"?: string;
       };
+      /**
+       * Raw request payload captured before body parsing. Used for webhook signature validation.
+       */
+      rawBody?: string;
     }
 
     interface Response {

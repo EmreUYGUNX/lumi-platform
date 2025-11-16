@@ -1,6 +1,5 @@
 import compression from "compression";
-import express from "express";
-import type { Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import hpp from "hpp";
 
 import type { ApplicationConfig } from "@lumi/types";
@@ -19,6 +18,23 @@ import { createSecurityMiddleware } from "./security.js";
 
 const BODY_SIZE_LIMIT = "10mb";
 const COMPRESSION_THRESHOLD_BYTES = 1024;
+const WEBHOOK_PREFIX = "/webhooks";
+
+const shouldCaptureRawBody = (req: Request): boolean => {
+  const path = req.originalUrl ?? "";
+  return path.startsWith(WEBHOOK_PREFIX);
+};
+
+const captureRawBody = (req: Request, _res: Response, buffer: Buffer) => {
+  if (!buffer || buffer.length === 0) {
+    return;
+  }
+
+  if (shouldCaptureRawBody(req)) {
+    // eslint-disable-next-line no-param-reassign -- augment request for downstream signature verification.
+    req.rawBody = buffer.toString("utf8");
+  }
+};
 
 export const registerMiddleware = (app: Express, config: ApplicationConfig): void => {
   app.use(createRequestIdMiddleware());
@@ -39,7 +55,12 @@ export const registerMiddleware = (app: Express, config: ApplicationConfig): voi
 
   app.use(hpp());
 
-  app.use(express.json({ limit: BODY_SIZE_LIMIT }));
+  app.use(
+    express.json({
+      limit: BODY_SIZE_LIMIT,
+      verify: captureRawBody,
+    }),
+  );
   app.use(
     express.urlencoded({
       extended: true,

@@ -82,6 +82,12 @@ const createMetricsRateLimiter = () =>
     allowInternalBypass: true,
   });
 
+const MEDIA_COLLECTION_PATH = "/media";
+const MEDIA_RESOURCE_PATH = "/media/:id";
+const MEDIA_UPLOAD_PATH = "/media/upload";
+const MEDIA_SIGNATURE_PATH = "/media/signature";
+const MEDIA_METRICS_PATH = "/media/metrics/lcp";
+
 export const createMediaRouter = (
   config: ApplicationConfig,
   options: MediaRouterOptions = {},
@@ -104,30 +110,27 @@ export const createMediaRouter = (
       .catch((error) => routerLogger.warn("Media cache warmup trigger failed", { error }));
   }
 
-  router.get("/media", requireAuth, requireMediaRole, controller.list);
-  registerRoute?.("GET", "/media");
+  router.get(MEDIA_COLLECTION_PATH, requireAuth, requireMediaRole, controller.list);
+  registerRoute?.("GET", MEDIA_COLLECTION_PATH);
 
-  router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
-  registerRoute?.("GET", "/media/:id");
-
-  router.get("/media", requireAuth, requireMediaRole, controller.list);
-  registerRoute?.("GET", "/media");
-
-  router.get("/media/:id", requireAuth, requireMediaRole, controller.get);
-  registerRoute?.("GET", "/media/:id");
+  router.get(MEDIA_RESOURCE_PATH, requireAuth, requireMediaRole, controller.get);
+  registerRoute?.("GET", MEDIA_RESOURCE_PATH);
 
   router.post(
-    "/media/upload",
+    MEDIA_UPLOAD_PATH,
     requireAuth,
     uploadLimiter,
     requireMediaRole,
     uploadParser,
     controller.upload,
   );
-  registerRoute?.("POST", "/media/upload");
+  registerRoute?.("POST", MEDIA_UPLOAD_PATH);
 
-  router.post("/media/signature", requireAuth, requireMediaRole, controller.signature);
-  registerRoute?.("POST", "/media/signature");
+  router.post(MEDIA_SIGNATURE_PATH, requireAuth, requireMediaRole, controller.signature);
+  registerRoute?.("POST", MEDIA_SIGNATURE_PATH);
+
+  router.post(MEDIA_METRICS_PATH, metricsLimiter, controller.recordLcpMetric);
+  registerRoute?.("POST", MEDIA_METRICS_PATH);
 
   router.post("/media/metrics/lcp", metricsLimiter, controller.recordLcpMetric);
   registerRoute?.("POST", "/media/metrics/lcp");
