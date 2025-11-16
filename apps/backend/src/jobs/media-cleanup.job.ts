@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
@@ -43,9 +43,9 @@ export const runMediaCleanupJob = async (
   const orphans = await repository.findOrphans(limit);
   const agedAssetCount = await prisma.mediaAsset.count({
     where: {
-      deletedAt: {
-        equals: Prisma.DbNull,
-      },
+      // Cloudinary cleanup considers records not soft-deleted.
+      // eslint-disable-next-line unicorn/no-null
+      deletedAt: null,
       createdAt: {
         lt: cutoff,
       },

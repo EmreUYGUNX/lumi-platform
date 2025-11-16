@@ -20,11 +20,9 @@ const createAsset = (overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
-  deletedAt: undefined,
+  deletedAt: new Date(0),
   createdAt: new Date(),
   updatedAt: new Date(),
-  products: [],
-  productVariants: [],
   ...overrides,
 });
 

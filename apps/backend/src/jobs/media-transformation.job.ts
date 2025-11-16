@@ -1,5 +1,5 @@
 import type { MediaAsset, Prisma, PrismaClient } from "@prisma/client";
-import type { UploadApiResponse } from "cloudinary";
+import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 import {
   type CloudinaryClient,
@@ -36,12 +36,12 @@ export interface MediaTransformationJobResult {
 const mergeMetadata = (
   current: MediaAsset["metadata"],
   patch: Record<string, unknown>,
-): Record<string, unknown> => {
+): Prisma.InputJsonValue => {
   const base =
     current && typeof current === "object" && !Array.isArray(current)
       ? (current as Record<string, unknown>)
       : {};
-  return { ...base, ...patch };
+  return { ...base, ...patch } as Prisma.InputJsonValue;
 };
 
 const updateAssetFromResponse = (
@@ -92,34 +92,35 @@ export const runMediaTransformationJob = async (
   let failed = 0;
   let batches = 0;
   const fetchBatch = async (cursorId?: string) => {
-    const cursorFilter = cursorId
-      ? {
-          skip: 1,
-          cursor: {
-            id: cursorId,
-          },
-        }
-      : {};
-
-    return prisma.mediaAsset.findMany({
+    const query: Prisma.MediaAssetFindManyArgs = {
       where: {
-        deletedAt: {
-          equals: Prisma.DbNull,
-        },
+        // eslint-disable-next-line unicorn/no-null -- query needs explicit null comparison.
+        deletedAt: null,
       },
       orderBy: {
         createdAt: "asc",
       },
       take: batchSize,
-      ...cursorFilter,
-    });
+    };
+
+    if (cursorId) {
+      query.skip = 1;
+      query.cursor = {
+        id: cursorId,
+      };
+    }
+
+    return prisma.mediaAsset.findMany(query);
   };
 
   const regenerateAsset = async (asset: MediaAsset) => {
+    const resourceType = (asset.resourceType ?? "image") as UploadApiOptions["resource_type"];
+    const assetType = (asset.type ?? "upload") as UploadApiOptions["type"];
+
     try {
       const response = await cloudinary.regenerateAsset(asset.publicId, {
-        resourceType: asset.resourceType,
-        type: asset.type,
+        resourceType,
+        type: assetType,
         invalidate: true,
       });
       await updateAssetFromResponse(repository, asset, response);

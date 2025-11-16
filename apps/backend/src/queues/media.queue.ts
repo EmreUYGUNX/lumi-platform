@@ -317,9 +317,13 @@ const createInMemoryMediaQueueController = (
 
   const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
     const run = pending.then(() => task());
-    pending = run.catch((error) => {
-      logger.error("In-memory media queue task failed", { error });
-    });
+    pending = (async () => {
+      try {
+        await run;
+      } catch (error) {
+        logger.error("In-memory media queue task failed", { error });
+      }
+    })();
     return run;
   };
 
