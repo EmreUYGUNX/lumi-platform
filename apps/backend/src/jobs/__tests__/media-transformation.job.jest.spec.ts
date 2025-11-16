@@ -20,7 +20,8 @@ const createAsset = (overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
-  deletedAt: new Date(0),
+  // eslint-disable-next-line unicorn/no-null -- testing null persistence.
+  deletedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

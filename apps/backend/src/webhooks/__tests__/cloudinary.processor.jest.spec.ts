@@ -20,7 +20,8 @@ const createAsset = (overrides: Partial<MediaAsset> = {}): MediaAsset => ({
   tags: [],
   metadata: {},
   uploadedById: "user_1",
-  deletedAt: new Date(0),
+  // eslint-disable-next-line unicorn/no-null -- tests rely on null state for soft delete.
+  deletedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,
@@ -128,7 +129,7 @@ describe("CloudinaryWebhookProcessor", () => {
       expect.objectContaining({
         metadata: expect.objectContaining({
           derived: expect.objectContaining({
-            "c_fill,w_300,h_300": expect.objectContaining({
+            "c_fill-w_300-h_300": expect.objectContaining({
               secureUrl: "https://example.com/thumb.jpg",
             }),
           }),

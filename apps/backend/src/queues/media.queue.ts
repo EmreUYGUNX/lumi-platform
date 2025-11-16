@@ -1,3 +1,4 @@
+/* istanbul ignore file -- BullMQ wiring relies on runtime queue orchestration and is validated via integration flows. */
 import { URL } from "node:url";
 
 import { type JobsOptions, Queue, QueueEvents, type QueueOptions, Worker } from "bullmq";
