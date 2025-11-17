@@ -192,7 +192,7 @@ describe("media recovery scenarios", () => {
     await controller.enqueueWebhookEvent({ event });
 
     expect(queueAddMock).toHaveBeenCalledWith(
-      "media:webhook-event",
+      "media-webhook-event",
       { event },
       expect.objectContaining({
         attempts: 5,
@@ -207,7 +207,7 @@ describe("media recovery scenarios", () => {
       app: { environment: "production" },
     }) as ApplicationConfig;
     createMediaQueueController({ config, driver: "bullmq" });
-    const handler = workerHandlers["media:tasks"];
+    const handler = workerHandlers["media-tasks"];
     expect(handler).toBeDefined();
 
     const event = {
@@ -222,14 +222,14 @@ describe("media recovery scenarios", () => {
     cloudinaryProcessor.process.mockRejectedValueOnce(new Error("temporary outage"));
     await expect(
       handler?.({
-        name: "media:webhook-event",
+        name: "media-webhook-event",
         data: { event },
         attemptsMade: 1,
       }),
     ).rejects.toThrow("temporary outage");
 
     await handler?.({
-      name: "media:webhook-event",
+      name: "media-webhook-event",
       data: { event },
       attemptsMade: 2,
     });

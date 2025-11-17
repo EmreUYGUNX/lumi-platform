@@ -52,6 +52,7 @@
 ### Performance Standards (P2)
 
 **P2: Image Optimization Rules**
+
 ```typescript
 // Cloudinary transformation parameters
 {
@@ -70,6 +71,7 @@
 ```
 
 **Performance Targets:**
+
 - Upload processing < 5s (P95)
 - Image delivery via CDN: TTFB < 100ms
 - Largest Contentful Paint (LCP) < 1.2s
@@ -79,6 +81,7 @@
 ### Security Standards (S2/S3)
 
 **S2: Upload Security**
+
 - MIME type whitelist: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
 - File size limits: 5MB for products, 10MB for banners
 - Antivirus scanning (ClamAV or Cloudinary add-on)
@@ -86,6 +89,7 @@
 - Sanitize filenames (remove special characters)
 
 **S3: Admin Controls**
+
 - Upload/Delete operations require authentication
 - RBAC enforcement: only admin/staff can delete
 - Audit logging for all media operations
@@ -95,6 +99,7 @@
 ### API Standards (Q2)
 
 **Media Upload Response:**
+
 ```typescript
 {
   "success": true,
@@ -243,6 +248,7 @@ model MediaAsset {
 ### 1. Cloudinary Configuration & SDK Setup (12 items)
 
 #### 1.1 Cloudinary Account Setup
+
 - [ ] Create Cloudinary account (or use existing)
 - [ ] Get API credentials (cloud_name, api_key, api_secret)
 - [ ] Configure upload presets in Cloudinary dashboard
@@ -254,6 +260,7 @@ model MediaAsset {
 - [ ] Set up webhook notification URL
 
 #### 1.2 Backend SDK Integration
+
 - [ ] Install Cloudinary SDK: `pnpm add cloudinary`
 - [ ] Create `cloudinary.config.ts`
   - [ ] Load credentials from environment variables
@@ -272,6 +279,7 @@ model MediaAsset {
 ### 2. Database Schema & Models (8 items)
 
 #### 2.1 Prisma Schema
+
 - [ ] Add `MediaAsset` model to `schema.prisma`
 - [ ] Add relations to `Product`, `ProductVariant`, `User`
 - [ ] Add indexes on `publicId`, `uploadedById`, `folder`
@@ -279,6 +287,7 @@ model MediaAsset {
 - [ ] Generate Prisma client: `pnpm prisma generate`
 
 #### 2.2 Repository Layer
+
 - [ ] Create `media.repository.ts`
   - [ ] `create(data)` - Create media record
   - [ ] `findById(id)` - Get media by ID
@@ -294,6 +303,7 @@ model MediaAsset {
 ### 3. Media Upload Pipeline (28 items)
 
 #### 3.1 Upload Endpoint & Validation
+
 - [ ] Create `POST /api/v1/media/upload` endpoint
 - [ ] Install `multer` for file handling: `pnpm add multer @types/multer`
 - [ ] Configure `multer` with memory storage
@@ -305,6 +315,7 @@ model MediaAsset {
 - [ ] Implement rate limiting (10 uploads/min per user)
 
 #### 3.2 Upload Processing Service
+
 - [ ] Create `media.service.ts` with `uploadImage()` method
   - [ ] Accept file buffer, metadata, user ID
   - [ ] Validate file type and size
@@ -320,6 +331,7 @@ model MediaAsset {
   - [ ] Handle partial failures
 
 #### 3.3 Eager Transformations
+
 - [ ] Configure thumbnail transformation (300x300, crop: fill)
 - [ ] Configure medium transformation (800x800, crop: limit)
 - [ ] Configure large transformation (1920px width, crop: limit)
@@ -328,6 +340,7 @@ model MediaAsset {
 - [ ] Store transformation URLs in response
 
 #### 3.4 Security Measures
+
 - [ ] Implement server-side upload signature generation
 - [ ] Create `POST /api/v1/media/signature` endpoint
   - [ ] Generate Cloudinary upload signature
@@ -345,6 +358,7 @@ model MediaAsset {
   - [ ] Prevent path traversal attacks
 
 #### 3.5 Upload Error Handling
+
 - [ ] Handle Cloudinary API errors
 - [ ] Handle file size exceeded (413 Payload Too Large)
 - [ ] Handle invalid MIME type (415 Unsupported Media Type)
@@ -358,6 +372,7 @@ model MediaAsset {
 ### 4. Asset Management API (18 items)
 
 #### 4.1 Media Retrieval Endpoints
+
 - [ ] GET `/api/v1/media` - List media assets
   - [ ] Paginate results (default 24)
   - [ ] Filter by folder (query param)
@@ -373,6 +388,7 @@ model MediaAsset {
   - [ ] Return 404 if not found or deleted
 
 #### 4.2 Media Update Endpoints (Admin)
+
 - [ ] PUT `/api/v1/admin/media/:id` - Update media metadata
   - [ ] Update tags
   - [ ] Update folder
@@ -385,6 +401,7 @@ model MediaAsset {
   - [ ] Return updated asset
 
 #### 4.3 Media Delete Endpoints (Admin)
+
 - [ ] DELETE `/api/v1/admin/media/:id` - Soft delete media
   - [ ] Check if media is in use (products, variants)
   - [ ] Warn if in use, prevent deletion
@@ -403,6 +420,7 @@ model MediaAsset {
 ### 5. Frontend Components (32 items)
 
 #### 5.1 Next.js Image Integration
+
 - [ ] Create `MediaImage.tsx` component
   - [ ] Wrap Next.js `Image` component
   - [ ] Accept Cloudinary URL or publicId
@@ -418,6 +436,7 @@ model MediaAsset {
   - [ ] Support format negotiation (WebP/AVIF)
 
 #### 5.2 Media Upload Component
+
 - [ ] Install `react-dropzone`: `pnpm add react-dropzone`
 - [ ] Create `MediaUploader.tsx` component
   - [ ] Drag & drop zone
@@ -439,6 +458,7 @@ model MediaAsset {
   - [ ] Retry failed uploads
 
 #### 5.3 Media Gallery Component
+
 - [ ] Create `MediaGallery.tsx` component
   - [ ] Grid layout (responsive)
   - [ ] Infinite scroll pagination
@@ -457,6 +477,7 @@ model MediaAsset {
   - [ ] Zoom functionality
 
 #### 5.4 Admin Media Manager
+
 - [ ] Create `MediaManager.tsx` page
   - [ ] Upload section
   - [ ] Gallery view
@@ -467,6 +488,7 @@ model MediaAsset {
   - [ ] Orphan detection warning
 
 #### 5.5 TanStack Query Hooks
+
 - [ ] Create `useMediaUpload()` hook
   - [ ] useMutation for upload
   - [ ] Invalidate media list on success
@@ -489,6 +511,7 @@ model MediaAsset {
 ### 6. Image Optimization & Performance (16 items)
 
 #### 6.1 Responsive Images
+
 - [ ] Define responsive breakpoints: 320, 640, 768, 1024, 1280, 1536, 1920
 - [ ] Generate `srcset` for each image
 - [ ] Calculate optimal `sizes` attribute
@@ -496,6 +519,7 @@ model MediaAsset {
 - [ ] Test on multiple devices (mobile, tablet, desktop)
 
 #### 6.2 Format Optimization
+
 - [ ] Enable automatic format selection (f_auto)
   - [ ] WebP for Chrome, Firefox, Edge
   - [ ] AVIF for browsers that support it
@@ -505,6 +529,7 @@ model MediaAsset {
 - [ ] Monitor format distribution analytics
 
 #### 6.3 Lazy Loading & Placeholders
+
 - [ ] Implement lazy loading with IntersectionObserver
 - [ ] Generate LQIP (Low Quality Image Placeholder)
   - [ ] Use Cloudinary blur transformation (w_20,e_blur:1000)
@@ -514,6 +539,7 @@ model MediaAsset {
 - [ ] Measure LCP improvement
 
 #### 6.4 CDN Caching
+
 - [ ] Configure Cloudinary CDN cache headers
   - [ ] Cache-Control: public, max-age=31536000
   - [ ] Immutable URLs (version in URL)
@@ -526,6 +552,7 @@ model MediaAsset {
 ### 7. Webhooks & Async Processing (12 items)
 
 #### 7.1 Cloudinary Webhook Setup
+
 - [ ] Create webhook endpoint: `POST /webhooks/cloudinary`
 - [ ] Verify webhook signature
   - [ ] Use Cloudinary webhook secret
@@ -542,8 +569,9 @@ model MediaAsset {
 - [ ] Log all webhook events
 
 #### 7.2 Background Jobs
-- [ ] Create media cleanup job (`media:cleanup`)
-  - [ ] Run daily (cron: 0 2 * * *)
+
+- [ ] Create media cleanup job (`media-cleanup`)
+  - [ ] Run daily (cron: 0 2 \* \* \*)
   - [ ] Find orphan assets (not attached to any entity)
   - [ ] Find assets older than 30 days
   - [ ] Soft delete orphans
@@ -558,6 +586,7 @@ model MediaAsset {
 ### 8. Security & Compliance (14 items)
 
 #### 8.1 Upload Security
+
 - [ ] Enforce MIME type whitelist (S2)
 - [ ] Validate file size limits (S2)
 - [ ] Sanitize filenames (remove special chars)
@@ -567,6 +596,7 @@ model MediaAsset {
 - [ ] Add CSRF protection for upload forms
 
 #### 8.2 Access Control
+
 - [ ] Require authentication for all media endpoints
 - [ ] RBAC for admin operations (update, delete)
 - [ ] Verify user owns uploaded media or is admin
@@ -579,6 +609,7 @@ model MediaAsset {
   - [ ] Internal: only authenticated users
 
 #### 8.3 Content Security
+
 - [ ] Integrate antivirus scanning
   - [ ] Scan all uploads before storage
   - [ ] Quarantine infected files
@@ -593,6 +624,7 @@ model MediaAsset {
 ### 9. Testing Implementation (24 items)
 
 #### 9.1 Unit Tests
+
 - [ ] Test `cloudinary.client.ts`
   - [ ] Mock Cloudinary SDK calls (nock)
   - [ ] Test upload success
@@ -611,6 +643,7 @@ model MediaAsset {
   - [ ] Test soft delete
 
 #### 9.2 Integration Tests
+
 - [ ] Test upload endpoint
   - [ ] Upload single image (success)
   - [ ] Upload multiple images (success)
@@ -629,6 +662,7 @@ model MediaAsset {
   - [ ] Audit log created
 
 #### 9.3 Average/Error/Recovery Tests
+
 - [ ] **Average Test** (`tests/average/media-average.test.ts`)
   - [ ] Upload 3 images
   - [ ] Verify transformations generated
@@ -649,6 +683,7 @@ model MediaAsset {
   - [ ] Orphan cleanup → Delete unused assets
 
 #### 9.4 Performance Tests
+
 - [ ] Measure upload processing time (target: < 5s P95)
 - [ ] Measure image delivery TTFB (target: < 100ms)
 - [ ] Measure LCP on image-heavy pages (target: < 1.2s)
@@ -660,6 +695,7 @@ model MediaAsset {
 ### 10. Documentation & Operational Readiness (18 items)
 
 #### 10.1 API Documentation
+
 - [ ] Document upload endpoint in OpenAPI spec
 - [ ] Document media list endpoint
 - [ ] Document media delete endpoint
@@ -668,6 +704,7 @@ model MediaAsset {
 - [ ] Add Postman collection examples
 
 #### 10.2 Runbook Creation
+
 - [ ] Create `docs/ops/media-runbook.md`
   - [ ] Cloudinary dashboard access
   - [ ] API key rotation procedure
@@ -686,6 +723,7 @@ model MediaAsset {
   - [ ] Recovery procedures
 
 #### 10.3 Monitoring & Alerts
+
 - [ ] Add Prometheus metrics
   - [ ] `media_uploads_total{status}`
   - [ ] `media_upload_duration_seconds`
@@ -702,6 +740,7 @@ model MediaAsset {
   - [ ] Alert at 80% quota
 
 #### 10.4 Frontend Documentation
+
 - [ ] Document `MediaImage` component usage
 - [ ] Document `MediaUploader` component
 - [ ] Document TanStack Query hooks
@@ -739,65 +778,65 @@ pnpm test:coverage
 ```typescript
 // Test successful upload
 const formData = new FormData();
-formData.append('file', imageFile);
-formData.append('folder', 'lumi/products');
+formData.append("file", imageFile);
+formData.append("folder", "lumi/products");
 
-const response = await fetch('/api/v1/media/upload', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${token}` },
-  body: formData
+const response = await fetch("/api/v1/media/upload", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${token}` },
+  body: formData,
 });
 
 expect(response.status).toBe(200);
 const result = await response.json();
 expect(result.success).toBe(true);
-expect(result.data).toHaveProperty('publicId');
-expect(result.data).toHaveProperty('transformations');
-expect(result.data.transformations).toHaveProperty('thumbnail');
+expect(result.data).toHaveProperty("publicId");
+expect(result.data).toHaveProperty("transformations");
+expect(result.data.transformations).toHaveProperty("thumbnail");
 
 // Verify transformations are accessible
 const thumbResponse = await fetch(result.data.transformations.thumbnail);
 expect(thumbResponse.status).toBe(200);
-expect(thumbResponse.headers.get('content-type')).toMatch(/image/);
+expect(thumbResponse.headers.get("content-type")).toMatch(/image/);
 ```
 
 ### Security Validation
 
 ```typescript
 // S2: MIME type validation
-const invalidFile = new File(['test'], 'test.exe', { type: 'application/exe' });
+const invalidFile = new File(["test"], "test.exe", { type: "application/exe" });
 const formData = new FormData();
-formData.append('file', invalidFile);
+formData.append("file", invalidFile);
 
-const response = await fetch('/api/v1/media/upload', {
-  method: 'POST',
-  body: formData
+const response = await fetch("/api/v1/media/upload", {
+  method: "POST",
+  body: formData,
 });
 
 expect(response.status).toBe(415); // Unsupported Media Type
 
 // S2: File size validation
-const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], 'large.jpg', {
-  type: 'image/jpeg'
+const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "large.jpg", {
+  type: "image/jpeg",
 });
-const response2 = await fetch('/api/v1/media/upload', {
-  method: 'POST',
-  body: formData
+const response2 = await fetch("/api/v1/media/upload", {
+  method: "POST",
+  body: formData,
 });
 
 expect(response2.status).toBe(413); // Payload Too Large
 
 // S3: Admin-only delete
-const deleteResponse = await fetch('/api/v1/admin/media/123', {
-  method: 'DELETE',
-  headers: { 'Authorization': `Bearer ${customerToken}` }
+const deleteResponse = await fetch("/api/v1/admin/media/123", {
+  method: "DELETE",
+  headers: { Authorization: `Bearer ${customerToken}` },
 });
 
 expect(deleteResponse.status).toBe(403); // Forbidden
 
 // S3: Audit log verification
 const auditLog = await prisma.auditLog.findFirst({
-  where: { action: 'media.delete', resourceId: mediaId }
+  where: { action: "media.delete", resourceId: mediaId },
 });
 expect(auditLog).toBeDefined();
 expect(auditLog.userId).toBe(adminUserId);
@@ -808,8 +847,8 @@ expect(auditLog.userId).toBe(adminUserId);
 ```typescript
 // Verify WebP/AVIF conversion
 const imageUrl = result.data.secureUrl;
-expect(imageUrl).toContain('f_auto'); // Format auto
-expect(imageUrl).toContain('q_auto:good'); // Quality auto
+expect(imageUrl).toContain("f_auto"); // Format auto
+expect(imageUrl).toContain("q_auto:good"); // Quality auto
 
 // Verify responsive breakpoints
 const breakpoints = result.data.transformations.responsive;
@@ -818,7 +857,7 @@ expect(breakpoints[0].width).toBe(320);
 expect(breakpoints[6].width).toBe(1920);
 
 // Measure LCP with Lighthouse
-const lighthouse = await runLighthouse('http://localhost:3000/products/test');
+const lighthouse = await runLighthouse("http://localhost:3000/products/test");
 expect(lighthouse.lcp).toBeLessThan(1200); // < 1.2s
 ```
 
@@ -832,12 +871,12 @@ expect(response.body).toMatchObject({
     id: expect.any(String),
     publicId: expect.any(String),
     url: expect.stringMatching(/^https:\/\/res\.cloudinary\.com/),
-    transformations: expect.any(Object)
+    transformations: expect.any(Object),
   },
   meta: {
     timestamp: expect.any(String),
-    requestId: expect.stringMatching(/^[0-9a-f-]{36}$/)
-  }
+    requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+  },
 });
 ```
 
@@ -846,6 +885,7 @@ expect(response.body).toMatchObject({
 ## 📊 SUCCESS METRICS
 
 ### Code Quality Metrics
+
 - ✅ Test coverage ≥85% (media module)
 - ✅ 0 TypeScript errors
 - ✅ 0 ESLint errors
@@ -853,6 +893,7 @@ expect(response.body).toMatchObject({
 - ✅ Storybook stories for all components
 
 ### Performance Metrics
+
 - ✅ Upload processing < 5s (P95)
 - ✅ Image delivery TTFB < 100ms
 - ✅ LCP < 1.2s for image-heavy pages
@@ -860,6 +901,7 @@ expect(response.body).toMatchObject({
 - ✅ Lighthouse Performance score > 90
 
 ### Security Metrics
+
 - ✅ 100% uploads validated (MIME + size)
 - ✅ Antivirus scanning active
 - ✅ Server-side signatures only (no client API keys)
@@ -867,6 +909,7 @@ expect(response.body).toMatchObject({
 - ✅ All media actions audited
 
 ### Optimization Metrics (P2)
+
 - ✅ 100% images served as WebP/AVIF
 - ✅ Responsive breakpoints: 320-1920px
 - ✅ Lazy loading for below-fold images
@@ -878,41 +921,47 @@ expect(response.body).toMatchObject({
 ## 🚨 COMMON PITFALLS TO AVOID
 
 ### 1. Exposing API Secrets
+
 ❌ **Wrong:**
+
 ```typescript
 // Client-side Cloudinary config with API secret
-const cloudinary = require('cloudinary').v2;
+const cloudinary = require("cloudinary").v2;
 cloudinary.config({
-  cloud_name: 'lumi',
-  api_key: '123456',
-  api_secret: 'SECRET' // NEVER expose this!
+  cloud_name: "lumi",
+  api_key: "123456",
+  api_secret: "SECRET", // NEVER expose this!
 });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Server-side only, generate signed upload parameters
 export async function generateUploadSignature() {
   const timestamp = Math.round(Date.now() / 1000);
   const signature = cloudinary.utils.api_sign_request(
-    { timestamp, folder: 'lumi/products' },
-    process.env.CLOUDINARY_API_SECRET
+    { timestamp, folder: "lumi/products" },
+    process.env.CLOUDINARY_API_SECRET,
   );
   return { timestamp, signature };
 }
 ```
 
 ### 2. Missing MIME Validation
+
 ❌ **Wrong:**
+
 ```typescript
 // Accept any file type
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post("/upload", upload.single("file"), async (req, res) => {
   const result = await cloudinary.uploader.upload(req.file.path);
   res.json(result);
 });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Validate MIME type (S2)
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -926,13 +975,16 @@ if (!ALLOWED_MIMES.includes(req.file.mimetype)) {
 ```
 
 ### 3. No Image Optimization
+
 ❌ **Wrong:**
+
 ```typescript
 // Serve original image without optimization
 <img src={imageUrl} alt="Product" />
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Use Next.js Image with Cloudinary loader (P2)
 <Image
@@ -950,26 +1002,31 @@ if (!ALLOWED_MIMES.includes(req.file.mimetype)) {
 ```
 
 ### 4. Hardcoded Transformation URLs
+
 ❌ **Wrong:**
+
 ```typescript
 // Hardcoded transformation in URL
 const thumbnailUrl = `https://res.cloudinary.com/lumi/image/upload/w_300,h_300,c_fill/${publicId}`;
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Use Cloudinary SDK to generate URLs
 const thumbnailUrl = cloudinary.url(publicId, {
   width: 300,
   height: 300,
-  crop: 'fill',
-  quality: 'auto:good',
-  format: 'auto'
+  crop: "fill",
+  quality: "auto:good",
+  format: "auto",
 });
 ```
 
 ### 5. No Lazy Loading
+
 ❌ **Wrong:**
+
 ```typescript
 // All images load eagerly
 {images.map(img => (
@@ -978,6 +1035,7 @@ const thumbnailUrl = cloudinary.url(publicId, {
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Lazy load below-fold images
 {images.map((img, index) => (
@@ -991,7 +1049,9 @@ const thumbnailUrl = cloudinary.url(publicId, {
 ```
 
 ### 6. Missing Error Handling
+
 ❌ **Wrong:**
+
 ```typescript
 // No error handling for Cloudinary failures
 const result = await cloudinary.uploader.upload(filePath);
@@ -999,6 +1059,7 @@ return result;
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Proper error handling
 try {
@@ -1017,39 +1078,45 @@ try {
 ```
 
 ### 7. No Orphan Cleanup
+
 ❌ **Wrong:**
+
 ```typescript
 // Upload media but never clean up unused assets
 // Result: Storage quota fills up with orphaned images
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Daily cleanup job
-cron.schedule('0 2 * * *', async () => {
+cron.schedule("0 2 * * *", async () => {
   const orphans = await mediaRepository.findOrphans();
   for (const orphan of orphans) {
-    if (isOlderThan(orphan.createdAt, 30, 'days')) {
+    if (isOlderThan(orphan.createdAt, 30, "days")) {
       await mediaService.softDelete(orphan.id);
-      logger.info('Deleted orphan media', { id: orphan.id });
+      logger.info("Deleted orphan media", { id: orphan.id });
     }
   }
 });
 ```
 
 ### 8. Missing Cache Headers
+
 ❌ **Wrong:**
+
 ```typescript
 // No cache headers, CDN can't cache effectively
 res.json({ url: imageUrl });
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Set proper cache headers
 res.set({
-  'Cache-Control': 'public, max-age=31536000, immutable',
-  'ETag': generateETag(imageUrl)
+  "Cache-Control": "public, max-age=31536000, immutable",
+  ETag: generateETag(imageUrl),
 });
 res.json({ url: imageUrl });
 ```
@@ -1059,6 +1126,7 @@ res.json({ url: imageUrl });
 ## 📦 DELIVERABLES
 
 ### 1. Backend Implementation
+
 - ✅ Cloudinary SDK integration
 - ✅ Media upload API with validation
 - ✅ Media management endpoints (CRUD)
@@ -1068,6 +1136,7 @@ res.json({ url: imageUrl });
 - ✅ Q2 format responses
 
 ### 2. Frontend Implementation
+
 - ✅ MediaImage component (Next.js wrapper)
 - ✅ MediaUploader component (drag & drop)
 - ✅ MediaGallery component
@@ -1077,12 +1146,14 @@ res.json({ url: imageUrl });
 - ✅ Storybook stories
 
 ### 3. Database
+
 - ✅ MediaAsset model in Prisma schema
 - ✅ Relations to Product, ProductVariant, User
 - ✅ Indexes for performance
 - ✅ Migration files
 
 ### 4. Testing
+
 - ✅ Unit tests (≥85% coverage)
 - ✅ Integration tests
 - ✅ Average/Error/Recovery tests
@@ -1090,6 +1161,7 @@ res.json({ url: imageUrl });
 - ✅ Security tests (S2/S3 validation)
 
 ### 5. Documentation
+
 - ✅ OpenAPI spec for media endpoints
 - ✅ Media runbook (`docs/ops/media-runbook.md`)
 - ✅ Component documentation (Storybook)
@@ -1097,6 +1169,7 @@ res.json({ url: imageUrl });
 - ✅ Troubleshooting guide
 
 ### 6. Infrastructure
+
 - ✅ Cloudinary account configured
 - ✅ Upload presets created
 - ✅ Webhook configured
@@ -1111,12 +1184,14 @@ res.json({ url: imageUrl });
 # PHASE 5: Cloudinary Media System - Completion Report
 
 ## Implementation Summary
+
 - **Start Date**: [Date]
 - **End Date**: [Date]
 - **Duration**: [Days]
 - **Team Members**: [Names]
 
 ## Completed Items
+
 - [x] Total Items: 182/182 (100%)
 - [x] Cloudinary Setup: 12/12
 - [x] Upload Pipeline: 28/28
@@ -1126,6 +1201,7 @@ res.json({ url: imageUrl });
 - [x] Testing: 24/24
 
 ## Metrics Achieved
+
 - **Test Coverage**: X% (Target: ≥85%)
 - **Upload Processing Time**: Xms P95 (Target: <5s)
 - **LCP**: Xms (Target: <1.2s)
@@ -1133,15 +1209,18 @@ res.json({ url: imageUrl });
 - **P2 Compliance**: WebP ✅, AVIF ✅, Responsive ✅
 
 ## Cloudinary Statistics
+
 - **Total Assets**: X
 - **Storage Used**: X GB
 - **Bandwidth (30 days)**: X GB
 - **Transformations**: X
 
 ## Known Issues
+
 - [List any known issues or technical debt]
 
 ## Next Phase Preparation
+
 - Phase 6 dependencies ready: ✅
 - Documentation complete: ✅
 - Production deployment checklist: ✅
@@ -1152,6 +1231,7 @@ res.json({ url: imageUrl });
 ## 🎯 NEXT PHASE PREVIEW
 
 **Phase 6: Next.js Foundation**
+
 - Next.js 14 App Router setup
 - Tailwind CSS + Design System
 - shadcn/ui integration
@@ -1160,6 +1240,7 @@ res.json({ url: imageUrl });
 - Animation system (Framer Motion + GSAP + Lenis)
 
 **Dependencies from Phase 5:**
+
 - MediaImage component for product images ✅
 - Cloudinary loader for Next.js Image ✅
 - Media upload hooks for admin ✅

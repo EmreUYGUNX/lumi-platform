@@ -39,7 +39,7 @@ Cloudinary powers every media asset flowing through Phase&nbsp;5. The backend en
      -F tags=diagnostic \
      -F file=@hero.jpg
    ```
-4. **Inspect the queue:** `MediaQueueController` logs webhook job failures (look for `media:webhook-event` with errors). Sentry alerts for webhook errors carry `media_event_type=webhook.failure`.
+4. **Inspect the queue:** `MediaQueueController` logs webhook job failures (look for `media-webhook-event` with errors). Sentry alerts for webhook errors carry `media_event_type=webhook.failure`.
 5. **Cloudinary dashboard:** search for the `public_id` to confirm the asset arrived. If it exists but the API returned 500/timeout, trigger `POST /api/v1/admin/media/:id/regenerate` to re-sync metadata.
 
 Common fixes:
@@ -123,7 +123,7 @@ Response playbook:
 
 ### Retry Policy
 
-- BullMQ queue (`media:webhook-event`) retries failed jobs **5 times** with exponential backoff (2s base). Failures emit Sentry alerts (`media_event_type=webhook.failure`) and are logged with job IDs.
+- BullMQ queue (`media-webhook-event`) retries failed jobs **5 times** with exponential backoff (2s base). Failures emit Sentry alerts (`media_event_type=webhook.failure`) and are logged with job IDs.
 - Manual replay: locate the `notification_id` in the Cloudinary dashboard and issue the **Resend** action, or enqueue custom payloads via `MediaQueueController.enqueueWebhookEvent`.
 
 ---
