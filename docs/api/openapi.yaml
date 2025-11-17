@@ -257,6 +257,15 @@ components:
               metadata:
                 alt: Carbon desk with walnut legs
                 dominantColor: "#3B82F6"
+              usage:
+                products:
+                  - id: cm2a0b1c2
+                    title: Carbon Desk
+                    slug: carbon-desk
+                variants:
+                  - id: cm2a0b1v0
+                    sku: CARBON-DESK-STD
+                    productId: cm2a0b1c2
           failures: []
         meta:
           counts:
@@ -340,6 +349,9 @@ components:
                 productId: cm2a0b1c2
           createdAt: 2025-09-29T10:01:08.000Z
           updatedAt: 2025-09-29T10:01:08.000Z
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: 1b07b0a4-53fb-4532-bbb7-3164bfc8c3d1
     MediaDeleteConflict:
       summary: Media asset still referenced
       value:
