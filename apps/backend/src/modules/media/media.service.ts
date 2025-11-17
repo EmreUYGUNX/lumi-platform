@@ -1,7 +1,6 @@
 import { performance } from "node:perf_hooks";
 
 import type { MediaAsset, Prisma, Product, ProductVariant } from "@prisma/client";
-import { MediaVisibility as PrismaMediaVisibility } from "@prisma/client";
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 import { getConfig } from "@/config/index.js";
@@ -50,25 +49,26 @@ const BLUR_PLACEHOLDER_TRANSFORMATION = {
 } as const;
 
 type VisibilityInput = MediaUploadBody["visibility"];
+type PrismaMediaVisibility = "PUBLIC" | "PRIVATE" | "INTERNAL";
 
 const VISIBILITY_TO_PRISMA: Record<VisibilityInput, PrismaMediaVisibility> = {
-  public: PrismaMediaVisibility.PUBLIC,
-  private: PrismaMediaVisibility.PRIVATE,
-  internal: PrismaMediaVisibility.INTERNAL,
+  public: "PUBLIC",
+  private: "PRIVATE",
+  internal: "INTERNAL",
 } as const;
 
 const PRISMA_TO_VISIBILITY = new Map<PrismaMediaVisibility, VisibilityInput>([
-  [PrismaMediaVisibility.PUBLIC, "public"],
-  [PrismaMediaVisibility.PRIVATE, "private"],
-  [PrismaMediaVisibility.INTERNAL, "internal"],
+  ["PUBLIC", "public"],
+  ["PRIVATE", "private"],
+  ["INTERNAL", "internal"],
 ]);
 
 const resolvePrismaVisibility = (value: VisibilityInput): PrismaMediaVisibility =>
   // eslint-disable-next-line security/detect-object-injection -- visibility map is a sealed constant.
-  VISIBILITY_TO_PRISMA[value] ?? PrismaMediaVisibility.PUBLIC;
+  VISIBILITY_TO_PRISMA[value] ?? "PUBLIC";
 
 const resolveOutputVisibility = (value?: PrismaMediaVisibility | null): VisibilityInput =>
-  PRISMA_TO_VISIBILITY.get(value ?? PrismaMediaVisibility.PUBLIC) ?? "public";
+  PRISMA_TO_VISIBILITY.get(value ?? "PUBLIC") ?? "public";
 
 const CACHE_STATUS_HEADER_KEYS = ["x-cache", "cf-cache-status", "x-cld-cache"] as const;
 const CACHE_PREFETCH_CONCURRENCY = 4;
@@ -293,7 +293,7 @@ const assertAssetNotInUse = (asset: MediaAssetWithUsage): void => {
 
 const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionContext): void => {
   if (!actor) {
-    if (asset.visibility !== PrismaMediaVisibility.PUBLIC) {
+    if (asset.visibility !== "PUBLIC") {
       throw new ApiError("You do not have permission to view this media asset.", {
         status: 403,
         code: "FORBIDDEN",
@@ -306,10 +306,7 @@ const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionC
     return;
   }
 
-  if (
-    asset.visibility === PrismaMediaVisibility.INTERNAL ||
-    asset.visibility === PrismaMediaVisibility.PUBLIC
-  ) {
+  if (asset.visibility === "INTERNAL" || asset.visibility === "PUBLIC") {
     return;
   }
 
@@ -322,7 +319,7 @@ const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionC
 const buildAccessFilter = (actor?: MediaActionContext): MediaAccessFilter | undefined => {
   if (!actor) {
     return {
-      visibilities: [PrismaMediaVisibility.PUBLIC],
+      visibilities: ["PUBLIC"],
     } satisfies MediaAccessFilter;
   }
 
@@ -332,7 +329,7 @@ const buildAccessFilter = (actor?: MediaActionContext): MediaAccessFilter | unde
 
   return {
     ownerId: actor.userId,
-    visibilities: [PrismaMediaVisibility.PUBLIC, PrismaMediaVisibility.INTERNAL],
+    visibilities: ["PUBLIC", "INTERNAL"],
   } satisfies MediaAccessFilter;
 };
 
