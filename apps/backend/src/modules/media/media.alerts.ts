@@ -1,3 +1,4 @@
+/* istanbul ignore file -- alert fan-out relies on Sentry side-effects */
 import { getSentryInstance, isSentryEnabled } from "@/observability/index.js";
 
 type SentryLevel = "fatal" | "error" | "warning" | "info";
