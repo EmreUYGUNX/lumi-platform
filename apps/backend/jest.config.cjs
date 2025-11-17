@@ -45,7 +45,8 @@ config.coveragePathIgnorePatterns = [
   "<rootDir>/apps/backend/src/lib/email/helpers.ts",
   "<rootDir>/apps/backend/src/config/swagger.ts",
   "<rootDir>/apps/backend/src/queues/media.queue.ts",
-  "<rootDir>/apps/backend/src/modules/user/"
+  "<rootDir>/apps/backend/src/modules/user/",
+  "<rootDir>/apps/backend/src/modules/media/media.usage-monitor.ts"
 ];
 
 config.transformIgnorePatterns = [
