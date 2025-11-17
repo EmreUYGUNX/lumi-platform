@@ -1,4 +1,5 @@
-/* istanbul ignore file -- runtime poller backed by external API */
+/* istanbul ignore file */
+// runtime poller backed by external API, exercised via integration tests only
 import type { CloudinaryClient } from "@/integrations/cloudinary/cloudinary.client.js";
 import { getCloudinaryClient } from "@/integrations/cloudinary/cloudinary.client.js";
 import { createChildLogger } from "@/lib/logger.js";
