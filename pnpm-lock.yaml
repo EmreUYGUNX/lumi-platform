@@ -32,6 +32,9 @@ overrides:
   esbuild: 0.25.11
   js-yaml: 4.1.1
   glob@10: 11.1.0
+  glob@10.3.10: 11.1.0
+  glob@10.4.2: 11.1.0
+  glob@10.4.5: 11.1.0
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
