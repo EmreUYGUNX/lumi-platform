@@ -108,6 +108,7 @@ export const createMediaRouter = (
     service
       .warmPopularAssets()
       .catch((error) => routerLogger.warn("Media cache warmup trigger failed", { error }));
+    service.startUsageMonitoring();
   }
 
   router.get(MEDIA_COLLECTION_PATH, requireAuth, controller.list);

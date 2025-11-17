@@ -25,6 +25,8 @@ tags:
     description: Order lifecycle, payments, and tracking endpoints.
   - name: Users
     description: Customer self-service profile, address, and preference APIs.
+  - name: Media
+    description: Media library operations, Cloudinary delivery, and administrative asset controls.
   - name: Admin
     description: RBAC-protected administrative controls.
 components:
@@ -135,6 +137,13 @@ components:
       schema:
         type: string
         format: cuid
+    MediaId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: cuid
   examples:
     StandardSuccess:
       summary: Success envelope
@@ -157,6 +166,183 @@ components:
         meta:
           timestamp: 2025-10-01T12:00:00Z
           requestId: 0c1eaa62-df05-4cf3-8f42-5d3fd20f27d1
+    MediaListSuccess:
+      summary: Paginated media assets
+      value:
+        success: true
+        data:
+          - id: cm2x1y2z3
+            publicId: lumi/products/board-001
+            url: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+            secureUrl: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+            folder: lumi/products
+            format: jpg
+            resourceType: image
+            type: upload
+            width: 1920
+            height: 1080
+            bytes: 245678
+            tags:
+              - product:cm2a0b1c2
+              - hero
+            metadata:
+              alt: Carbon desk with walnut legs
+              dominantColor: "#3B82F6"
+              blurDataUrl: data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFElEQVQoU2NkQAL+/v7/Bw4cOADzCQ4GT5GpewAAAABJRU5ErkJggg==
+            version: 3
+            visibility: public
+            transformations:
+              original: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+              thumbnail: https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg
+              medium: https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg
+              large: https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg
+              responsive_640: https://res.cloudinary.com/lumi/image/upload/c_limit,w_640/v1727704823/lumi/products/board-001.jpg
+            usage:
+              products:
+                - id: cm2a0b1c2
+                  title: Carbon Desk
+                  slug: carbon-desk
+              variants:
+                - id: cm2a0b1v0
+                  sku: CARBON-DESK-STD
+                  productId: cm2a0b1c2
+            createdAt: 2025-09-29T10:01:08.000Z
+            updatedAt: 2025-09-29T10:01:08.000Z
+        meta:
+          pagination:
+            totalItems: 42
+            page: 1
+            pageSize: 24
+            totalPages: 2
+            hasNextPage: true
+            hasPreviousPage: false
+    MediaUploadSuccess:
+      summary: Multi-file upload result
+      value:
+        success: true
+        data:
+          uploads:
+            - id: cm2x1y2z3
+              publicId: lumi/products/board-001
+              url: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+              secureUrl: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+              folder: lumi/products
+              format: jpg
+              resourceType: image
+              type: upload
+              width: 1920
+              height: 1080
+              bytes: 245678
+              tags:
+                - product:cm2a0b1c2
+                - hero
+              version: 3
+              visibility: public
+              transformations:
+                thumbnail: https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg
+                medium: https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg
+                large: https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg
+                responsive_640: https://res.cloudinary.com/lumi/image/upload/c_limit,w_640/v1727704823/lumi/products/board-001.jpg
+              metadata:
+                alt: Carbon desk with walnut legs
+                dominantColor: "#3B82F6"
+          failures: []
+        meta:
+          counts:
+            total: 1
+            uploaded: 1
+            failed: 0
+          partialFailure: false
+    MediaUploadPayloadTooLarge:
+      summary: Upload rejected due to size
+      value:
+        success: false
+        error:
+          code: PAYLOAD_TOO_LARGE
+          message: File exceeds maximum allowed size.
+          details:
+            - message: Maximum allowed size is 5242880 bytes
+              fileName: hero.png
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: d2fa64a9-fd79-4c6d-925c-9b5a83185cf8
+    MediaDeleteForbidden:
+      summary: Delete denied
+      value:
+        success: false
+        error:
+          code: FORBIDDEN
+          message: Administrator privileges required to delete media assets.
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: e6b60c86-0aac-4f56-aa55-0fb52e8c4760
+    MediaUploadUnsupportedMime:
+      summary: Unsupported MIME type
+      value:
+        success: false
+        error:
+          code: UNSUPPORTED_MEDIA_TYPE
+          message: Unsupported media type.
+          details:
+            - message: MIME type application/x-msdownload is not supported.
+              fileName: payload.exe
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: 918eb7a5-1d57-48df-94c1-b415cbc6ebb0
+    MediaAssetSuccess:
+      summary: Single media asset
+      value:
+        success: true
+        data:
+          id: cm2x1y2z3
+          publicId: lumi/products/board-001
+          url: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+          secureUrl: https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg
+          folder: lumi/products
+          format: jpg
+          resourceType: image
+          type: upload
+          width: 1920
+          height: 1080
+          bytes: 245678
+          tags:
+            - product:cm2a0b1c2
+            - hero
+          metadata:
+            alt: Carbon desk with walnut legs
+            dominantColor: "#3B82F6"
+          version: 3
+          visibility: public
+          transformations:
+            thumbnail: https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg
+            medium: https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg
+            large: https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg
+            responsive_640: https://res.cloudinary.com/lumi/image/upload/c_limit,w_640/v1727704823/lumi/products/board-001.jpg
+          usage:
+            products:
+              - id: cm2a0b1c2
+                title: Carbon Desk
+                slug: carbon-desk
+            variants:
+              - id: cm2a0b1v0
+                sku: CARBON-DESK-STD
+                productId: cm2a0b1c2
+          createdAt: 2025-09-29T10:01:08.000Z
+          updatedAt: 2025-09-29T10:01:08.000Z
+    MediaDeleteConflict:
+      summary: Media asset still referenced
+      value:
+        success: false
+        error:
+          code: CONFLICT
+          message: Media asset is currently assigned to products or variants.
+          details:
+            - message: Detach all associations before deleting this asset.
+              products: 2
+              variants: 1
+        meta:
+          timestamp: 2025-10-01T12:00:00Z
+          requestId: 8fd53f56-2c1d-4d6c-9b9b-4b1f683d8fe4
   responses:
     UnauthorizedError:
       description: Caller is not authenticated.
@@ -359,34 +545,190 @@ components:
               nullable: true
             isPrimary:
               type: boolean
-    MediaAsset:
+    MediaUsageSummary:
       type: object
+      required:
+        - products
+        - variants
+      properties:
+        products:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - title
+              - slug
+            properties:
+              id:
+                type: string
+                format: cuid
+              title:
+                type: string
+              slug:
+                type: string
+        variants:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - productId
+            properties:
+              id:
+                type: string
+                format: cuid
+              productId:
+                type: string
+                format: cuid
+              sku:
+                type: string
+                nullable: true
+    MediaAsset:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
         - type: object
           required:
             - id
+            - publicId
             - url
+            - secureUrl
+            - format
+            - resourceType
             - type
+            - bytes
+            - tags
+            - version
+            - transformations
+            - usage
+            - visibility
           properties:
             id:
               type: string
               format: cuid
+            publicId:
+              type: string
+              maxLength: 200
             url:
               type: string
               format: uri
+            secureUrl:
+              type: string
+              format: uri
+            folder:
+              type: string
+              nullable: true
+            format:
+              type: string
+            resourceType:
+              type: string
+              enum:
+                - image
+                - video
+                - raw
             type:
               type: string
-              enum: [IMAGE, VIDEO, DOCUMENT]
-            provider:
-              type: string
-              enum: [CLOUDINARY, S3]
-            alt:
-              type: string
+              enum:
+                - upload
+                - private
+                - authenticated
+                - fetch
+            width:
+              type: integer
               nullable: true
-            caption:
-              type: string
+            height:
+              type: integer
               nullable: true
+            bytes:
+              type: integer
+              minimum: 0
+            tags:
+              type: array
+              items:
+                type: string
+            metadata:
+              type: object
+              additionalProperties: true
+              nullable: true
+            version:
+              type: integer
+              minimum: 1
+            transformations:
+              type: object
+              description: Cloudinary URLs for named variants (thumbnail, medium, responsive breakpoints).
+              additionalProperties:
+                type: string
+                format: uri
+            usage:
+              $ref: "#/components/schemas/MediaUsageSummary"
+            visibility:
+              type: string
+              enum:
+                - public
+                - private
+                - internal
+            deletedAt:
+              type: string
+              format: date-time
+              nullable: true
+    MediaUploadFailure:
+      type: object
+      required:
+        - fileName
+        - message
+        - code
+      properties:
+        fileName:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+          nullable: true
+    MediaUploadResult:
+      type: object
+      required:
+        - uploads
+        - failures
+      properties:
+        uploads:
+          type: array
+          description: Successfully persisted media assets.
+          items:
+            $ref: "#/components/schemas/MediaAsset"
+        failures:
+          type: array
+          description: Uploads rejected due to validation or threat scanning.
+          items:
+            $ref: "#/components/schemas/MediaUploadFailure"
+    MediaUploadMeta:
+      type: object
+      required:
+        - counts
+        - partialFailure
+      properties:
+        counts:
+          type: object
+          required:
+            - total
+            - uploaded
+            - failed
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            uploaded:
+              type: integer
+              minimum: 0
+            failed:
+              type: integer
+              minimum: 0
+        partialFailure:
+          type: boolean
     Product:
       allOf:
         - $ref: "#/components/schemas/AuditTimestamps"
@@ -2025,3 +2367,280 @@ paths:
       responses:
         "202":
           description: Unlock request accepted
+  /api/v1/media:
+    get:
+      tags: [Media]
+      summary: List media assets
+      description: >
+        Returns a paginated list of Cloudinary-backed assets. Private and internal assets are returned only to the
+        uploader or RBAC-approved operators. Responses include cache headers and strong ETags so the admin portal can
+        poll efficiently.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 24
+        - name: folder
+          in: query
+          schema:
+            type: string
+          description: Restrict results to a specific Cloudinary folder (e.g., `lumi/products`).
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+            enum: [image, video, raw]
+        - name: tags
+          in: query
+          description: >
+            Filter by tags (AND semantics). Repeat the parameter to provide multiple tags (e.g., `tags=product:123&tags=hero`).
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Convenience alias for a single tag filter.
+        - name: search
+          in: query
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 120
+          description: Case-insensitive search across `publicId`, folder, and tags.
+        - name: productId
+          in: query
+          schema:
+            type: string
+            format: cuid
+        - name: productVariantId
+          in: query
+          schema:
+            type: string
+            format: cuid
+        - name: uploadedById
+          in: query
+          schema:
+            type: string
+            format: cuid
+        - name: includeDeleted
+          in: query
+          schema:
+            type: boolean
+          description: >
+            When `true`, includes soft-deleted assets. Ignored unless the caller has the `admin` or `staff` role.
+        - $ref: "#/components/parameters/RequestIdHeader"
+      responses:
+        "200":
+          description: Paginated media assets
+          headers:
+            ETag:
+              description: Strong validator representing the asset list snapshot.
+              schema:
+                type: string
+            Cache-Control:
+              description: Cache policy hint for CDN/CDP layers.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MediaAsset"
+                      meta:
+                        type: object
+                        properties:
+                          pagination:
+                            $ref: "#/components/schemas/Pagination"
+              examples:
+                success:
+                  $ref: "#/components/examples/MediaListSuccess"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /api/v1/media/upload:
+    post:
+      tags: [Media]
+      summary: Upload media assets
+      description: >
+        Accepts up to 10 files per request, enforces MIME/size policies, performs malware scanning, and stores the
+        assets in Cloudinary with eager thumbnail/medium/large variants and responsive breakpoints.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: string
+                    format: binary
+                  description: Image files (`image/jpeg`, `image/png`, `image/webp`, `image/gif`).
+                folder:
+                  type: string
+                  description: >
+                    Target Cloudinary folder. Must match an allow-listed value (e.g., `lumi/products`, `lumi/banners`).
+                  example: lumi/products
+                visibility:
+                  type: string
+                  enum: [public, private, internal]
+                  default: public
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional contextual tags (product, campaign, locale).
+                metadata:
+                  description: Optional JSON payload for alt text, captions, or custom fields.
+                  oneOf:
+                    - type: object
+                      additionalProperties: true
+                    - type: string
+                      description: JSON string
+            encoding:
+              files:
+                contentType: image/jpeg, image/png, image/webp, image/gif
+                style: form
+                explode: true
+      responses:
+        "200":
+          description: Upload summary
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/MediaUploadResult"
+                      meta:
+                        $ref: "#/components/schemas/MediaUploadMeta"
+              examples:
+                success:
+                  $ref: "#/components/examples/MediaUploadSuccess"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+              examples:
+                validation:
+                  $ref: "#/components/examples/ValidationError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+              examples:
+                tooLarge:
+                  $ref: "#/components/examples/MediaUploadPayloadTooLarge"
+        "415":
+          description: Unsupported MIME type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+              examples:
+                unsupported:
+                  $ref: "#/components/examples/MediaUploadUnsupportedMime"
+        "429":
+          description: Upload rate limited
+          headers:
+            Retry-After:
+              $ref: "#/components/headers/Retry-After"
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+  /api/v1/admin/media/{id}:
+    delete:
+      tags: [Media, Admin]
+      summary: Soft delete media asset
+      description: >
+        Marks the asset as deleted and removes it from listings. Actual Cloudinary destruction happens through the
+        follow-up cleanup job or the permanent delete endpoint. Requires `admin` or `staff`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+        - $ref: "#/components/parameters/RequestIdHeader"
+      responses:
+        "200":
+          description: Deleted asset snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StandardSuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/MediaAsset"
+              examples:
+                success:
+                  $ref: "#/components/examples/MediaAssetSuccess"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+        "409":
+          description: Asset still referenced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardErrorResponse"
+              examples:
+                conflict:
+                  $ref: "#/components/examples/MediaDeleteConflict"

@@ -67,6 +67,17 @@ export interface UploadSignaturePayload {
   params: Record<string, string | number>;
 }
 
+export interface CloudinaryUsageRecord {
+  usage: number;
+  limit?: number;
+}
+
+export interface CloudinaryUsageSummary {
+  storage: CloudinaryUsageRecord;
+  bandwidth: CloudinaryUsageRecord;
+  transformations: CloudinaryUsageRecord;
+}
+
 export class CloudinaryClient {
   private activeConfig: CloudinaryIntegrationConfig;
 
@@ -189,6 +200,16 @@ export class CloudinaryClient {
     };
   }
 
+  async getUsageSummary(): Promise<CloudinaryUsageSummary> {
+    this.ensureConfiguration();
+    try {
+      const payload = (await cloudinary.api.usage()) as Record<string, unknown>;
+      return CloudinaryClient.normaliseUsageSummary(payload);
+    } catch (error) {
+      throw CloudinaryClient.toIntegrationError("usage", error);
+    }
+  }
+
   private static mergeTransformations(
     base: TransformationDefinition,
     override?: TransformationDefinition,
@@ -307,6 +328,75 @@ export class CloudinaryClient {
       details,
       error,
     );
+  }
+
+  private static pickNumber(
+    source: Record<string, unknown> | undefined,
+    ...keys: string[]
+  ): number | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    // eslint-disable-next-line no-restricted-syntax -- Explicit iteration over candidate keys.
+    for (const key of keys) {
+      // eslint-disable-next-line security/detect-object-injection -- Usage fields are an allow-listed set defined above.
+      const value = source[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private static toUsageSection(source: unknown): Record<string, unknown> | undefined {
+    if (isRecord(source)) {
+      return source;
+    }
+
+    return undefined;
+  }
+
+  private static extractUsageRecord(
+    payload: Record<string, unknown>,
+    primaryKey: string,
+    fallbackKeys: string[] = [],
+  ): CloudinaryUsageRecord {
+    // eslint-disable-next-line security/detect-object-injection -- Usage sections are derived from known Cloudinary keys.
+    const primarySection = CloudinaryClient.toUsageSection(payload[primaryKey]);
+    const fallbackSection = fallbackKeys
+      .map((key) =>
+        // eslint-disable-next-line security/detect-object-injection -- Fallback keys originate from a static allowlist.
+        CloudinaryClient.toUsageSection(payload[key]),
+      )
+      .find(Boolean);
+
+    const usage =
+      CloudinaryClient.pickNumber(primarySection, "usage", "used", "current_usage", "consumed") ??
+      CloudinaryClient.pickNumber(fallbackSection, "usage", "used", "current_usage", "consumed") ??
+      CloudinaryClient.pickNumber(payload, `${primaryKey}_usage`);
+
+    const limit =
+      CloudinaryClient.pickNumber(primarySection, "limit", "quota") ??
+      CloudinaryClient.pickNumber(fallbackSection, "limit", "quota") ??
+      CloudinaryClient.pickNumber(payload, `${primaryKey}_limit`) ??
+      CloudinaryClient.pickNumber(payload, `${primaryKey}_quota`);
+
+    return {
+      usage: typeof usage === "number" && Number.isFinite(usage) ? usage : 0,
+      limit: typeof limit === "number" && Number.isFinite(limit) && limit > 0 ? limit : undefined,
+    };
+  }
+
+  private static normaliseUsageSummary(payload: Record<string, unknown>): CloudinaryUsageSummary {
+    return {
+      storage: CloudinaryClient.extractUsageRecord(payload, "storage"),
+      bandwidth: CloudinaryClient.extractUsageRecord(payload, "bandwidth"),
+      transformations: CloudinaryClient.extractUsageRecord(payload, "transformations", [
+        "requests",
+      ]),
+    };
   }
 
   private static serialiseEagerTransformations(

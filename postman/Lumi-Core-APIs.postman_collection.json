@@ -284,6 +284,234 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "List Media Assets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/media?folder=lumi/products&perPage=24&tags=product:cm2a0b1c2",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "media"],
+              "query": [
+                {
+                  "key": "folder",
+                  "value": "lumi/products"
+                },
+                {
+                  "key": "perPage",
+                  "value": "24"
+                },
+                {
+                  "key": "tags",
+                  "value": "product:cm2a0b1c2"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/media?folder=lumi/products&perPage=24&tags=product:cm2a0b1c2",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "media"],
+                  "query": [
+                    {
+                      "key": "folder",
+                      "value": "lumi/products"
+                    },
+                    {
+                      "key": "perPage",
+                      "value": "24"
+                    },
+                    {
+                      "key": "tags",
+                      "value": "product:cm2a0b1c2"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"cm2x1y2z3\",\n      \"publicId\": \"lumi/products/board-001\",\n      \"url\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n      \"secureUrl\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n      \"folder\": \"lumi/products\",\n      \"format\": \"jpg\",\n      \"resourceType\": \"image\",\n      \"type\": \"upload\",\n      \"width\": 1920,\n      \"height\": 1080,\n      \"bytes\": 245678,\n      \"tags\": [\"product:cm2a0b1c2\", \"hero\"],\n      \"metadata\": {\n        \"alt\": \"Carbon desk with walnut legs\",\n        \"dominantColor\": \"#3B82F6\"\n      },\n      \"version\": 3,\n      \"visibility\": \"public\",\n      \"transformations\": {\n        \"thumbnail\": \"https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg\",\n        \"medium\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg\",\n        \"large\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg\"\n      },\n      \"usage\": {\n        \"products\": [\n          {\n            \"id\": \"cm2a0b1c2\",\n            \"title\": \"Carbon Desk\",\n            \"slug\": \"carbon-desk\"\n          }\n        ],\n        \"variants\": [\n          {\n            \"id\": \"cm2a0b1v0\",\n            \"productId\": \"cm2a0b1c2\",\n            \"sku\": \"CARBON-DESK-STD\"\n          }\n        ]\n      },\n      \"createdAt\": \"2025-09-29T10:01:08.000Z\",\n      \"updatedAt\": \"2025-09-29T10:01:08.000Z\"\n    }\n  ],\n  \"meta\": {\n    \"pagination\": {\n      \"totalItems\": 42,\n      \"page\": 1,\n      \"pageSize\": 24,\n      \"totalPages\": 2,\n      \"hasNextPage\": true,\n      \"hasPreviousPage\": false\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upload Media Asset",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "{{mediaSamplePath}}"
+                },
+                {
+                  "key": "folder",
+                  "value": "lumi/products",
+                  "type": "text"
+                },
+                {
+                  "key": "visibility",
+                  "value": "public",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "product:cm2a0b1c2",
+                  "type": "text"
+                },
+                {
+                  "key": "metadata",
+                  "value": "{\"alt\":\"Carbon desk\"}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/media/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "media", "upload"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "{{mediaSamplePath}}"
+                    },
+                    {
+                      "key": "folder",
+                      "value": "lumi/products",
+                      "type": "text"
+                    },
+                    {
+                      "key": "visibility",
+                      "value": "public",
+                      "type": "text"
+                    },
+                    {
+                      "key": "tags",
+                      "value": "product:cm2a0b1c2",
+                      "type": "text"
+                    },
+                    {
+                      "key": "metadata",
+                      "value": "{\"alt\":\"Carbon desk\"}",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/v1/media/upload",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "media", "upload"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"uploads\": [\n      {\n        \"id\": \"cm2x1y2z3\",\n        \"publicId\": \"lumi/products/board-001\",\n        \"url\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n        \"secureUrl\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n        \"folder\": \"lumi/products\",\n        \"format\": \"jpg\",\n        \"resourceType\": \"image\",\n        \"type\": \"upload\",\n        \"width\": 1920,\n        \"height\": 1080,\n        \"bytes\": 245678,\n        \"tags\": [\"product:cm2a0b1c2\", \"hero\"],\n        \"version\": 3,\n        \"visibility\": \"public\",\n        \"transformations\": {\n          \"thumbnail\": \"https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg\",\n          \"medium\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg\",\n          \"large\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg\"\n        }\n      }\n    ],\n    \"failures\": []\n  },\n  \"meta\": {\n    \"counts\": {\n      \"total\": 1,\n      \"uploaded\": 1,\n      \"failed\": 0\n    },\n    \"partialFailure\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Media Asset (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/media/{{mediaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "admin", "media", "{{mediaId}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/admin/media/{{mediaId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "admin", "media", "{{mediaId}}"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"cm2x1y2z3\",\n    \"publicId\": \"lumi/products/board-001\",\n    \"url\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n    \"secureUrl\": \"https://res.cloudinary.com/lumi/image/upload/v1727704823/lumi/products/board-001.jpg\",\n    \"folder\": \"lumi/products\",\n    \"format\": \"jpg\",\n    \"resourceType\": \"image\",\n    \"type\": \"upload\",\n    \"width\": 1920,\n    \"height\": 1080,\n    \"bytes\": 245678,\n    \"tags\": [\"product:cm2a0b1c2\", \"hero\"],\n    \"metadata\": {\n      \"alt\": \"Carbon desk with walnut legs\",\n      \"dominantColor\": \"#3B82F6\"\n    },\n    \"version\": 3,\n    \"visibility\": \"public\",\n    \"transformations\": {\n      \"thumbnail\": \"https://res.cloudinary.com/lumi/image/upload/c_fill,w_300,h_300/v1727704823/lumi/products/board-001.jpg\",\n      \"medium\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_800/v1727704823/lumi/products/board-001.jpg\",\n      \"large\": \"https://res.cloudinary.com/lumi/image/upload/c_limit,w_1920/v1727704823/lumi/products/board-001.jpg\"\n    },\n    \"usage\": {\n      \"products\": [],\n      \"variants\": []\n    },\n    \"deletedAt\": \"2025-09-30T17:11:03.000Z\",\n    \"createdAt\": \"2025-09-29T10:01:08.000Z\",\n    \"updatedAt\": \"2025-09-30T17:11:03.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -12,6 +12,7 @@ import type {
 } from "@/jobs/media-transformation.job.js";
 import { runMediaTransformationJob } from "@/jobs/media-transformation.job.js";
 import { createChildLogger } from "@/lib/logger.js";
+import { reportMediaWebhookFailure } from "@/modules/media/media.alerts.js";
 import {
   type WebhookIdempotencyStore,
   createWebhookIdempotencyStore,
@@ -226,6 +227,16 @@ class BullMediaQueueController implements MediaQueueController {
         attemptsMade: job?.attemptsMade,
         error,
       });
+      if (job?.name === WEBHOOK_JOB_NAME) {
+        const payload = (job.data as MediaWebhookJobPayload | undefined)?.event;
+        reportMediaWebhookFailure({
+          jobId: job.id ? String(job.id) : undefined,
+          eventId: payload?.id,
+          eventType: payload?.type,
+          attempt: job.attemptsMade,
+          errorMessage: error instanceof Error ? error.message : undefined,
+        });
+      }
     });
 
     this.events.on("completed", (data) => {
