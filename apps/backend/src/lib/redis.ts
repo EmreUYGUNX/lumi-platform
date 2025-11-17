@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+// Thin redis client wrapper around network sockets; exercised via integration smoke tests.
 import { createClient } from "redis";
 
 import { getConfig } from "@/config/index.js";
