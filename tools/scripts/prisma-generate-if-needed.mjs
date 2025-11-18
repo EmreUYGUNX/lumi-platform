@@ -76,6 +76,13 @@ const resolvePrismaEnv = () => {
     );
   }
 
+  if (!childEnv.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING) {
+    childEnv.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING = "1";
+    console.log(
+      "PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING enforced to avoid checksum fetch flakiness.",
+    );
+  }
+
   return childEnv;
 };
 
