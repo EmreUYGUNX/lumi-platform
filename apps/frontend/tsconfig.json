@@ -31,7 +31,13 @@
       }
     ]
   },
-  "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts", "__tests__/**/*"],
+  "include": [
+    "next-env.d.ts",
+    "src/**/*",
+    ".next/types/**/*.ts",
+    "__tests__/**/*",
+    "tailwind.config.ts"
+  ],
   "references": [
     {
       "path": "../../packages/ui"

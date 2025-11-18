@@ -66,6 +66,7 @@ describe("cloudinary.config", () => {
         crop: "fill",
         quality: config.defaultDelivery.quality,
         format: config.defaultDelivery.format,
+        flags: "progressive",
       }),
     );
   });

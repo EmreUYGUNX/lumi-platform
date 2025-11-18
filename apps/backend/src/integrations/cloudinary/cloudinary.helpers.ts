@@ -55,4 +55,5 @@ export const buildEagerTransformations = (
     quality: defaults.quality,
     format: defaults.format,
     fetch_format: defaults.fetchFormat,
+    flags: "progressive",
   }));
