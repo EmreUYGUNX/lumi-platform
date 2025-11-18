@@ -454,6 +454,9 @@ importers:
       "@tanstack/react-query-devtools":
         specifier: ^5.90.2
         version: 5.90.2(@tanstack/react-query@5.90.9(react@18.3.1))(react@18.3.1)
+      autoprefixer:
+        specifier: ^10.4.22
+        version: 10.4.22(postcss@8.5.6)
       critters:
         specifier: ^0.0.25
         version: 0.0.25
@@ -463,6 +466,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.6
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -512,12 +518,6 @@ importers:
       "@types/react-dom":
         specifier: ^18.2.22
         version: 18.3.7(@types/react@18.3.26)
-      autoprefixer:
-        specifier: ^10.4.22
-        version: 10.4.22(postcss@8.5.6)
-      postcss:
-        specifier: ^8.5.6
-        version: 8.5.6
       tailwindcss:
         specifier: ^3.4.18
         version: 3.4.18(tsx@4.20.6)(yaml@2.8.1)
