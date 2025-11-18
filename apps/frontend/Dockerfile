@@ -72,6 +72,9 @@ RUN rm -rf ./apps/frontend/node_modules ./apps/frontend/src
 COPY --from=build /workspace/packages ./packages
 COPY --from=build /workspace/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=build /workspace/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# Drop npm CLI to avoid CVE-2025-64756 that only affects the unused npm binary.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
 RUN chown -R lumi:nodejs /app
 USER lumi
 EXPOSE 3000
