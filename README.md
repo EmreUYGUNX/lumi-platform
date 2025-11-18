@@ -83,6 +83,16 @@ Commonly used root-level scripts (full catalog in `package.json`):
 
 Environment variables are centrally documented in [`docs/configuration/environment.md`](docs/configuration/environment.md). Secrets must never be committed; use the sealed vault procedure defined in [`docs/security.md`](docs/security.md#secret-management-policy).
 
+### Frontend Environment Variables
+
+The Next.js workspace (`apps/frontend`) reads its configuration from the standard `.env*` files. Ensure the following public variables are set before running any frontend command:
+
+- `NEXT_PUBLIC_API_URL` – Absolute base URL for the backend API (example: `http://localhost:4000/api/v1`).
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` – Cloudinary cloud identifier used when building image URLs.
+- `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_AMPLITUDE_API_KEY`, `NEXT_PUBLIC_GA4_MEASUREMENT_ID` – Optional analytics identifiers that default to blank but must be provided in production as needed.
+
+Copy `.env.example` (or the templates under `env/`) into your local `.env` files and adjust the values above to match your environment before running `pnpm dev`.
+
 ## Documentation Map
 
 - [`docs/getting-started.md`](docs/getting-started.md) – Full onboarding, validation, and developer workflows.

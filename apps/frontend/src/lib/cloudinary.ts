@@ -1,6 +1,7 @@
 /* istanbul ignore file */
 import type { ImageLoaderProps } from "next/image";
 
+import { env } from "@/lib/env";
 import { CLOUDINARY_BREAKPOINTS as SHARED_CLOUDINARY_BREAKPOINTS } from "@lumi/shared/media/cloudinary";
 
 export const CLOUDINARY_BREAKPOINTS = SHARED_CLOUDINARY_BREAKPOINTS;
@@ -46,8 +47,7 @@ export interface CloudinaryUrlOptions {
   baseUrl?: string;
 }
 
-const getCloudName = (): string =>
-  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME || "demo";
+const getCloudName = (): string => env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
 const encodePublicId = (value: string): string =>
   value
