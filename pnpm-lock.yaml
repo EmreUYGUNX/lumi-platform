@@ -518,6 +518,9 @@ importers:
       "@types/react-dom":
         specifier: ^18.2.22
         version: 18.3.7(@types/react@18.3.26)
+      identity-obj-proxy:
+        specifier: ^3.0.0
+        version: 3.0.0
       tailwindcss:
         specifier: ^3.4.18
         version: 3.4.18(tsx@4.20.6)(yaml@2.8.1)
@@ -8271,6 +8274,12 @@ packages:
     engines: { node: ">=0.4.7" }
     hasBin: true
 
+  harmony-reflect@1.6.2:
+    resolution:
+      {
+        integrity: sha512-HIp/n38R9kQjDEziXyDTuW3vvoxxyxjxFzXLrBr18uB47GnSt+G9D29fqrpM5ZkspMcPICud3XsBJQ4Y2URg8g==,
+      }
+
   has-async-hooks@1.0.0:
     resolution:
       {
@@ -8492,6 +8501,13 @@ packages:
         integrity: sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ==,
       }
     engines: { node: ">=0.10.0" }
+
+  identity-obj-proxy@3.0.0:
+    resolution:
+      {
+        integrity: sha512-00n6YnVHKrinT9t0d9+5yZC6UBNJANpYEQvL2LlX6Ab9lnmxzIRcEmTPuyGScvl1+jKuCICX1Z0Ab1pPKKdikA==,
+      }
+    engines: { node: ">=4" }
 
   ieee754@1.2.1:
     resolution:
@@ -19551,6 +19567,8 @@ snapshots:
     optionalDependencies:
       uglify-js: 3.19.3
 
+  harmony-reflect@1.6.2: {}
+
   has-async-hooks@1.0.0: {}
 
   has-bigints@1.1.0: {}
@@ -19677,6 +19695,10 @@ snapshots:
   iconv-lite@0.7.0:
     dependencies:
       safer-buffer: 2.1.2
+
+  identity-obj-proxy@3.0.0:
+    dependencies:
+      harmony-reflect: 1.6.2
 
   ieee754@1.2.1: {}
 

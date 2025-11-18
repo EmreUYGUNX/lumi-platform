@@ -17,6 +17,7 @@ module.exports = createProjectJestConfig({
   moduleNameMapper: {
     "^@/(.*)$": path.join(__dirname, "src", "$1"),
     "^@config/(.*)$": path.join(__dirname, "../../config", "$1"),
+    "\\.(css|scss|sass)$": "identity-obj-proxy",
   },
   coverageDirectory: path.join(__dirname, "../../coverage/apps/frontend"),
   setupFiles: [],
