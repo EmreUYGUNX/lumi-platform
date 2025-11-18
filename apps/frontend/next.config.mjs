@@ -7,6 +7,9 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   openAnalyzer: false
 });
 const CLOUDINARY_BREAKPOINTS = require("../../packages/shared/media/cloudinary-breakpoints.json");
+const CLOUDINARY_CLOUD_NAME =
+  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_REMOTE_PATH = CLOUDINARY_CLOUD_NAME ? `/${CLOUDINARY_CLOUD_NAME}/**` : "/**";
 
 const nextConfig = {
   reactStrictMode: true,
@@ -17,7 +20,10 @@ const nextConfig = {
   productionBrowserSourceMaps: process.env.NODE_ENV === "production",
   transpilePackages: ["@lumi/ui", "@lumi/shared"],
   experimental: {
+    appDir: true,
     typedRoutes: true,
+    optimizeCss: true,
+    serverComponentsExternalPackages: ["@prisma/client"],
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],
     serverActions: {
       bodySizeLimit: "2mb"
@@ -39,9 +45,16 @@ const nextConfig = {
     tsconfigPath: "./tsconfig.json"
   },
   images: {
-    formats: ["image/avif", "image/webp"],
+    formats: ["image/webp", "image/avif"],
     deviceSizes: CLOUDINARY_BREAKPOINTS,
-    minimumCacheTTL: 31536000
+    minimumCacheTTL: 31536000,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: CLOUDINARY_REMOTE_PATH
+      }
+    ]
   },
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,

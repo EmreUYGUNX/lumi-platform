@@ -3,6 +3,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/store/*": ["./src/store/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/types/*": ["./src/types/*"],
       "@/app/layout": ["./src/app/layout.tsx"],
       "@/app/page": ["./src/app/page.tsx"],
       "@/*": ["./src/*"],
@@ -16,14 +22,14 @@
     "noEmit": true,
     "isolatedModules": true,
     "incremental": true,
+    "strict": true,
     "tsBuildInfoFile": ".next/tsconfig.tsbuildinfo",
     "types": ["node", "jest", "@testing-library/jest-dom"],
     "plugins": [
       {
         "name": "next"
       }
-    ],
-    "strictNullChecks": true
+    ]
   },
   "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts", "__tests__/**/*"],
   "references": [

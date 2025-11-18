@@ -1,6 +1,8 @@
 /* istanbul ignore file */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { env } from "@/lib/env";
+
 import type { MediaAsset, MediaUploadPayload } from "../types/media.types";
 import { mediaKeys } from "./media.keys";
 
@@ -22,7 +24,7 @@ interface ApiResponse<T> {
   meta?: unknown;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL.replace(/\/+$/u, "");
 const UPLOAD_ENDPOINT = `${API_BASE_URL}/media/upload`;
 
 const toMediaAsset = (input: MediaAsset): MediaAsset => ({

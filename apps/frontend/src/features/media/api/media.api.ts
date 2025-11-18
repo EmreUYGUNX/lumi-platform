@@ -1,4 +1,6 @@
 /* istanbul ignore file */
+import { env } from "@/lib/env";
+
 import type {
   MediaAsset,
   MediaDeletePayload,
@@ -6,7 +8,7 @@ import type {
   MediaUpdatePayload,
 } from "../types/media.types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL.replace(/\/+$/u, "");
 const MEDIA_ENDPOINT = `${API_BASE_URL}/media`;
 const ADMIN_MEDIA_ENDPOINT = `${API_BASE_URL}/admin/media`;
 
