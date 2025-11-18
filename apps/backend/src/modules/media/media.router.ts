@@ -104,10 +104,13 @@ export const createMediaRouter = (
   const uploadParser = createUploadParser();
   const metricsLimiter = createMetricsRateLimiter();
 
-  if (!options.service && !options.controller) {
+  const enableRuntimeWarmers = config.app.environment !== "test";
+
+  if (enableRuntimeWarmers && !options.service && !options.controller) {
     service
       .warmPopularAssets()
       .catch((error) => routerLogger.warn("Media cache warmup trigger failed", { error }));
+    service.startUsageMonitoring();
   }
 
   router.get(MEDIA_COLLECTION_PATH, requireAuth, controller.list);

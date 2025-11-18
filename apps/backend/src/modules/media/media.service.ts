@@ -1,5 +1,6 @@
+import { performance } from "node:perf_hooks";
+
 import type { MediaAsset, Prisma, Product, ProductVariant } from "@prisma/client";
-import { MediaVisibility as PrismaMediaVisibility } from "@prisma/client";
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
 
 import { getConfig } from "@/config/index.js";
@@ -14,10 +15,12 @@ import type { PaginatedResult } from "@/lib/repository/base.repository.js";
 import { mediaMetrics } from "@/observability/media-metrics.js";
 import type { ApplicationConfig } from "@lumi/types";
 
+import { reportMediaCloudinaryError, reportMediaUploadFailure } from "./media.alerts.js";
 import type { MediaAccessFilter, MediaListFilters } from "./media.repository.js";
 import { MediaRepository } from "./media.repository.js";
 import { MediaScanService, sanitizeFilename } from "./media.security.js";
 import { MediaThreatService } from "./media.threats.js";
+import { MediaUsageMonitor } from "./media.usage-monitor.js";
 import {
   IMAGE_MIME_WHITELIST,
   type MediaListQuery,
@@ -46,25 +49,26 @@ const BLUR_PLACEHOLDER_TRANSFORMATION = {
 } as const;
 
 type VisibilityInput = MediaUploadBody["visibility"];
+type PrismaMediaVisibility = "PUBLIC" | "PRIVATE" | "INTERNAL";
 
 const VISIBILITY_TO_PRISMA: Record<VisibilityInput, PrismaMediaVisibility> = {
-  public: PrismaMediaVisibility.PUBLIC,
-  private: PrismaMediaVisibility.PRIVATE,
-  internal: PrismaMediaVisibility.INTERNAL,
+  public: "PUBLIC",
+  private: "PRIVATE",
+  internal: "INTERNAL",
 } as const;
 
 const PRISMA_TO_VISIBILITY = new Map<PrismaMediaVisibility, VisibilityInput>([
-  [PrismaMediaVisibility.PUBLIC, "public"],
-  [PrismaMediaVisibility.PRIVATE, "private"],
-  [PrismaMediaVisibility.INTERNAL, "internal"],
+  ["PUBLIC", "public"],
+  ["PRIVATE", "private"],
+  ["INTERNAL", "internal"],
 ]);
 
 const resolvePrismaVisibility = (value: VisibilityInput): PrismaMediaVisibility =>
   // eslint-disable-next-line security/detect-object-injection -- visibility map is a sealed constant.
-  VISIBILITY_TO_PRISMA[value] ?? PrismaMediaVisibility.PUBLIC;
+  VISIBILITY_TO_PRISMA[value] ?? "PUBLIC";
 
 const resolveOutputVisibility = (value?: PrismaMediaVisibility | null): VisibilityInput =>
-  PRISMA_TO_VISIBILITY.get(value ?? PrismaMediaVisibility.PUBLIC) ?? "public";
+  PRISMA_TO_VISIBILITY.get(value ?? "PUBLIC") ?? "public";
 
 const CACHE_STATUS_HEADER_KEYS = ["x-cache", "cf-cache-status", "x-cld-cache"] as const;
 const CACHE_PREFETCH_CONCURRENCY = 4;
@@ -289,7 +293,7 @@ const assertAssetNotInUse = (asset: MediaAssetWithUsage): void => {
 
 const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionContext): void => {
   if (!actor) {
-    if (asset.visibility !== PrismaMediaVisibility.PUBLIC) {
+    if (asset.visibility !== "PUBLIC") {
       throw new ApiError("You do not have permission to view this media asset.", {
         status: 403,
         code: "FORBIDDEN",
@@ -302,10 +306,7 @@ const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionC
     return;
   }
 
-  if (
-    asset.visibility === PrismaMediaVisibility.INTERNAL ||
-    asset.visibility === PrismaMediaVisibility.PUBLIC
-  ) {
+  if (asset.visibility === "INTERNAL" || asset.visibility === "PUBLIC") {
     return;
   }
 
@@ -318,7 +319,7 @@ const assertVisibilityAccess = (asset: MediaAssetWithUsage, actor?: MediaActionC
 const buildAccessFilter = (actor?: MediaActionContext): MediaAccessFilter | undefined => {
   if (!actor) {
     return {
-      visibilities: [PrismaMediaVisibility.PUBLIC],
+      visibilities: ["PUBLIC"],
     } satisfies MediaAccessFilter;
   }
 
@@ -328,7 +329,7 @@ const buildAccessFilter = (actor?: MediaActionContext): MediaAccessFilter | unde
 
   return {
     ownerId: actor.userId,
-    visibilities: [PrismaMediaVisibility.PUBLIC, PrismaMediaVisibility.INTERNAL],
+    visibilities: ["PUBLIC", "INTERNAL"],
   } satisfies MediaAccessFilter;
 };
 
@@ -558,6 +559,8 @@ export class MediaService {
 
   private readonly auditEntityToken = AUDIT_ENTITY;
 
+  private readonly usageMonitor?: MediaUsageMonitor;
+
   constructor(options: MediaServiceOptions = {}) {
     this.repository = options.repository ?? new MediaRepository(getPrismaClient());
     this.cloudinary = options.cloudinaryClient ?? getCloudinaryClient();
@@ -565,10 +568,18 @@ export class MediaService {
     this.scanner = options.scanService ?? new MediaScanService();
     this.threats = options.threatService ?? new MediaThreatService();
     this.config = options.config ?? getConfig();
+    this.usageMonitor = new MediaUsageMonitor({
+      client: this.cloudinary,
+      logger: this.logger,
+    });
   }
 
   getAuditEntity(): string {
     return this.auditEntityToken;
+  }
+
+  startUsageMonitoring(): void {
+    this.usageMonitor?.start();
   }
 
   async listAssets(query?: MediaListQuery, actor?: MediaActionContext): Promise<MediaListResult> {
@@ -646,11 +657,23 @@ export class MediaService {
     const asset = await this.loadAsset(id, { includeUsage: true });
     assertPrivilegedActor(actor);
 
-    const response = await this.cloudinary.regenerateAsset(asset.publicId, {
-      resourceType: resolveResourceType(asset.resourceType),
-      type: resolveAssetType(asset.type),
-      invalidate: true,
-    });
+    let response: UploadApiResponse;
+    try {
+      response = await this.cloudinary.regenerateAsset(asset.publicId, {
+        resourceType: resolveResourceType(asset.resourceType),
+        type: resolveAssetType(asset.type),
+        invalidate: true,
+      });
+    } catch (error) {
+      mediaMetrics.recordCloudinaryError("regenerate");
+      reportMediaCloudinaryError({
+        operation: "regenerate",
+        publicId: asset.publicId,
+        folder: asset.folder,
+        errorMessage: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
 
     await this.repository.updateMetadata(id, {
       version: response.version ?? asset.version,
@@ -689,10 +712,21 @@ export class MediaService {
 
     assertAssetNotInUse(asset);
 
-    await this.cloudinary.deleteAsset(asset.publicId, {
-      resourceType: resolveResourceType(asset.resourceType),
-      invalidate: true,
-    });
+    try {
+      await this.cloudinary.deleteAsset(asset.publicId, {
+        resourceType: resolveResourceType(asset.resourceType),
+        invalidate: true,
+      });
+    } catch (error) {
+      mediaMetrics.recordCloudinaryError("delete");
+      reportMediaCloudinaryError({
+        operation: "delete",
+        publicId: asset.publicId,
+        folder: asset.folder,
+        errorMessage: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
 
     await this.repository.forceDeleteAsset(id);
     return this.toAssetView(asset);
@@ -915,26 +949,27 @@ export class MediaService {
 
   private async processSingleUpload(file: PreparedUploadFile, context: UploadContext) {
     const folder = context.folder ?? this.config.media.cloudinary.folders.products;
-    const extension = ensureMimeTypeSupported(resolveMimeExtension(file.mimeType), file.mimeType);
-
-    const sizeLimit = this.resolveSizeLimit(folder);
-    enforceFileSizeLimit(file, sizeLimit);
-
-    const safeFileName = sanitizeFilename(file.originalName || "upload", extension);
-
-    try {
-      await this.scanner.scan({
-        buffer: file.buffer,
-        filename: safeFileName,
-      });
-    } catch (error) {
-      await this.handleScanFailure(error, file, context, safeFileName);
-      throw error;
-    }
-
+    const uploadStart = performance.now();
     let uploadResponse: UploadApiResponse | undefined;
+    let safeFileName = file.originalName || "upload";
 
     try {
+      const extension = ensureMimeTypeSupported(resolveMimeExtension(file.mimeType), file.mimeType);
+      const sizeLimit = this.resolveSizeLimit(folder);
+      enforceFileSizeLimit(file, sizeLimit);
+
+      safeFileName = sanitizeFilename(file.originalName || "upload", extension);
+
+      try {
+        await this.scanner.scan({
+          buffer: file.buffer,
+          filename: safeFileName,
+        });
+      } catch (error) {
+        await this.handleScanFailure(error, file, context, safeFileName);
+        throw error;
+      }
+
       uploadResponse = await this.performCloudinaryUpload(file, context, safeFileName, folder);
       const blurDataUrl = await this.generateBlurPlaceholder(uploadResponse);
 
@@ -954,13 +989,26 @@ export class MediaService {
         uploadedById: context.uploadedById,
       });
 
+      mediaMetrics.recordUploadStatus("success");
       return this.toUploadPayload(dbRecord, uploadResponse);
     } catch (error) {
       if (uploadResponse?.public_id) {
         await this.safeDeleteAsset(uploadResponse.public_id);
       }
 
+      mediaMetrics.recordUploadStatus("failure");
+      reportMediaUploadFailure({
+        fileName: safeFileName,
+        folder,
+        status: error instanceof ApiError ? error.status : undefined,
+        code: error instanceof ApiError ? error.code : undefined,
+        userId: context.uploadedById,
+        bytes: file.size,
+        errorMessage: error instanceof Error ? error.message : undefined,
+      });
       throw error;
+    } finally {
+      mediaMetrics.observeUploadDuration(folder, performance.now() - uploadStart);
     }
   }
 
@@ -990,7 +1038,17 @@ export class MediaService {
     options.cdn_cache_control = "public, max-age=31536000, immutable";
     options.cache_control = "public, max-age=31536000, immutable";
 
-    return this.cloudinary.upload(file.buffer, options);
+    try {
+      return await this.cloudinary.upload(file.buffer, options);
+    } catch (error) {
+      mediaMetrics.recordCloudinaryError("upload");
+      reportMediaCloudinaryError({
+        operation: "upload",
+        folder,
+        errorMessage: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
   }
 
   private async generateBlurPlaceholder(
@@ -1063,6 +1121,7 @@ export class MediaService {
     });
 
     mediaMetrics.recordUploadFormat(uploadResponse.format ?? extension);
+    mediaMetrics.recordStorageBytes(record.folder ?? folder, record.bytes);
     return record;
   }
 
@@ -1104,6 +1163,12 @@ export class MediaService {
     try {
       await this.cloudinary.deleteAsset(publicId, { invalidate: true });
     } catch (error) {
+      mediaMetrics.recordCloudinaryError("delete");
+      reportMediaCloudinaryError({
+        operation: "delete",
+        publicId,
+        errorMessage: error instanceof Error ? error.message : undefined,
+      });
       this.logger.warn("Failed to cleanup Cloudinary asset after upload failure", {
         error,
         publicId,

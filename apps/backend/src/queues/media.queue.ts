@@ -12,6 +12,7 @@ import type {
 } from "@/jobs/media-transformation.job.js";
 import { runMediaTransformationJob } from "@/jobs/media-transformation.job.js";
 import { createChildLogger } from "@/lib/logger.js";
+import { reportMediaWebhookFailure } from "@/modules/media/media.alerts.js";
 import {
   type WebhookIdempotencyStore,
   createWebhookIdempotencyStore,
@@ -20,10 +21,10 @@ import { CloudinaryWebhookProcessor } from "@/webhooks/cloudinary.processor.js";
 import type { CloudinaryWebhookEvent } from "@/webhooks/cloudinary.types.js";
 import type { ApplicationConfig } from "@lumi/types";
 
-const MEDIA_QUEUE_NAME = "media:tasks";
-const WEBHOOK_JOB_NAME = "media:webhook-event";
-const CLEANUP_JOB_NAME = "media:cleanup";
-const TRANSFORMATION_JOB_NAME = "media:regenerate-transformations";
+const MEDIA_QUEUE_NAME = "media-tasks";
+const WEBHOOK_JOB_NAME = "media-webhook-event";
+const CLEANUP_JOB_NAME = "media-cleanup";
+const TRANSFORMATION_JOB_NAME = "media-regenerate-transformations";
 const CLEANUP_CRON_EXPRESSION = "0 2 * * *";
 const TRANSFORMATION_CRON_EXPRESSION = "0 3 * * 0";
 const DEFAULT_WEBHOOK_ATTEMPTS = 5;
@@ -136,13 +137,13 @@ const createWebhookJobOptions = (event: CloudinaryWebhookEvent): JobsOptions => 
 const createCleanupJobOptions = (): JobsOptions => ({
   removeOnComplete: 50,
   removeOnFail: 100,
-  jobId: "media:cleanup:adhoc",
+  jobId: "media-cleanup-adhoc",
 });
 
 const createTransformationJobOptions = (): JobsOptions => ({
   removeOnComplete: 10,
   removeOnFail: 50,
-  jobId: "media:transformations:adhoc",
+  jobId: "media-transformations-adhoc",
 });
 
 export interface MediaQueueController {
@@ -226,6 +227,16 @@ class BullMediaQueueController implements MediaQueueController {
         attemptsMade: job?.attemptsMade,
         error,
       });
+      if (job?.name === WEBHOOK_JOB_NAME) {
+        const payload = (job.data as MediaWebhookJobPayload | undefined)?.event;
+        reportMediaWebhookFailure({
+          jobId: job.id ? String(job.id) : undefined,
+          eventId: payload?.id,
+          eventType: payload?.type,
+          attempt: job.attemptsMade,
+          errorMessage: error instanceof Error ? error.message : undefined,
+        });
+      }
     });
 
     this.events.on("completed", (data) => {
@@ -271,7 +282,7 @@ class BullMediaQueueController implements MediaQueueController {
           pattern: CLEANUP_CRON_EXPRESSION,
           tz: "UTC",
         },
-        jobId: "media:cleanup:daily",
+        jobId: "media-cleanup-daily",
         removeOnComplete: true,
       },
     );
@@ -286,7 +297,7 @@ class BullMediaQueueController implements MediaQueueController {
           pattern: TRANSFORMATION_CRON_EXPRESSION,
           tz: "UTC",
         },
-        jobId: "media:transformations:weekly",
+        jobId: "media-transformations-weekly",
         removeOnComplete: true,
       },
     );

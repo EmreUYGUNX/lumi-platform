@@ -81,6 +81,9 @@ LABEL org.opencontainers.image.title="Lumi Backend Service" \
 
 RUN apk add --no-cache tini ca-certificates openssl
 RUN addgroup -S nodejs && adduser -S lumi -G nodejs -u 1001
+# Drop npm CLI to avoid CVE-2025-64756 from the bundled glob dependency.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production \
   PORT=4000
