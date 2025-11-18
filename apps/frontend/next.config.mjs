@@ -20,7 +20,6 @@ const nextConfig = {
   productionBrowserSourceMaps: process.env.NODE_ENV === "production",
   transpilePackages: ["@lumi/ui", "@lumi/shared"],
   experimental: {
-    appDir: true,
     typedRoutes: true,
     optimizeCss: true,
     serverComponentsExternalPackages: ["@prisma/client"],
