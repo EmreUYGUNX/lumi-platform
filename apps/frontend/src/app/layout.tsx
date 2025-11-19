@@ -21,6 +21,11 @@ const inter = Inter({
   display: "swap",
 });
 
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ThemeProvider } from "@/providers/ThemeProvider";
+
+import "./globals.css";
+
 export const metadata: Metadata = {
   title: "Lumi Commerce Experience",
   description: "Next.js foundation for the Lumi commerce platform.",
