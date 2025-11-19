@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { Route } from "next";
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -21,7 +23,7 @@ export default async function AuthLayout({ children }: AuthLayoutProps): Promise
     <div className="bg-lumi-bg relative min-h-screen overflow-hidden">
       <AuthBackground />
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-10">
-        <Link href="/" className="gradient-text text-2xl font-semibold">
+        <Link href={"/" as Route} className="gradient-text text-2xl font-semibold">
           Lumi Commerce
         </Link>
         <div className="border-lumi-border/60 bg-lumi-bg/90 shadow-glow mt-10 w-full max-w-md rounded-3xl border p-8">

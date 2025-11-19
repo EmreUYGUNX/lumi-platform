@@ -1,9 +1,13 @@
+import type { Route } from "next";
+
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function NotFound(): JSX.Element {
+  const homeRoute = "/" as Route;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 text-center">
       <div className="space-y-3">
@@ -35,7 +39,7 @@ export default function NotFound(): JSX.Element {
         </Button>
       </form>
       <div className="flex flex-wrap justify-center gap-3 text-sm">
-        <Link href="/" className="text-lumi-primary hover:underline">
+        <Link href={homeRoute} className="text-lumi-primary hover:underline">
           Home
         </Link>
         <Link href={{ pathname: "/dashboard" }} className="text-lumi-primary hover:underline">
@@ -46,7 +50,7 @@ export default function NotFound(): JSX.Element {
         </Link>
       </div>
       <Button asChild>
-        <Link href="/">Return home</Link>
+        <Link href={homeRoute}>Return home</Link>
       </Button>
     </div>
   );

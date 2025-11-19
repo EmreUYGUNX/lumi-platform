@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import type { Route } from "next";
 import { Menu, X } from "lucide-react";
 
 import Link from "next/link";
@@ -10,8 +11,10 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const homeRoute = "/" as Route;
+
 const publicNavLinks = [
-  { href: "/", label: "Experience" },
+  { href: homeRoute, label: "Experience" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
   { href: "/login", label: "Login" },
@@ -27,7 +30,7 @@ export function PublicHeader(): JSX.Element {
     <header className="supports-backdrop-blur:bg-lumi-bg/70 border-lumi-border/60 bg-lumi-bg/80 sticky top-0 z-40 border-b backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between">
         <Link
-          href="/"
+          href={homeRoute}
           className="gradient-text text-lg font-semibold tracking-tight"
           aria-label="Lumi Home"
         >
