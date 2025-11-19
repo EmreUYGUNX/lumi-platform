@@ -21,7 +21,6 @@ const nextConfig = {
   productionBrowserSourceMaps: process.env.NODE_ENV === "production",
   transpilePackages: ["@lumi/ui", "@lumi/shared"],
   experimental: {
-    appDir: true,
     optimizeCss: true,
     serverComponentsExternalPackages: ["@prisma/client"],
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],
@@ -49,6 +48,7 @@ const nextConfig = {
     formats: ["image/webp", "image/avif"],
     deviceSizes: CLOUDINARY_BREAKPOINTS,
     minimumCacheTTL: 31536000,
+    domains: ["res.cloudinary.com"],
     remotePatterns: [
       {
         protocol: "https",
