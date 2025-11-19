@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "apps/**"
+  - "!apps/**/.lumi-next/**"
   - "!apps/**/.next/**"
   - "packages/*"
   - "packages/**"

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CommandPaletteTrigger } from "@/components/dashboard/CommandPaletteTrigger";
-import { DashboardSidebarNav, dashboardNavItems } from "@/components/dashboard/DashboardSidebarNav";
+import { DashboardSidebarNav } from "@/components/dashboard/DashboardSidebarNav";
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar";
+import { dashboardNavItems } from "@/data/dashboard-nav";
 import { getCurrentUser, resolvePreviewUser, shouldEnforceGuards } from "@/lib/session";
 
 interface DashboardLayoutProps {

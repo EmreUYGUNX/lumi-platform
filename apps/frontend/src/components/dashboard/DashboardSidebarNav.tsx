@@ -1,18 +1,10 @@
 "use client";
 
-import { BarChart3, Home, Layers3, Settings } from "lucide-react";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { dashboardNavItems } from "@/data/dashboard-nav";
 import { cn } from "@/lib/utils";
-
-export const dashboardNavItems = [
-  { href: "/dashboard", icon: Home, label: "Overview" },
-  { href: "/dashboard/orders", icon: Layers3, label: "Orders" },
-  { href: "/dashboard/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
-];
 
 export function DashboardSidebarNav(): JSX.Element {
   const pathname = usePathname();

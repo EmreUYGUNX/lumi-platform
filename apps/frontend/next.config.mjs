@@ -12,7 +12,6 @@ const CLOUDINARY_CLOUD_NAME =
 const CLOUDINARY_REMOTE_PATH = CLOUDINARY_CLOUD_NAME ? `/${CLOUDINARY_CLOUD_NAME}/**` : "/**";
 
 const nextConfig = {
-  distDir: ".lumi-next",
   reactStrictMode: true,
   swcMinify: true,
   poweredByHeader: false,
