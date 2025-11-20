@@ -271,6 +271,9 @@ jobs:
           echo "Disk space before cleanup:"
           df -h
           docker builder prune -af || true
+          docker system prune -af --volumes || true
+          rm -rf .trivy-cache || true
+          rm -rf ${{ github.workspace }}/trivy-tmp || true
           echo "Disk space after cleanup:"
           df -h
       - name: Set up Docker Buildx
@@ -278,7 +281,9 @@ jobs:
       - name: Build backend production image
         run: docker build --file apps/backend/Dockerfile --target production --tag lumi-backend-ci:latest .
       - name: Create Trivy temp directory
-        run: mkdir -p ${{ github.workspace }}/trivy-tmp
+        run: |
+          mkdir -p /tmp/trivy-tmp
+          mkdir -p /tmp/trivy-cache
       - name: File system vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -289,10 +294,10 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           trivyignores: .trivyignore
-          cache-dir: .trivy-cache
+          cache-dir: /tmp/trivy-cache
         env:
-          TMPDIR: ${{ github.workspace }}/trivy-tmp
-          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
+          TMPDIR: /tmp/trivy-tmp
+          TRIVY_TEMP_DIR: /tmp/trivy-tmp
       - name: Backend image vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -301,10 +306,10 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: .trivy-cache
+          cache-dir: /tmp/trivy-cache
         env:
-          TMPDIR: ${{ github.workspace }}/trivy-tmp
-          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
+          TMPDIR: /tmp/trivy-tmp
+          TRIVY_TEMP_DIR: /tmp/trivy-tmp
         if: ${{ success() }}
       - name: Remove backend image
         run: docker rmi lumi-backend-ci:latest || true
@@ -312,7 +317,8 @@ jobs:
         run: |
           echo "Disk space before mid-cleanup:"
           df -h
-          rm -rf ${{ github.workspace }}/trivy-tmp/*
+          rm -rf /tmp/trivy-tmp/*
+          rm -rf /tmp/trivy-cache/*
           docker builder prune -af || true
           echo "Disk space after mid-cleanup:"
           df -h
@@ -326,10 +332,10 @@ jobs:
           severity: HIGH,CRITICAL
           format: table
           exit-code: 1
-          cache-dir: .trivy-cache
+          cache-dir: /tmp/trivy-cache
         env:
-          TMPDIR: ${{ github.workspace }}/trivy-tmp
-          TRIVY_TEMP_DIR: ${{ github.workspace }}/trivy-tmp
+          TMPDIR: /tmp/trivy-tmp
+          TRIVY_TEMP_DIR: /tmp/trivy-tmp
       - name: Remove frontend image
         run: docker rmi lumi-frontend-ci:latest || true
 
