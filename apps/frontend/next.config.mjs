@@ -13,7 +13,6 @@ const CLOUDINARY_REMOTE_PATH = CLOUDINARY_CLOUD_NAME ? `/${CLOUDINARY_CLOUD_NAME
 
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   poweredByHeader: false,
   compress: true,
   output: "standalone",
@@ -21,13 +20,12 @@ const nextConfig = {
   transpilePackages: ["@lumi/ui", "@lumi/shared"],
   experimental: {
     optimizeCss: true,
-    serverComponentsExternalPackages: ["@prisma/client"],
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],
-    typedRoutes: true,
     serverActions: {
       bodySizeLimit: "2mb",
     },
   },
+  serverExternalPackages: ["@prisma/client"],
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",
     styledComponents: true,
