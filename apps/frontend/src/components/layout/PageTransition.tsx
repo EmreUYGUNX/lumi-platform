@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import { AnimatePresence, motion } from "framer-motion";
 import type { Route } from "next";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSelectedLayoutSegments } from "next/navigation";
 
 import { pageTransitionVariants } from "@/animations/motion-presets";
 
@@ -87,10 +87,14 @@ export function PageTransition({
   preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
   const pathname = usePathname();
+  const segments = useSelectedLayoutSegments();
   const [isReady, setIsReady] = useState(false);
   const scrollHandledRef = useRef(false);
 
-  const routeKey = useMemo(() => `${pathname ?? ""}-${Date.now()}`, [pathname]);
+  const routeKey = useMemo(() => {
+    if (!segments || segments.length === 0) return pathname ?? "root";
+    return segments.join("/") || "root";
+  }, [segments, pathname]);
 
   useEffect(() => setIsReady(true), []);
 
