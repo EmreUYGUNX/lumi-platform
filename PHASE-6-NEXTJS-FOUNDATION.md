@@ -28,7 +28,7 @@
 3. **shadcn/ui Integration** - Enterprise component library with custom theming
 4. **Layout System** - Route groups for public, auth, dashboard, admin
 5. **State Management** - Zustand + TanStack Query for global and server state
-6. **Animation System** - Framer Motion + GSAP + Lenis for smooth UX
+6. **Animation System** - Framer Motion + GSAP for smooth UX
 7. **Performance Optimization** - Code splitting, lazy loading, bundle analysis
 8. **Developer Experience** - TypeScript strict mode, ESLint, Prettier, path aliases
 
@@ -54,42 +54,44 @@
 ### Design System Standards (B1)
 
 **B1: Brand Consistency Rule**
+
 ```css
 /* Only use deneme.html approved color palette */
 :root {
   /* Primary Colors */
-  --lumi-primary: #3B82F6;      /* Blue 500 */
-  --lumi-primary-dark: #2563EB; /* Blue 600 */
-  --lumi-primary-light: #60A5FA;/* Blue 400 */
+  --lumi-primary: #3b82f6; /* Blue 500 */
+  --lumi-primary-dark: #2563eb; /* Blue 600 */
+  --lumi-primary-light: #60a5fa; /* Blue 400 */
 
   /* Secondary Colors */
-  --lumi-secondary: #8B5CF6;    /* Violet 500 */
-  --lumi-accent: #F59E0B;       /* Amber 500 */
+  --lumi-secondary: #8b5cf6; /* Violet 500 */
+  --lumi-accent: #f59e0b; /* Amber 500 */
 
   /* Neutral Colors */
-  --lumi-bg: #FFFFFF;
-  --lumi-bg-secondary: #F9FAFB; /* Gray 50 */
-  --lumi-text: #111827;         /* Gray 900 */
-  --lumi-text-secondary: #6B7280; /* Gray 500 */
-  --lumi-border: #E5E7EB;       /* Gray 200 */
+  --lumi-bg: #ffffff;
+  --lumi-bg-secondary: #f9fafb; /* Gray 50 */
+  --lumi-text: #111827; /* Gray 900 */
+  --lumi-text-secondary: #6b7280; /* Gray 500 */
+  --lumi-border: #e5e7eb; /* Gray 200 */
 
   /* Semantic Colors */
-  --lumi-success: #10B981;      /* Green 500 */
-  --lumi-warning: #F59E0B;      /* Amber 500 */
-  --lumi-error: #EF4444;        /* Red 500 */
-  --lumi-info: #3B82F6;         /* Blue 500 */
+  --lumi-success: #10b981; /* Green 500 */
+  --lumi-warning: #f59e0b; /* Amber 500 */
+  --lumi-error: #ef4444; /* Red 500 */
+  --lumi-info: #3b82f6; /* Blue 500 */
 }
 
 [data-theme="dark"] {
   --lumi-bg: #111827;
-  --lumi-bg-secondary: #1F2937;
-  --lumi-text: #F9FAFB;
-  --lumi-text-secondary: #9CA3AF;
+  --lumi-bg-secondary: #1f2937;
+  --lumi-text: #f9fafb;
+  --lumi-text-secondary: #9ca3af;
   --lumi-border: #374151;
 }
 ```
 
 **Enforcement:**
+
 - No colors outside this palette
 - Use Tailwind utilities only from `theme.extend.colors.lumi`
 - ESLint rule to prevent hex codes in className
@@ -97,11 +99,13 @@
 ### Performance Standards (P1/P2)
 
 **P1: Core Web Vitals**
+
 - Largest Contentful Paint (LCP): < 2.0s
 - First Input Delay (FID): < 100ms
 - Cumulative Layout Shift (CLS): < 0.1
 
 **P2: Bundle & Loading**
+
 - Initial bundle size: < 180KB gzipped
 - Route-based code splitting enabled
 - Critical CSS inlined
@@ -112,28 +116,33 @@
 ### Security Standards (S1-S4)
 
 **S1: Auth Forms**
+
 - No plain password storage in state
 - Secure fetch only (HTTPS)
 - httpOnly cookies for tokens
 
 **S2: Input Sanitization**
+
 - All user inputs sanitized before render
 - CSP headers via Next.js headers()
 - DOMPurify for rich text content
 
 **S3: Route Protection**
+
 - Middleware guards for /dashboard, /admin
 - Server component role checks
 - Client-side guards as UX enhancement
 
 **S4: Environment Variables**
+
 - All config from .env files
-- NEXT_PUBLIC_* for client-side only
+- NEXT*PUBLIC*\* for client-side only
 - No hardcoded secrets
 
 ### Code Quality Standards (Q1)
 
 **Q1: TypeScript & Linting**
+
 - TypeScript strict mode enabled
 - 0 TypeScript errors
 - 0 ESLint errors
@@ -213,7 +222,6 @@ apps/frontend/
 │   ├── providers/
 │   │   ├── QueryProvider.tsx
 │   │   ├── ThemeProvider.tsx
-│   │   ├── LenisProvider.tsx
 │   │   └── AnalyticsProvider.tsx
 │   ├── store/
 │   │   ├── session.ts              # Auth session store
@@ -224,8 +232,7 @@ apps/frontend/
 │   │   └── animations.css          # Animation utilities
 │   ├── animations/
 │   │   ├── motion-presets.ts       # Framer Motion variants
-│   │   ├── gsap.ts                 # GSAP setup
-│   │   └── lenis.ts                # Smooth scroll config
+│   │   └── gsap.ts                 # GSAP setup
 │   └── types/
 │       ├── api.ts                  # API types
 │       └── index.ts
@@ -249,6 +256,7 @@ apps/frontend/
 ### 1. Next.js 14 Setup & Configuration (22 items)
 
 #### 1.1 Project Initialization
+
 - [ ] Verify Next.js 14 installed: `pnpm add next@latest react@latest react-dom@latest`
 - [ ] Create `next.config.mjs` with App Router config
   - [ ] Enable `appDir` experimental feature
@@ -259,6 +267,7 @@ apps/frontend/
   - [ ] Configure `experimental.optimizeCss: true`
 
 #### 1.2 TypeScript Configuration
+
 - [ ] Create `tsconfig.json` extending `tsconfig.base.json`
   - [ ] Set `strict: true`
   - [ ] Set `baseUrl: "."`
@@ -273,6 +282,7 @@ apps/frontend/
   - [ ] Set `jsx: "preserve"`
 
 #### 1.3 Environment Configuration
+
 - [ ] Create `lib/env.ts` for environment variable validation
   - [ ] Use Zod schema for validation
   - [ ] Validate `NEXT_PUBLIC_API_URL`
@@ -283,6 +293,7 @@ apps/frontend/
 - [ ] Document environment setup in README
 
 #### 1.4 Package Scripts
+
 - [ ] Add script: `"dev": "next dev"`
 - [ ] Add script: `"build": "next build"`
 - [ ] Add script: `"start": "next start"`
@@ -295,6 +306,7 @@ apps/frontend/
 ### 2. Tailwind CSS & Design System (28 items)
 
 #### 2.1 Tailwind Installation
+
 - [ ] Install: `pnpm add -D tailwindcss postcss autoprefixer`
 - [ ] Initialize: `pnpm dlx tailwindcss init -p`
 - [ ] Configure `tailwind.config.ts` with TypeScript
@@ -302,6 +314,7 @@ apps/frontend/
   - [ ] Configure darkMode: `class`
 
 #### 2.2 Design Tokens (B1 Compliance)
+
 - [ ] Create `src/styles/tokens.css`
   - [ ] Define CSS variables for light theme (`:root`)
   - [ ] Define CSS variables for dark theme (`[data-theme="dark"]`)
@@ -317,6 +330,7 @@ apps/frontend/
   - [ ] Transition timings
 
 #### 2.3 Tailwind Theme Extension
+
 - [ ] Extend `theme.colors` in `tailwind.config.ts`
   - [ ] Map `lumi.primary` to CSS var `--lumi-primary`
   - [ ] Map all lumi color tokens
@@ -332,6 +346,7 @@ apps/frontend/
   - [ ] `2xl: '1536px'` (default)
 
 #### 2.4 Tailwind Plugins
+
 - [ ] Install `@tailwindcss/typography`: `pnpm add -D @tailwindcss/typography`
 - [ ] Install `@tailwindcss/forms`: `pnpm add -D @tailwindcss/forms`
 - [ ] Install `@tailwindcss/aspect-ratio`: `pnpm add -D @tailwindcss/aspect-ratio`
@@ -339,6 +354,7 @@ apps/frontend/
 - [ ] Add plugins to `tailwind.config.ts`
 
 #### 2.5 Global Styles
+
 - [ ] Create `app/globals.css`
   - [ ] Import Tailwind directives (`@tailwind base/components/utilities`)
   - [ ] Import tokens.css
@@ -349,6 +365,7 @@ apps/frontend/
   - [ ] Add animation utilities
 
 #### 2.6 Theme Provider
+
 - [ ] Install `next-themes`: `pnpm add next-themes`
 - [ ] Create `src/providers/ThemeProvider.tsx`
   - [ ] Wrap with `ThemeProvider` from next-themes
@@ -363,6 +380,7 @@ apps/frontend/
 ### 3. shadcn/ui Integration (32 items)
 
 #### 3.1 shadcn/ui Setup
+
 - [ ] Initialize: `pnpm dlx shadcn-ui@latest init`
   - [ ] Set style: `default`
   - [ ] Set base color: `blue` (customize to lumi palette)
@@ -374,6 +392,7 @@ apps/frontend/
   - [ ] Enable RSC: `true`
 
 #### 3.2 Core Components Installation
+
 - [ ] Add button: `pnpm dlx shadcn-ui@latest add button`
 - [ ] Add input: `pnpm dlx shadcn-ui@latest add input`
 - [ ] Add textarea: `pnpm dlx shadcn-ui@latest add textarea`
@@ -384,6 +403,7 @@ apps/frontend/
 - [ ] Add label: `pnpm dlx shadcn-ui@latest add label`
 
 #### 3.3 Layout Components
+
 - [ ] Add dialog: `pnpm dlx shadcn-ui@latest add dialog`
 - [ ] Add sheet: `pnpm dlx shadcn-ui@latest add sheet`
 - [ ] Add dropdown-menu: `pnpm dlx shadcn-ui@latest add dropdown-menu`
@@ -393,6 +413,7 @@ apps/frontend/
 - [ ] Add separator: `pnpm dlx shadcn-ui@latest add separator`
 
 #### 3.4 Feedback Components
+
 - [ ] Add toast: `pnpm dlx shadcn-ui@latest add toast`
 - [ ] Add alert: `pnpm dlx shadcn-ui@latest add alert`
 - [ ] Add badge: `pnpm dlx shadcn-ui@latest add badge`
@@ -401,11 +422,13 @@ apps/frontend/
 - [ ] Add skeleton: `pnpm dlx shadcn-ui@latest add skeleton`
 
 #### 3.5 Data Display Components
+
 - [ ] Add card: `pnpm dlx shadcn-ui@latest add card`
 - [ ] Add table: `pnpm dlx shadcn-ui@latest add table`
 - [ ] Add avatar: `pnpm dlx shadcn-ui@latest add avatar`
 
 #### 3.6 Form Integration
+
 - [ ] Add form: `pnpm dlx shadcn-ui@latest add form`
 - [ ] Install React Hook Form: `pnpm add react-hook-form`
 - [ ] Install Zod: `pnpm add zod @hookform/resolvers`
@@ -417,18 +440,19 @@ apps/frontend/
 ### 4. Route Groups & Layouts (36 items)
 
 #### 4.1 Root Layout
+
 - [ ] Create `app/layout.tsx`
   - [ ] Import Inter font with `next/font/google`
   - [ ] Configure font with `variable` option
   - [ ] Add metadata (title, description, viewport)
   - [ ] Add ThemeProvider
   - [ ] Add QueryProvider
-  - [ ] Add LenisProvider (smooth scroll)
   - [ ] Add global MotionConfig
   - [ ] Add Toaster for notifications
   - [ ] Apply font className to `<body>`
 
 #### 4.2 Public Routes (public)
+
 - [ ] Create `app/(public)/layout.tsx`
   - [ ] Header component (desktop + mobile)
   - [ ] Footer component
@@ -445,6 +469,7 @@ apps/frontend/
 - [ ] Create `app/(public)/error.tsx`
 
 #### 4.3 Auth Routes (auth)
+
 - [ ] Create `app/(auth)/layout.tsx`
   - [ ] Minimal layout (centered form)
   - [ ] Logo/branding
@@ -466,6 +491,7 @@ apps/frontend/
 - [ ] Create auth error boundaries
 
 #### 4.4 Dashboard Routes (dashboard)
+
 - [ ] Create `app/(dashboard)/layout.tsx`
   - [ ] Sidebar navigation (collapsible)
   - [ ] Top bar (breadcrumbs, user menu)
@@ -486,6 +512,7 @@ apps/frontend/
 - [ ] Create `app/(dashboard)/error.tsx`
 
 #### 4.5 Admin Routes (admin)
+
 - [ ] Create `app/(admin)/layout.tsx`
   - [ ] Admin sidebar with sections
   - [ ] Admin top bar
@@ -498,6 +525,7 @@ apps/frontend/
 - [ ] Create admin loading/error states
 
 #### 4.6 Global Error Pages
+
 - [ ] Create `app/not-found.tsx`
   - [ ] 404 message
   - [ ] Search functionality
@@ -513,6 +541,7 @@ apps/frontend/
 ### 5. State Management (24 items)
 
 #### 5.1 Zustand Setup
+
 - [ ] Install Zustand: `pnpm add zustand immer`
 - [ ] Create `src/store/session.ts`
   - [ ] Define session state type
@@ -531,6 +560,7 @@ apps/frontend/
   - [ ] Actions to toggle UI elements
 
 #### 5.2 TanStack Query Setup
+
 - [ ] Install: `pnpm add @tanstack/react-query @tanstack/react-query-devtools`
 - [ ] Create `src/lib/query-client.ts`
   - [ ] Configure QueryClient with defaults
@@ -544,6 +574,7 @@ apps/frontend/
   - [ ] Support SSR hydration with `HydrationBoundary`
 
 #### 5.3 API Client Integration
+
 - [ ] Create `src/lib/api-client.ts`
   - [ ] Axios or fetch wrapper
   - [ ] Add base URL from environment
@@ -559,6 +590,7 @@ apps/frontend/
   - [ ] Extract data safely
 
 #### 5.4 Custom Hooks
+
 - [ ] Create example query hook: `src/features/products/hooks/useProducts.ts`
   - [ ] useQuery for product list
   - [ ] Filter, sort, pagination params
@@ -575,6 +607,7 @@ apps/frontend/
 ### 6. Animation System (26 items)
 
 #### 6.1 Framer Motion Setup
+
 - [ ] Install: `pnpm add framer-motion`
 - [ ] Create `src/animations/motion-presets.ts`
   - [ ] Define fade variants
@@ -587,6 +620,7 @@ apps/frontend/
   - [ ] Respect `prefers-reduced-motion`
 
 #### 6.2 GSAP Integration
+
 - [ ] Install: `pnpm add gsap`
 - [ ] Create `src/animations/gsap.ts`
   - [ ] Register GSAP plugins (ScrollTrigger, ScrollSmoother)
@@ -601,18 +635,8 @@ apps/frontend/
   - [ ] Tooltip reveal on hover
   - [ ] Click expansion
 
-#### 6.3 Lenis Smooth Scroll
-- [ ] Install: `pnpm add @studio-freight/lenis`
-- [ ] Create `src/providers/LenisProvider.tsx`
-  - [ ] Initialize Lenis on mount
-  - [ ] Configure smooth scroll options
-  - [ ] Destroy on unmount
-  - [ ] Sync with Next.js route changes
-  - [ ] Integrate with GSAP ScrollTrigger
-- [ ] Test smooth scrolling on all routes
-- [ ] Disable on mobile if performance issue
+#### 6.3 Page Transitions
 
-#### 6.4 Page Transitions
 - [ ] Create `src/components/layout/PageTransition.tsx`
   - [ ] Use Framer Motion `AnimatePresence`
   - [ ] Create `useTransitionRouter` hook
@@ -626,6 +650,7 @@ apps/frontend/
 ### 7. Middleware & Route Protection (16 items)
 
 #### 7.1 Middleware Setup
+
 - [ ] Create `middleware.ts` at project root
   - [ ] Import `NextRequest`, `NextResponse`
   - [ ] Define protected route patterns
@@ -646,6 +671,7 @@ apps/frontend/
 - [ ] Export middleware config with matcher
 
 #### 7.2 Client-Side Guards
+
 - [ ] Create `src/lib/guards.ts`
   - [ ] `requireAuth()` wrapper component
   - [ ] `requireRole(role)` wrapper component
@@ -658,6 +684,7 @@ apps/frontend/
 ### 8. Performance Optimization (20 items)
 
 #### 8.1 Code Splitting
+
 - [ ] Use Next.js `dynamic()` for heavy components
   - [ ] Admin dashboard charts
   - [ ] Rich text editor
@@ -668,6 +695,7 @@ apps/frontend/
 - [ ] Optimize bundle size (target: < 180KB initial)
 
 #### 8.2 Image Optimization
+
 - [ ] Use `next/image` for all images
 - [ ] Configure Cloudinary loader
   - [ ] Create `src/lib/image-loader.ts`
@@ -678,12 +706,14 @@ apps/frontend/
 - [ ] Test responsive images on all devices
 
 #### 8.3 Font Optimization
+
 - [ ] Use `next/font/google` for web fonts
 - [ ] Configure `display: 'swap'` to prevent FOIT
 - [ ] Subset fonts (Latin only if applicable)
 - [ ] Preload critical fonts
 
 #### 8.4 CSS Optimization
+
 - [ ] Enable CSS modules for component styles
 - [ ] Use Tailwind JIT mode (enabled by default)
 - [ ] Purge unused CSS in production
@@ -691,6 +721,7 @@ apps/frontend/
 - [ ] Lazy load non-critical CSS
 
 #### 8.5 Runtime Performance
+
 - [ ] Implement React.memo for expensive components
 - [ ] Use useMemo for expensive calculations
 - [ ] Use useCallback for event handlers
@@ -702,6 +733,7 @@ apps/frontend/
 ### 9. Developer Experience (18 items)
 
 #### 9.1 ESLint Configuration
+
 - [ ] Install: `pnpm add -D eslint eslint-config-next`
 - [ ] Create `eslint.config.mjs`
   - [ ] Extend `next/core-web-vitals`
@@ -712,6 +744,7 @@ apps/frontend/
 - [ ] Add pre-commit hook with lint-staged
 
 #### 9.2 Prettier Configuration
+
 - [ ] Install: `pnpm add -D prettier prettier-plugin-tailwindcss`
 - [ ] Create `.prettierrc.json`
   - [ ] Set print width: 100
@@ -721,6 +754,7 @@ apps/frontend/
   - [ ] Tailwind plugin for class sorting
 
 #### 9.3 VS Code Configuration
+
 - [ ] Create `.vscode/settings.json`
   - [ ] Enable format on save
   - [ ] Tailwind IntelliSense
@@ -732,6 +766,7 @@ apps/frontend/
   - [ ] Recommend Prettier
 
 #### 9.4 Git Hooks
+
 - [ ] Install husky: `pnpm add -D husky`
 - [ ] Install lint-staged: `pnpm add -D lint-staged`
 - [ ] Create pre-commit hook
@@ -745,6 +780,7 @@ apps/frontend/
 ### 10. Testing & Documentation (22 items)
 
 #### 10.1 Testing Setup
+
 - [ ] Install: `pnpm add -D vitest @testing-library/react @testing-library/jest-dom`
 - [ ] Create `vitest.config.ts`
 - [ ] Create test setup file
@@ -752,6 +788,7 @@ apps/frontend/
 - [ ] Add coverage script: `"test:coverage": "vitest --coverage"`
 
 #### 10.2 Component Tests
+
 - [ ] Test Button component variants
 - [ ] Test Form component validation
 - [ ] Test Theme toggle
@@ -761,6 +798,7 @@ apps/frontend/
 - [ ] Achieve ≥85% coverage for components
 
 #### 10.3 Integration Tests
+
 - [ ] Test login flow
 - [ ] Test registration flow
 - [ ] Test protected route access
@@ -769,6 +807,7 @@ apps/frontend/
 - [ ] Test TanStack Query hooks
 
 #### 10.4 E2E Tests (Preparation)
+
 - [ ] Install Playwright: `pnpm add -D @playwright/test`
 - [ ] Create `playwright.config.ts`
 - [ ] Create smoke test: login → dashboard navigation
@@ -776,6 +815,7 @@ apps/frontend/
 - [ ] Add E2E script: `"test:e2e": "playwright test"`
 
 #### 10.5 Documentation
+
 - [ ] Create `docs/frontend/next-foundation.md`
   - [ ] Architecture overview
   - [ ] Route structure explanation
@@ -824,12 +864,12 @@ ANALYZE=true pnpm --filter @lumi/frontend build
 
 ```typescript
 // Lighthouse test (run on deployed preview)
-const lighthouse = require('lighthouse');
-const chromeLauncher = require('chrome-launcher');
+const lighthouse = require("lighthouse");
+const chromeLauncher = require("chrome-launcher");
 
 async function runLighthouse(url: string) {
-  const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
-  const options = { logLevel: 'info', output: 'json', port: chrome.port };
+  const chrome = await chromeLauncher.launch({ chromeFlags: ["--headless"] });
+  const options = { logLevel: "info", output: "json", port: chrome.port };
   const runnerResult = await lighthouse(url, options);
 
   const { performance, accessibility, bestPractices, seo } = runnerResult.lhr.categories;
@@ -843,8 +883,8 @@ async function runLighthouse(url: string) {
 }
 
 // Run on homepage and dashboard
-runLighthouse('http://localhost:3000');
-runLighthouse('http://localhost:3000/dashboard');
+runLighthouse("http://localhost:3000");
+runLighthouse("http://localhost:3000/dashboard");
 ```
 
 ### Design System Validation (B1)
@@ -887,19 +927,19 @@ const sessionStore = useSessionStore();
 expect(sessionStore.password).toBeUndefined();
 
 // S2: CSP headers
-const response = await fetch('/');
-const csp = response.headers.get('Content-Security-Policy');
+const response = await fetch("/");
+const csp = response.headers.get("Content-Security-Policy");
 expect(csp).toContain("default-src 'self'");
 
 // S3: Protected routes
-const dashboardResponse = await fetch('/dashboard', {
-  headers: { Cookie: '' } // No auth
+const dashboardResponse = await fetch("/dashboard", {
+  headers: { Cookie: "" }, // No auth
 });
 expect(dashboardResponse.status).toBe(302); // Redirect to login
 
 // S4: No hardcoded secrets
-const envFile = fs.readFileSync('.env.local', 'utf-8');
-expect(envFile).not.toContain('hardcoded_secret_key');
+const envFile = fs.readFileSync(".env.local", "utf-8");
+expect(envFile).not.toContain("hardcoded_secret_key");
 ```
 
 ---
@@ -907,6 +947,7 @@ expect(envFile).not.toContain('hardcoded_secret_key');
 ## 📊 SUCCESS METRICS
 
 ### Code Quality Metrics
+
 - ✅ TypeScript strict mode: 0 errors
 - ✅ ESLint: 0 errors, 0 warnings
 - ✅ Prettier: All files formatted
@@ -914,6 +955,7 @@ expect(envFile).not.toContain('hardcoded_secret_key');
 - ✅ Bundle size: < 180KB (initial)
 
 ### Performance Metrics
+
 - ✅ Lighthouse Performance: ≥90
 - ✅ LCP: < 2.0s
 - ✅ FID: < 100ms
@@ -921,6 +963,7 @@ expect(envFile).not.toContain('hardcoded_secret_key');
 - ✅ Build time: < 60s
 
 ### Design System Metrics (B1)
+
 - ✅ 100% colors from approved palette
 - ✅ Consistent spacing (8px grid)
 - ✅ Typography scale followed
@@ -928,6 +971,7 @@ expect(envFile).not.toContain('hardcoded_secret_key');
 - ✅ Responsive on all breakpoints
 
 ### Security Metrics (S1-S4)
+
 - ✅ No client-side password storage
 - ✅ CSP headers configured
 - ✅ All protected routes guarded
@@ -939,53 +983,65 @@ expect(envFile).not.toContain('hardcoded_secret_key');
 ## 🚨 COMMON PITFALLS TO AVOID
 
 ### 1. Colors Outside Palette (B1 Violation)
+
 ❌ **Wrong:**
+
 ```tsx
 <div className="bg-[#3B82F6]"> // Hardcoded hex
 ```
 
 ✅ **Correct:**
+
 ```tsx
 <div className="bg-lumi-primary"> // From design tokens
 ```
 
 ### 2. Client-Side Password Storage (S1 Violation)
+
 ❌ **Wrong:**
+
 ```typescript
 const sessionStore = create<SessionState>((set) => ({
-  password: '',
-  setPassword: (password) => set({ password })
+  password: "",
+  setPassword: (password) => set({ password }),
 }));
 ```
 
 ✅ **Correct:**
+
 ```typescript
 // Never store password in client state
 // Only use httpOnly cookies for tokens
 ```
 
 ### 3. Missing Type Safety
+
 ❌ **Wrong:**
+
 ```typescript
-const data: any = await fetch('/api/products');
+const data: any = await fetch("/api/products");
 ```
 
 ✅ **Correct:**
+
 ```typescript
-const response = await apiClient.get<ProductListResponse>('/products');
+const response = await apiClient.get<ProductListResponse>("/products");
 if (isSuccessResponse(response)) {
   const products = response.data; // Fully typed
 }
 ```
 
 ### 4. No Loading States
+
 ❌ **Wrong:**
+
 ```tsx
 const { data } = useProducts();
 return <div>{data.products.map(...)}</div>; // Crashes on undefined
 ```
 
 ✅ **Correct:**
+
 ```tsx
 const { data, isLoading, error } = useProducts();
 if (isLoading) return <Skeleton />;
@@ -994,12 +1050,15 @@ return <div>{data?.products.map(...)}</div>;
 ```
 
 ### 5. Unoptimized Images
+
 ❌ **Wrong:**
+
 ```tsx
 <img src="/hero.jpg" alt="Hero" /> // No optimization
 ```
 
 ✅ **Correct:**
+
 ```tsx
 <Image
   src="/hero.jpg"
@@ -1013,15 +1072,18 @@ return <div>{data?.products.map(...)}</div>;
 ```
 
 ### 6. No Error Boundaries
+
 ❌ **Wrong:**
+
 ```tsx
 // No error boundary, entire app crashes on error
 ```
 
 ✅ **Correct:**
+
 ```tsx
 // app/error.tsx and route-specific error.tsx files
-'use client';
+"use client";
 export default function Error({ error, reset }) {
   return (
     <div>
@@ -1033,25 +1095,29 @@ export default function Error({ error, reset }) {
 ```
 
 ### 7. Missing Responsive Design
+
 ❌ **Wrong:**
+
 ```tsx
 <div className="w-[1200px]"> // Fixed width
 ```
 
 ✅ **Correct:**
+
 ```tsx
-<div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-  // Responsive container
-</div>
+<div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">// Responsive container</div>
 ```
 
 ### 8. Accessibility Ignored
+
 ❌ **Wrong:**
+
 ```tsx
 <div onClick={handleClick}>Click me</div> // Not accessible
 ```
 
 ✅ **Correct:**
+
 ```tsx
 <button onClick={handleClick} aria-label="Submit form">
   Click me
@@ -1063,12 +1129,14 @@ export default function Error({ error, reset }) {
 ## 📦 DELIVERABLES
 
 ### 1. Next.js Application
+
 - ✅ Next.js 14 with App Router
 - ✅ TypeScript strict mode configured
 - ✅ Path aliases setup
 - ✅ Environment validation
 
 ### 2. Design System
+
 - ✅ Tailwind CSS configured
 - ✅ Design tokens (tokens.css)
 - ✅ B1 color palette enforced
@@ -1076,12 +1144,14 @@ export default function Error({ error, reset }) {
 - ✅ Responsive breakpoints
 
 ### 3. Component Library
+
 - ✅ shadcn/ui installed and customized
 - ✅ 25+ UI components
 - ✅ Form components with validation
 - ✅ Layout components (Header, Footer, Sidebar)
 
 ### 4. Layouts & Routes
+
 - ✅ Root layout with providers
 - ✅ Public layout and pages
 - ✅ Auth layout and pages
@@ -1090,36 +1160,41 @@ export default function Error({ error, reset }) {
 - ✅ Error boundaries and loading states
 
 ### 5. State Management
+
 - ✅ Zustand stores (session, UI)
 - ✅ TanStack Query configured
 - ✅ API client with Q2 format
 - ✅ Custom hooks for data fetching
 
 ### 6. Animation System
+
 - ✅ Framer Motion presets
 - ✅ GSAP integration
-- ✅ Lenis smooth scroll
 - ✅ Page transitions
 
 ### 7. Middleware & Security
+
 - ✅ Auth middleware (S3)
 - ✅ Route protection
 - ✅ RBAC guards
 - ✅ CSRF protection
 
 ### 8. Developer Tools
+
 - ✅ ESLint + Prettier configured
 - ✅ Husky + lint-staged
 - ✅ VS Code settings
 - ✅ TypeScript strict mode
 
 ### 9. Testing
+
 - ✅ Vitest setup
 - ✅ Component tests (≥85% coverage)
 - ✅ Integration tests
 - ✅ Playwright E2E (preparation)
 
 ### 10. Documentation
+
 - ✅ Architecture documentation
 - ✅ Design token reference
 - ✅ Component usage guide
@@ -1133,12 +1208,14 @@ export default function Error({ error, reset }) {
 # PHASE 6: Next.js Foundation - Completion Report
 
 ## Implementation Summary
+
 - **Start Date**: [Date]
 - **End Date**: [Date]
 - **Duration**: [Days]
 - **Team Members**: [Names]
 
 ## Completed Items
+
 - [x] Total Items: 264/264 (100%)
 - [x] Next.js Setup: 22/22
 - [x] Tailwind & Design System: 28/28
@@ -1152,6 +1229,7 @@ export default function Error({ error, reset }) {
 - [x] Testing: 22/22
 
 ## Metrics Achieved
+
 - **TypeScript Errors**: 0
 - **ESLint Errors**: 0
 - **Test Coverage**: X% (Target: ≥85%)
@@ -1161,9 +1239,11 @@ export default function Error({ error, reset }) {
 - **B1 Compliance**: ✅ 100%
 
 ## Known Issues
+
 - [List any known issues or technical debt]
 
 ## Next Phase Preparation
+
 - Phase 7 dependencies ready: ✅
 - Auth integration points ready: ✅
 - Documentation complete: ✅
@@ -1174,6 +1254,7 @@ export default function Error({ error, reset }) {
 ## 🎯 NEXT PHASE PREVIEW
 
 **Phase 7: Auth Orchestration (Enterprise)**
+
 - Full auth flow integration (login, register, forgot password)
 - Session lifecycle management
 - Device trust and fingerprinting
@@ -1182,6 +1263,7 @@ export default function Error({ error, reset }) {
 - Audit trail and compliance
 
 **Dependencies from Phase 6:**
+
 - Layout system ✅
 - State management (Zustand + TanStack Query) ✅
 - Route protection middleware ✅

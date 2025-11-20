@@ -33,12 +33,10 @@ ENV NODE_ENV=development
 WORKDIR /workspace
 COPY --from=deps /workspace/.pnpm-store /workspace/.pnpm-store
 COPY . .
-RUN pnpm install --filter @lumi/frontend... --frozen-lockfile
 EXPOSE 3000
 ENV PNPM_YES=true \
   PNPM_NON_INTERACTIVE=true
 CMD ["sh", "-c", "pnpm install --filter @lumi/frontend... --frozen-lockfile --force && pnpm --filter @lumi/frontend exec next dev --hostname 0.0.0.0 --port ${PORT:-3000}"]
-CMD ["pnpm", "--filter", "@lumi/frontend", "dev"]
 
 FROM base AS build
 

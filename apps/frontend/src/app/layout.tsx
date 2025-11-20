@@ -8,7 +8,6 @@ import { Inter } from "next/font/google";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { LenisProvider } from "@/providers/LenisProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
@@ -44,22 +43,20 @@ export default function RootLayout({ children }: PropsWithChildren): JSX.Element
       >
         <ThemeProvider>
           <QueryProvider>
-            <LenisProvider>
-              <MotionConfig
-                transition={{
-                  duration: 0.4,
-                  ease: [0.4, 0, 0.2, 1],
-                }}
-              >
-                <TooltipProvider delayDuration={150}>
-                  <div className="bg-lumi-background text-lumi-text relative flex min-h-screen flex-col">
-                    <ThemeToggle className="fixed bottom-6 right-6 z-50" />
-                    {children}
-                  </div>
-                  <Toaster />
-                </TooltipProvider>
-              </MotionConfig>
-            </LenisProvider>
+            <MotionConfig
+              transition={{
+                duration: 0.4,
+                ease: [0.4, 0, 0.2, 1],
+              }}
+            >
+              <TooltipProvider delayDuration={150}>
+                <div className="bg-lumi-background text-lumi-text relative flex min-h-screen flex-col">
+                  <ThemeToggle className="fixed bottom-6 right-6 z-50" />
+                  {children}
+                </div>
+                <Toaster />
+              </TooltipProvider>
+            </MotionConfig>
           </QueryProvider>
         </ThemeProvider>
       </body>

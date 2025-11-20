@@ -964,12 +964,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
 ```typescript
 // Validate MIME type (S2)
-const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 if (!ALLOWED_MIMES.includes(req.file.mimetype)) {
   return res.status(415).json({
     success: false,
-    error: { code: 'INVALID_MIME_TYPE', message: 'File type not supported' }
+    error: { code: "INVALID_MIME_TYPE", message: "File type not supported" },
   });
 }
 ```
@@ -1064,16 +1064,16 @@ return result;
 // Proper error handling
 try {
   const result = await cloudinary.uploader.upload(filePath, {
-    folder: 'lumi/products',
-    eager: transformations
+    folder: "lumi/products",
+    eager: transformations,
   });
   return formatSuccess(result);
 } catch (error) {
-  logger.error('Cloudinary upload failed', { error, filePath });
+  logger.error("Cloudinary upload failed", { error, filePath });
   if (error.http_code === 420) {
-    return formatError({ code: 'RATE_LIMIT', message: 'Upload rate limit exceeded' });
+    return formatError({ code: "RATE_LIMIT", message: "Upload rate limit exceeded" });
   }
-  return formatError({ code: 'UPLOAD_FAILED', message: 'Image upload failed' });
+  return formatError({ code: "UPLOAD_FAILED", message: "Image upload failed" });
 }
 ```
 
@@ -1237,7 +1237,7 @@ res.json({ url: imageUrl });
 - shadcn/ui integration
 - Layout system (auth, dashboard, public)
 - State management (Zustand + TanStack Query)
-- Animation system (Framer Motion + GSAP + Lenis)
+- Animation system (Framer Motion + GSAP)
 
 **Dependencies from Phase 5:**
 
