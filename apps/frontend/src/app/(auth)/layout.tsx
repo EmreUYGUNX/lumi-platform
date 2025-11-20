@@ -6,6 +6,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AuthBackground } from "@/components/auth/AuthBackground";
+import { PageTransition } from "@/components/layout/PageTransition";
 import { getCurrentUser, shouldEnforceGuards } from "@/lib/session";
 
 interface AuthLayoutProps {
@@ -27,7 +28,7 @@ export default async function AuthLayout({ children }: AuthLayoutProps): Promise
           Lumi Commerce
         </Link>
         <div className="border-lumi-border/60 bg-lumi-bg/90 shadow-glow mt-10 w-full max-w-md rounded-3xl border p-8">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
         <div className="text-lumi-text-secondary mt-6 flex flex-wrap items-center justify-center gap-4 text-xs">
           <Link href="/contact" className="hover:text-lumi-primary">
