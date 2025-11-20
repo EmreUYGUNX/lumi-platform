@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -48,7 +48,9 @@ export default async function DashboardLayout({
           <CommandPaletteTrigger />
         </div>
         <main className="flex-1 px-6 py-8">
-          <PageTransition preserveScroll>{children}</PageTransition>
+          <Suspense fallback={children}>
+            <PageTransition preserveScroll>{children}</PageTransition>
+          </Suspense>
         </main>
         <nav className="border-lumi-border/60 bg-lumi-bg border-t py-3 lg:hidden">
           <div className="flex items-center justify-around text-xs font-semibold">

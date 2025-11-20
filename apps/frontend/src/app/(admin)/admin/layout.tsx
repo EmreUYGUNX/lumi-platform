@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { redirect } from "next/navigation";
 
@@ -31,7 +31,9 @@ export default async function AdminLayout({ children }: AdminLayoutProps): Promi
       <div className="flex flex-1 flex-col">
         <AdminTopbar />
         <main className="flex-1 px-6 py-8">
-          <PageTransition preserveScroll>{children}</PageTransition>
+          <Suspense fallback={children}>
+            <PageTransition preserveScroll>{children}</PageTransition>
+          </Suspense>
         </main>
       </div>
     </div>

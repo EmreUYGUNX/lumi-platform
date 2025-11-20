@@ -14,12 +14,18 @@ module.exports = createProjectJestConfig({
   projectRoot: __dirname,
   testEnvironment: "jsdom",
   tsconfig: path.join(__dirname, "tsconfig.json"),
+  modulePathIgnorePatterns: [
+    "<rootDir>/apps/frontend/.next",
+    "<rootDir>/apps/frontend/.next/standalone",
+  ],
   moduleNameMapper: {
     "^@/(.*)$": path.join(__dirname, "src", "$1"),
     "^@config/(.*)$": path.join(__dirname, "../../config", "$1"),
     "\\.(css|scss|sass)$": "identity-obj-proxy",
     "^next/font/(.*)$": path.join(__dirname, "__mocks__", "next", "font", "$1.ts"),
+    "^gsap(.*)$": path.join(__dirname, "__mocks__", "gsap.ts"),
   },
+  transformIgnorePatterns: ["node_modules/(?!gsap)"],
   coverageDirectory: path.join(__dirname, "../../coverage/apps/frontend"),
   setupFiles: [],
   collectCoverageFrom: [

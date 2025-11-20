@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { MarketingWrapper } from "@/components/layout/MarketingWrapper";
 import { NewsletterSignup } from "@/components/layout/NewsletterSignup";
@@ -16,7 +16,9 @@ export default function PublicLayout({ children }: PublicLayoutProps): JSX.Eleme
       <div className="bg-lumi-bg flex min-h-screen flex-col">
         <PublicHeader />
         <main className="flex-1">
-          <PageTransition>{children}</PageTransition>
+          <Suspense fallback={children}>
+            <PageTransition>{children}</PageTransition>
+          </Suspense>
         </main>
         <NewsletterSignup />
         <PublicFooter />

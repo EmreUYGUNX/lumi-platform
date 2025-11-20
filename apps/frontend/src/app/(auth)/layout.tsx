@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import type { Route } from "next";
 
@@ -28,7 +28,9 @@ export default async function AuthLayout({ children }: AuthLayoutProps): Promise
           Lumi Commerce
         </Link>
         <div className="border-lumi-border/60 bg-lumi-bg/90 shadow-glow mt-10 w-full max-w-md rounded-3xl border p-8">
-          <PageTransition>{children}</PageTransition>
+          <Suspense fallback={children}>
+            <PageTransition>{children}</PageTransition>
+          </Suspense>
         </div>
         <div className="text-lumi-text-secondary mt-6 flex flex-wrap items-center justify-center gap-4 text-xs">
           <Link href="/contact" className="hover:text-lumi-primary">
