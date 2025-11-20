@@ -10,16 +10,17 @@ describe("HomePage component", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: /next\.js foundation for lumi's immersive commerce experience/i,
+        name: /build experience-first commerce with deneme\.html precision\./i,
       }),
     ).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /explore architecture/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /review design tokens/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /schedule a briefing/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view platform overview/i })).toBeInTheDocument();
 
-    ["Composable storefronts", "Enterprise foundations", "Experiential UI"].forEach((title) => {
+    ["Adaptive Storefronts", "Commerce Orchestration", "Customer Graph"].forEach((title) => {
+      const lookup = title.toLowerCase();
       expect(
-        screen.getByRole("heading", { level: 2, name: new RegExp(title, "i") }),
+        screen.getByText((content) => content.toLowerCase().includes(lookup)),
       ).toBeInTheDocument();
     });
   });

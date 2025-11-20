@@ -35,8 +35,10 @@
     "next-env.d.ts",
     "src/**/*",
     ".next/types/**/*.ts",
+    "__mocks__/**/*",
     "__tests__/**/*",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    ".lumi-next/types/**/*.ts"
   ],
   "references": [
     {

@@ -1,4 +1,5 @@
 import { Children, isValidElement } from "react";
+import type { ReactElement } from "react";
 
 import { describe, it } from "@jest/globals";
 
@@ -22,9 +23,43 @@ describe("RootLayout component", () => {
 
     const themeProvider = bodyElement.props.children;
     expect(isValidElement(themeProvider)).toBe(true);
+    if (!isValidElement(themeProvider)) {
+      throw new Error("ThemeProvider failed to mount in RootLayout");
+    }
+    const themeProviderElement = themeProvider as ReactElement;
 
-    const appShell = themeProvider.props.children;
-    expect(isValidElement(appShell)).toBe(true);
+    const queryProvider = themeProviderElement.props.children;
+    expect(isValidElement(queryProvider)).toBe(true);
+    if (!isValidElement(queryProvider)) {
+      throw new Error("QueryProvider failed to mount in RootLayout");
+    }
+    const queryProviderElement = queryProvider as ReactElement;
+
+    const lenisProvider = queryProviderElement.props.children;
+    expect(isValidElement(lenisProvider)).toBe(true);
+    if (!isValidElement(lenisProvider)) {
+      throw new Error("LenisProvider failed to mount in RootLayout");
+    }
+    const lenisProviderElement = lenisProvider as ReactElement;
+
+    const motionConfig = lenisProviderElement.props.children;
+    expect(isValidElement(motionConfig)).toBe(true);
+    if (!isValidElement(motionConfig)) {
+      throw new Error("MotionConfig failed to mount in RootLayout");
+    }
+    const motionConfigElement = motionConfig as ReactElement;
+
+    const tooltipProvider = motionConfigElement.props.children;
+    expect(isValidElement(tooltipProvider)).toBe(true);
+    if (!isValidElement(tooltipProvider)) {
+      throw new Error("TooltipProvider failed to mount in RootLayout");
+    }
+
+    const tooltipElement = tooltipProvider as ReactElement;
+    const [appShell, toaster] = Children.toArray(tooltipElement.props.children);
+    if (!isValidElement(appShell) || !isValidElement(toaster)) {
+      throw new Error("App shell or toaster root is not a valid React element.");
+    }
     expect(appShell.props.className).toContain("flex");
 
     const renderedChildren = Children.toArray(appShell.props.children);
