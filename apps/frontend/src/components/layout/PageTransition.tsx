@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useTransition, type ReactNode } from "react";
 
 import type { Route } from "next";
 
@@ -25,39 +25,16 @@ export function useTransitionRouter(options: { preserveScroll?: boolean } = {}):
   prefetch: (href: Route) => void;
 } {
   const router = useRouter();
-  const pathname = usePathname();
   const preserveScrollDefault = options.preserveScroll ?? false;
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const lastScrollPosition = useRef(0);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const shouldPreserve = preserveScrollDefault || lastScrollPosition.current > 0;
-    const targetScroll = shouldPreserve ? lastScrollPosition.current : 0;
-    window.scrollTo({ top: targetScroll, behavior: shouldPreserve ? "auto" : "smooth" });
-    setIsTransitioning(false);
-  }, [pathname, preserveScrollDefault]);
-
-  useEffect(() => {
-    if (!isPending) {
-      lastScrollPosition.current = 0;
-    }
-  }, [isPending]);
-
-  const setScrollState = (preserveScroll?: boolean): void => {
-    if (typeof window === "undefined") return;
-    lastScrollPosition.current = preserveScroll ? window.scrollY : 0;
-  };
+  const isTransitioning = isPending;
 
   const runNavigation = (navigate: () => void, opts?: TransitionOptions): void => {
-    const preserveScroll = opts?.preserveScroll ?? preserveScrollDefault;
-    setScrollState(preserveScroll);
-    setIsTransitioning(true);
-
     startTransition(() => {
       navigate();
+      if (!opts?.preserveScroll && !preserveScrollDefault && typeof window !== "undefined") {
+        window.scrollTo({ top: 0 });
+      }
     });
   };
 
@@ -81,24 +58,8 @@ export function useTransitionRouter(options: { preserveScroll?: boolean } = {}):
 
 export function PageTransition({
   children,
-  preserveScroll = false,
+  preserveScroll: _preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
-  const [isReady, setIsReady] = useState(false);
-  const scrollHandledRef = useRef(false);
-
-  useEffect(() => setIsReady(true), []);
-
-  useEffect(() => {
-    if (!preserveScroll && typeof window !== "undefined" && scrollHandledRef.current) {
-      window.scrollTo({ top: 0 });
-    }
-    scrollHandledRef.current = true;
-  }, [routeKey, preserveScroll]);
-
-  if (!isReady) {
-    return <>{children}</>;
-  }
-
-  // Temporarily disable animated transitions to mitigate router key crashes on Next 14.2.33.
+  // Animations disabled to avoid router crash on Next 14.2.33
   return <>{children}</>;
 }
