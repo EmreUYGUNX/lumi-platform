@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
-import { AnimatePresence, motion } from "framer-motion";
 import type { Route } from "next";
 
-import { usePathname, useRouter, useSelectedLayoutSegments } from "next/navigation";
-
-import { pageTransitionVariants } from "@/animations/motion-presets";
+import { useRouter } from "next/navigation";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -86,15 +83,8 @@ export function PageTransition({
   children,
   preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
-  const pathname = usePathname();
-  const segments = useSelectedLayoutSegments();
   const [isReady, setIsReady] = useState(false);
   const scrollHandledRef = useRef(false);
-
-  const routeKey = useMemo(() => {
-    if (!segments || segments.length === 0) return pathname ?? "root";
-    return segments.join("/") || "root";
-  }, [segments, pathname]);
 
   useEffect(() => setIsReady(true), []);
 
@@ -109,18 +99,6 @@ export function PageTransition({
     return <>{children}</>;
   }
 
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={routeKey}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={pageTransitionVariants}
-        className="min-h-full"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
+  // Temporarily disable animated transitions to mitigate router key crashes on Next 14.2.33.
+  return <>{children}</>;
 }
