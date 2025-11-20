@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import { AnimatePresence, motion } from "framer-motion";
 import type { Route } from "next";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { pageTransitionVariants } from "@/animations/motion-presets";
 
@@ -29,7 +29,6 @@ export function useTransitionRouter(options: { preserveScroll?: boolean } = {}):
 } {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const preserveScrollDefault = options.preserveScroll ?? false;
   const [isTransitioning, setIsTransitioning] = useState(false);
   const lastScrollPosition = useRef(0);
@@ -42,7 +41,7 @@ export function useTransitionRouter(options: { preserveScroll?: boolean } = {}):
     const targetScroll = shouldPreserve ? lastScrollPosition.current : 0;
     window.scrollTo({ top: targetScroll, behavior: shouldPreserve ? "auto" : "smooth" });
     setIsTransitioning(false);
-  }, [pathname, searchParams, preserveScrollDefault]);
+  }, [pathname, preserveScrollDefault]);
 
   useEffect(() => {
     if (!isPending) {
@@ -88,14 +87,10 @@ export function PageTransition({
   preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isReady, setIsReady] = useState(false);
   const scrollHandledRef = useRef(false);
 
-  const routeKey = useMemo(
-    () => `${pathname}?${searchParams?.toString() ?? ""}`,
-    [pathname, searchParams],
-  );
+  const routeKey = useMemo(() => `${pathname ?? ""}-${Date.now()}`, [pathname]);
 
   useEffect(() => setIsReady(true), []);
 
