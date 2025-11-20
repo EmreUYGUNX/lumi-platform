@@ -44,8 +44,9 @@ export default function RootLayout({ children }: PropsWithChildren): JSX.Element
         <ThemeProvider>
           <QueryProvider>
             <MotionConfig
+              reducedMotion="user"
               transition={{
-                duration: 0.4,
+                duration: 0.45,
                 ease: [0.4, 0, 0.2, 1],
               }}
             >

@@ -32,13 +32,12 @@
     ]
   },
   "include": [
-    "next-env.d.ts",
-    "src/**/*",
-    ".next/types/**/*.ts",
     "__mocks__/**/*",
     "__tests__/**/*",
+    "next-env.d.ts",
+    "src/**/*",
     "tailwind.config.ts",
-    ".lumi-next/types/**/*.ts"
+    ".next/types/**/*.ts"
   ],
   "references": [
     {

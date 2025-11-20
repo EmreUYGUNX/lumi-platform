@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { CommandPaletteTrigger } from "@/components/dashboard/CommandPaletteTrigger";
 import { DashboardSidebarNav } from "@/components/dashboard/DashboardSidebarNav";
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar";
+import { PageTransition } from "@/components/layout/PageTransition";
 import { dashboardNavItems } from "@/data/dashboard-nav";
 import { getCurrentUser, resolvePreviewUser, shouldEnforceGuards } from "@/lib/session";
 
@@ -46,7 +47,11 @@ export default async function DashboardLayout({
         <div className="border-lumi-border/60 bg-lumi-bg border-b px-6 py-3">
           <CommandPaletteTrigger />
         </div>
-        <main className="flex-1 px-6 py-8">{children}</main>
+        <main className="flex-1 px-6 py-8">
+          <Suspense fallback={children}>
+            <PageTransition preserveScroll>{children}</PageTransition>
+          </Suspense>
+        </main>
         <nav className="border-lumi-border/60 bg-lumi-bg border-t py-3 lg:hidden">
           <div className="flex items-center justify-around text-xs font-semibold">
             {dashboardNavItems.map((item) => {

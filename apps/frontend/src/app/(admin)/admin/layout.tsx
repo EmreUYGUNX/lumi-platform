@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { redirect } from "next/navigation";
 
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
+import { PageTransition } from "@/components/layout/PageTransition";
 import { getCurrentUser, hasRole, shouldEnforceGuards } from "@/lib/session";
 
 interface AdminLayoutProps {
@@ -29,7 +30,11 @@ export default async function AdminLayout({ children }: AdminLayoutProps): Promi
       </aside>
       <div className="flex flex-1 flex-col">
         <AdminTopbar />
-        <main className="flex-1 px-6 py-8">{children}</main>
+        <main className="flex-1 px-6 py-8">
+          <Suspense fallback={children}>
+            <PageTransition preserveScroll>{children}</PageTransition>
+          </Suspense>
+        </main>
       </div>
     </div>
   );
