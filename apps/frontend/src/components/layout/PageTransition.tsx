@@ -4,7 +4,7 @@ import { useTransition, type ReactNode } from "react";
 
 import type { Route } from "next";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -60,6 +60,14 @@ export function PageTransition({
   children,
   preserveScroll: _preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
-  // Animations disabled to avoid router crash on Next 14.2.33
-  return <>{children}</>;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const routeKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
+
+  // Animations disabled (Next 14.2.33 crash mitigation).  Still key the wrapper to force re-render per route.
+  return (
+    <div key={routeKey} className="min-h-full">
+      {children}
+    </div>
+  );
 }
