@@ -18,12 +18,15 @@ const createStorage = (): Storage => {
       clear: () => {
         store.clear();
       },
-      getItem: (key: string) => store.get(key) ?? null,
+      getItem: (key: string) =>
+        // eslint-disable-next-line security/detect-object-injection
+        store.get(key) ?? null,
       key: (index: number) => {
         if (!Number.isInteger(index) || index < 0) {
           return null;
         }
         const keys = [...store.keys()];
+        // eslint-disable-next-line security/detect-object-injection
         return keys[index] ?? null;
       },
       removeItem: (key: string) => {
