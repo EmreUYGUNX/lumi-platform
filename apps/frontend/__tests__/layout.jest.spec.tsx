@@ -35,14 +35,7 @@ describe("RootLayout component", () => {
     }
     const queryProviderElement = queryProvider as ReactElement;
 
-    const lenisProvider = queryProviderElement.props.children;
-    expect(isValidElement(lenisProvider)).toBe(true);
-    if (!isValidElement(lenisProvider)) {
-      throw new Error("LenisProvider failed to mount in RootLayout");
-    }
-    const lenisProviderElement = lenisProvider as ReactElement;
-
-    const motionConfig = lenisProviderElement.props.children;
+    const motionConfig = queryProviderElement.props.children;
     expect(isValidElement(motionConfig)).toBe(true);
     if (!isValidElement(motionConfig)) {
       throw new Error("MotionConfig failed to mount in RootLayout");
