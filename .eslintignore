@@ -5,6 +5,8 @@ coverage/
 .turbo/
 .next/
 .cache/
+next-env.d.ts
+*/next-env.d.ts
 pnpm-lock.yaml
 *.config.js
 *.config.cjs

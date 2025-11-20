@@ -1,10 +1,13 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { useEffect, useTransition, type ReactNode } from "react";
 
+import { AnimatePresence, motion } from "framer-motion";
 import type { Route } from "next";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { pageTransitionVariants } from "@/animations/motion-presets";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -64,10 +67,23 @@ export function PageTransition({
   const searchParams = useSearchParams();
   const routeKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
 
-  // Animations disabled (Next 14.2.33 crash mitigation).  Still key the wrapper to force re-render per route.
+  useEffect(() => {
+    // On mount only; prevents hydration mismatch and ensures client can animate safely
+    // (no-op body intentionally).
+  }, []);
+
   return (
-    <div key={routeKey} className="min-h-full">
-      {children}
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={routeKey}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={pageTransitionVariants}
+        className="min-h-full"
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
 }
