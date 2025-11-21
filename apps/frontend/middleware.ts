@@ -39,8 +39,13 @@ const decodeJwt = (token: string): JwtPayload | undefined => {
     return undefined;
   }
 
+  const payloadSegment = parts[1];
+  if (!payloadSegment) {
+    return undefined;
+  }
+
   try {
-    const payload = decodeBase64Url(parts[1]);
+    const payload = decodeBase64Url(payloadSegment);
     return JSON.parse(payload) as JwtPayload;
   } catch {
     return undefined;
