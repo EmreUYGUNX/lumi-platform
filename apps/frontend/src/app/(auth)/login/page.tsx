@@ -19,6 +19,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 
+// Prevent Next from attempting to prerender this client page during build.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const loginSchema = z.object({
   email: z.string().email("Geçerli bir e-posta girin."),
   password: z.string().min(8, "Şifreniz en az 8 karakter olmalı."),

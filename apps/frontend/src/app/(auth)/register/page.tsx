@@ -20,6 +20,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
+// Prevent prerender during build; this client page should render at runtime.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const registerSchema = z
   .object({
     name: z.string().min(2, "Adınız en az 2 karakter olmalı."),

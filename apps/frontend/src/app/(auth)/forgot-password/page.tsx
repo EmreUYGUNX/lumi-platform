@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
+// Avoid static prerender; run at request time.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const forgotSchema = z.object({
   email: z.string().email("Geçerli bir e-posta girin."),
 });
