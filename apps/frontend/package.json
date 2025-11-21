@@ -4,15 +4,15 @@
   "private": true,
   "description": "Future Next.js web client for Lumi commerce platform.",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next dev",
+    "build": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
+    "start": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check",
     "test": "pnpm run test:jest",
     "test:jest": "jest --config jest.config.cjs --runInBand",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
