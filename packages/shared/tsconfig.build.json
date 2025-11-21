@@ -5,5 +5,6 @@
     "emitDeclarationOnly": false,
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
+  "references": [{ "path": "../types" }],
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**", "**/*.stories.*"]
 }
