@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { HeroSection } from "@/components/marketing/HeroSection";
+import { ImageGalleryPanel } from "@/components/performance/lazy";
 import { ProfileFormExample } from "@/components/examples/forms/ProfileFormExample";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +90,10 @@ export default function PublicHomePage(): JSX.Element {
             </div>
           ))}
         </div>
+      </Section>
+
+      <Section title="Visual performance gallery">
+        <ImageGalleryPanel />
       </Section>
 
       <Section title="What makes Lumi different">

@@ -4,6 +4,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { AdminChartsPanel, MapCoveragePanel } from "@/components/performance/lazy";
 import { RequireRole } from "@/lib/guards";
 
 const analytics = [
@@ -107,6 +108,11 @@ function AdminContent(): JSX.Element {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminChartsPanel />
+        <MapCoveragePanel />
+      </div>
     </div>
   );
 }

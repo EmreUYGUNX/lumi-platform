@@ -5,6 +5,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  AdminChartsPanel,
+  MapCoveragePanel,
+  RichTextEditorPanel,
+} from "@/components/performance/lazy";
 import { RequireAuth } from "@/lib/guards";
 
 const stats = [
@@ -99,6 +104,13 @@ function DashboardContent(): JSX.Element {
           </Card>
         ))}
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminChartsPanel />
+        <RichTextEditorPanel />
+      </div>
+
+      <MapCoveragePanel />
     </div>
   );
 }
