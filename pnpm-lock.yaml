@@ -48,6 +48,7 @@ overrides:
   jest-matcher-utils: 29.7.0
   glob: 10.5.0
   js-yaml: 4.1.1
+  axios: 1.6.8
 
 packageExtensionsChecksum: c8692b251a2411d4265c571b29b16ff7
 
@@ -6365,10 +6366,10 @@ packages:
       }
     engines: { node: ">=4" }
 
-  axios@0.21.4:
+  axios@1.6.8:
     resolution:
       {
-        integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==,
+        integrity: sha512-v/ZHtJDU39mDpyBoFVkETcd/uNdxrWRrg3bKpOKzXFA6Bvqopts6ALSMU3y6ijYxbw2B+wPrIv46egTzJXCLGQ==,
       }
 
   axobject-query@4.1.0:
@@ -19431,9 +19432,11 @@ snapshots:
 
   axe-core@4.10.3: {}
 
-  axios@0.21.4:
+  axios@1.6.8:
     dependencies:
       follow-redirects: 1.15.11
+      form-data: 4.0.4
+      proxy-from-env: 1.1.0
     transitivePeerDependencies:
       - debug
 
@@ -23036,7 +23039,7 @@ snapshots:
     dependencies:
       "@types/request": 2.48.13
       "@types/superagent": 8.1.9
-      axios: 0.21.4
+      axios: 1.6.8
       combos: 0.2.0
       fs-extra: 10.1.0
       js-yaml: 4.1.1
