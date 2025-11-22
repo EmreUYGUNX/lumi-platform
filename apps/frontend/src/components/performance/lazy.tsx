@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactElement } from "react";
 
 import dynamic from "next/dynamic";
