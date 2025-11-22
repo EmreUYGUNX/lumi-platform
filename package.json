@@ -183,6 +183,7 @@
       "@radix-ui/react-primitive": "2.1.4",
       "@radix-ui/react-slot": "1.2.4",
       "test-exclude>glob": "7.2.3",
+      "openapi-validator>axios": "1.7.9",
       "@smithy/is-array-buffer": "4.2.0",
       "@smithy/util-buffer-from": "4.2.0",
       "@smithy/util-utf8": "4.2.0",
