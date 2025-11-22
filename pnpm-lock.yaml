@@ -176,6 +176,9 @@ importers:
       glob:
         specifier: ^11.1.0
         version: 11.1.0
+      hermes-parser:
+        specifier: ^0.32.1
+        version: 0.32.1
       husky:
         specifier: ^9.0.11
         version: 9.1.7
@@ -9288,6 +9291,18 @@ packages:
         integrity: sha512-ZRiwvN089JfMXokizgqEPXsl2Guk094yExfoDXR0cBYWxtBbaSww/w+vT4WEJsBW2iTUi1GgZ6swmoug3Oy4Xw==,
       }
     engines: { node: ">=16.0.0" }
+
+  hermes-estree@0.32.1:
+    resolution:
+      {
+        integrity: sha512-ne5hkuDxheNBAikDjqvCZCwihnz0vVu9YsBzAEO1puiyFR4F1+PAz/SiPHSsNTuOveCYGRMX8Xbx4LOubeC0Qg==,
+      }
+
+  hermes-parser@0.32.1:
+    resolution:
+      {
+        integrity: sha512-175dz634X/W5AiwrpLdoMl/MOb17poLHyIqgyExlE8D9zQ1OPnoORnGMB5ltRKnpvQzBjMYvT2rN/sHeIfZW5Q==,
+      }
 
   highlight.js@10.7.3:
     resolution:
@@ -21259,6 +21274,12 @@ snapshots:
   hdr-histogram-percentiles-obj@3.0.0: {}
 
   helmet@7.2.0: {}
+
+  hermes-estree@0.32.1: {}
+
+  hermes-parser@0.32.1:
+    dependencies:
+      hermes-estree: 0.32.1
 
   highlight.js@10.7.3: {}
 
