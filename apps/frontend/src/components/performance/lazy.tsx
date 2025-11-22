@@ -24,12 +24,10 @@ const PanelSkeleton = (): ReactElement => (
 
 export const AdminChartsPanel = dynamic(() => import("./panels/AdminChartsPanel"), {
   loading: () => <PanelSkeleton />,
-  ssr: false,
 });
 
 export const RichTextEditorPanel = dynamic(() => import("./panels/RichTextEditorPanel"), {
   loading: () => <PanelSkeleton />,
-  ssr: false,
 });
 
 export const ImageGalleryPanel = dynamic(() => import("./panels/ImageGalleryPanel"), {
@@ -38,5 +36,4 @@ export const ImageGalleryPanel = dynamic(() => import("./panels/ImageGalleryPane
 
 export const MapCoveragePanel = dynamic(() => import("./panels/MapCoveragePanel"), {
   loading: () => <PanelSkeleton />,
-  ssr: false,
 });
