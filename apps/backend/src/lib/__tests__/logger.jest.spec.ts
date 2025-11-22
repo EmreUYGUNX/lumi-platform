@@ -442,9 +442,7 @@ describe("logger", () => {
   it("renders colourised console output in pretty mode", async () => {
     jest.resetModules();
     jest.doMock("winston-daily-rotate-file", () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-      const MockedTransportStream = require("winston-transport");
-      class MockRotationTransport extends MockedTransportStream {
+      class MockRotationTransport extends TransportStream {
         public readonly dirname: string | undefined;
 
         constructor(options: Record<string, unknown>) {
@@ -453,7 +451,7 @@ describe("logger", () => {
         }
 
         // eslint-disable-next-line class-methods-use-this
-        log(_info: unknown, next: () => void): void {
+        override log(_info: unknown, next: () => void): void {
           next();
         }
       }

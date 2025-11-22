@@ -9,6 +9,8 @@ import { AuthBackground } from "@/components/auth/AuthBackground";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { getCurrentUser, shouldEnforceGuards } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
+
 interface AuthLayoutProps {
   children: ReactNode;
 }

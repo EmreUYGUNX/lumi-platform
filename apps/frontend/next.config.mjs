@@ -1,5 +1,12 @@
 import { createRequire } from "node:module";
 
+// Node 18 (CI) does not expose `self` globally like Node 20+. Some client bundles
+// leveraged during SSG expect `self` to exist, so polyfill it early to avoid
+// ReferenceError when Next executes those chunks while collecting page data.
+if (typeof globalThis.self === "undefined") {
+  globalThis.self = globalThis;
+}
+
 const require = createRequire(import.meta.url);
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",

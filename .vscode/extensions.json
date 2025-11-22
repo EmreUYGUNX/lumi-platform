@@ -2,6 +2,7 @@
   "recommendations": [
     "esbenp.prettier-vscode",
     "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
     "orta.vscode-jest",
     "streetsidesoftware.code-spell-checker"
   ]

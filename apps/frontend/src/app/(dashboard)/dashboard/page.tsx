@@ -1,6 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+/* eslint-disable react/jsx-no-useless-fragment */
+
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  AdminChartsPanel,
+  MapCoveragePanel,
+  RichTextEditorPanel,
+} from "@/components/performance/lazy";
+import { RequireAuth } from "@/lib/guards";
 
 const stats = [
   { label: "GMV", value: "$4.2M", delta: "+22% vs last cycle" },
@@ -35,7 +45,7 @@ const actionCards = [
   },
 ];
 
-export default function DashboardHomePage(): JSX.Element {
+function DashboardContent(): JSX.Element {
   return (
     <div className="space-y-8">
       <div className="border-lumi-border/70 bg-lumi-bg shadow-lumi-primary/5 rounded-3xl border p-6 shadow-lg">
@@ -94,6 +104,21 @@ export default function DashboardHomePage(): JSX.Element {
           </Card>
         ))}
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminChartsPanel />
+        <RichTextEditorPanel />
+      </div>
+
+      <MapCoveragePanel />
     </div>
+  );
+}
+
+export default function DashboardHomePage(): JSX.Element {
+  return (
+    <RequireAuth>
+      <DashboardContent />
+    </RequireAuth>
   );
 }

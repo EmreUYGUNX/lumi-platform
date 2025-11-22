@@ -1,7 +1,7 @@
 import { Children, isValidElement } from "react";
 import type { ReactElement } from "react";
 
-import { describe, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import RootLayout, { metadata } from "@/app/layout";
 
@@ -49,18 +49,33 @@ describe("RootLayout component", () => {
     }
 
     const tooltipElement = tooltipProvider as ReactElement;
-    const [appShell, toaster] = Children.toArray(tooltipElement.props.children);
-    if (!isValidElement(appShell) || !isValidElement(toaster)) {
+    const tooltipChildren = Children.toArray(tooltipElement.props.children);
+    const appShell = tooltipChildren.find((child) => isValidElement(child));
+    const toaster = tooltipChildren.find((child) => {
+      if (!isValidElement(child)) return false;
+      const elementType = (child as ReactElement).type;
+      return (
+        typeof elementType === "function" && (elementType as { name?: string }).name === "Toaster"
+      );
+    });
+    if (!appShell || !toaster || !isValidElement(appShell) || !isValidElement(toaster)) {
       throw new Error("App shell or toaster root is not a valid React element.");
     }
-    expect(appShell.props.className).toContain("flex");
+    expect((appShell as ReactElement).props.className).toContain("flex");
 
-    const renderedChildren = Children.toArray(appShell.props.children);
-    const projectedChild = renderedChildren.at(-1);
-    expect(isValidElement(projectedChild)).toBe(true);
-    if (!isValidElement(projectedChild)) {
-      throw new Error("RootLayout failed to project its children");
-    }
-    expect(projectedChild.props.children).toBe("Child node");
+    const containsChildNode = (node: unknown): boolean => {
+      if (!isValidElement(node)) {
+        return false;
+      }
+      const element = node as ReactElement;
+      if (element.props?.children === "Child node") {
+        return true;
+      }
+      const childrenArray = Children.toArray(element.props?.children);
+      return childrenArray.some((child) => containsChildNode(child));
+    };
+
+    const renderedChildren = Children.toArray((appShell as ReactElement).props.children);
+    expect(renderedChildren.some((child) => containsChildNode(child))).toBe(true);
   });
 });

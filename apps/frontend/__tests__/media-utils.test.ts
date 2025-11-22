@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import { formatFileSize, normaliseTagInput } from "@/features/media/utils/media-formatters";
 import { buildCloudinaryUrl, buildSizesAttribute, buildSrcSet } from "@/lib/cloudinary";

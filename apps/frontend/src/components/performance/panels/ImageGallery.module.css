@@ -1,0 +1,33 @@
+.galleryGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--lumi-border);
+  background: var(--lumi-bg-secondary);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.04);
+}
+
+.caption {
+  padding: 12px 14px 16px 14px;
+  color: var(--lumi-text-secondary);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tag {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--lumi-text);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border: 1px solid var(--lumi-border);
+}

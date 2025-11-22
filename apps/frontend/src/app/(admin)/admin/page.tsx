@@ -1,5 +1,11 @@
+"use client";
+
+/* eslint-disable react/jsx-no-useless-fragment */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { AdminChartsPanel, MapCoveragePanel } from "@/components/performance/lazy";
+import { RequireRole } from "@/lib/guards";
 
 const analytics = [
   { label: "API uptime", value: "99.99%", status: "Nominal" },
@@ -28,7 +34,7 @@ const systemHealth = [
   },
 ];
 
-export default function AdminPage(): JSX.Element {
+function AdminContent(): JSX.Element {
   return (
     <div className="space-y-8">
       <div className="border-lumi-border/70 bg-lumi-bg shadow-glow rounded-3xl border p-6">
@@ -102,6 +108,19 @@ export default function AdminPage(): JSX.Element {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminChartsPanel />
+        <MapCoveragePanel />
+      </div>
     </div>
+  );
+}
+
+export default function AdminPage(): JSX.Element {
+  return (
+    <RequireRole role="admin">
+      <AdminContent />
+    </RequireRole>
   );
 }

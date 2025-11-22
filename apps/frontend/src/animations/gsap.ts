@@ -4,17 +4,47 @@ import { useEffect, type DependencyList } from "react";
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import type * as ScrollSmootherModule from "gsap/ScrollSmoother";
 
-type ScrollSmootherPlugin = { create?: (...args: unknown[]) => unknown } | undefined;
+type ScrollSmootherPlugin = typeof ScrollSmootherModule.ScrollSmoother | undefined;
 
 let pluginsRegistered = false;
 let scrollSmootherPlugin: ScrollSmootherPlugin;
+let scrollSmootherLoading: Promise<ScrollSmootherPlugin> | undefined;
 
 export interface GSAPPluginBundle {
   gsap: typeof gsap;
   ScrollTrigger?: typeof ScrollTrigger;
   ScrollSmoother?: ScrollSmootherPlugin;
 }
+
+const loadScrollSmoother = async (): Promise<ScrollSmootherPlugin> => {
+  if (scrollSmootherPlugin) {
+    return scrollSmootherPlugin;
+  }
+
+  if (!scrollSmootherLoading) {
+    scrollSmootherLoading = import("gsap/ScrollSmoother")
+      .then((smootherModule: typeof ScrollSmootherModule) => {
+        const plugin: ScrollSmootherPlugin =
+          smootherModule.ScrollSmoother ?? smootherModule.default ?? undefined;
+        if (plugin) {
+          gsap.registerPlugin(plugin);
+          scrollSmootherPlugin = plugin;
+        }
+        return plugin;
+      })
+      .catch((error) => {
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console -- surfaced only during development
+          console.warn("[GSAP] ScrollSmoother unavailable; continuing without it.", error);
+        }
+        return scrollSmootherPlugin;
+      });
+  }
+
+  return scrollSmootherLoading;
+};
 
 export const registerGSAPPlugins = (): GSAPPluginBundle => {
   if (typeof window === "undefined") {
@@ -23,22 +53,7 @@ export const registerGSAPPlugins = (): GSAPPluginBundle => {
 
   if (!pluginsRegistered) {
     gsap.registerPlugin(ScrollTrigger);
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require -- Optional club plugin
-      const smootherModule = require("gsap/ScrollSmoother");
-      const plugin: ScrollSmootherPlugin =
-        smootherModule?.ScrollSmoother ?? smootherModule?.default ?? undefined;
-      if (plugin) {
-        gsap.registerPlugin(plugin);
-        scrollSmootherPlugin = plugin;
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console -- surfaced only during development
-        console.warn("[GSAP] ScrollSmoother unavailable; continuing without it.", error);
-      }
-    }
+    loadScrollSmoother().catch(() => {});
 
     pluginsRegistered = true;
   }

@@ -9,6 +9,8 @@ import { animateHero, animateHotspots, useGSAP } from "@/animations/gsap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { buildBlurPlaceholder, buildSizesAttribute } from "@/lib/cloudinary";
+import { cloudinaryImageLoader } from "@/lib/image-loader";
 
 interface Stat {
   value: string;
@@ -41,6 +43,14 @@ const hotspots = [
     position: "bottom-[18%] left-1/2",
   },
 ];
+
+const heroPlaceholder = buildBlurPlaceholder("#3B82F6");
+const heroSizes = buildSizesAttribute("hero");
+const heroImageSrc =
+  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME &&
+  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME.length > 0
+    ? "lumi/experience-map"
+    : "https://res.cloudinary.com/demo/image/upload/e_blur:200,q_60/v1699999999/lumi-grid.png";
 
 export function HeroSection(): JSX.Element {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -156,10 +166,14 @@ export function HeroSection(): JSX.Element {
             <div className="relative overflow-hidden rounded-2xl">
               <Image
                 ref={imageRef}
-                src="https://res.cloudinary.com/demo/image/upload/e_blur:200,q_60/v1699999999/lumi-grid.png"
+                loader={cloudinaryImageLoader}
+                src={heroImageSrc}
                 alt="Lumi experience map"
                 width={640}
                 height={480}
+                sizes={heroSizes}
+                placeholder="blur"
+                blurDataURL={heroPlaceholder}
                 className="rounded-2xl border border-white/10 object-cover shadow-md"
                 priority
               />

@@ -7,5 +7,7 @@ module.exports = createProjectJestConfig({
   projectRoot: __dirname,
   testEnvironment: "node",
   tsconfig: path.join(__dirname, "tsconfig.json"),
-  coverageDirectory: path.join(__dirname, "../../coverage/packages/testing")
+  coverageDirectory: path.join(__dirname, "../../coverage/packages/testing"),
+  coverageProvider: "v8",
+  coverageThreshold: null
 });

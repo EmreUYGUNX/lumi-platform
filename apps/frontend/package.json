@@ -4,15 +4,16 @@
   "private": true,
   "description": "Future Next.js web client for Lumi commerce platform.",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next dev",
+    "build": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
+    "start": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check",
-    "test": "pnpm run test:jest",
-    "test:jest": "jest --config jest.config.cjs --runInBand",
-    "analyze": "ANALYZE=true next build"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "analyze": "ANALYZE=true node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -60,7 +61,6 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
     "@lumi/testing": "workspace:*",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
@@ -68,10 +68,17 @@
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.12.7",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@playwright/test": "^1.49.1",
     "identity-obj-proxy": "^3.0.0",
-    "tailwindcss": "^3.4.18"
+    "msw": "^2.4.9",
+    "tailwindcss": "^3.4.18",
+    "@vitest/coverage-istanbul": "^2.1.9",
+    "@vitest/coverage-v8": "^2.1.9",
+    "vitest": "^2.1.9"
   }
 }

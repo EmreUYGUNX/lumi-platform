@@ -1,5 +1,5 @@
-import { describe, it } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
+import { describe, it } from "vitest";
 
 import HomePage from "@/app/page";
 

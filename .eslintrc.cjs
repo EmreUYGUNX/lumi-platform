@@ -173,17 +173,27 @@ module.exports = {
       parserOptions: {
         project: [path.join(__dirname, "apps/frontend/tsconfig.json")],
       },
-      plugins: ["react", "react-hooks", "jsx-a11y", "@next/next"],
+      settings: {
+        tailwindcss: {
+          callees: ["cn", "cva"],
+          config: path.join(__dirname, "apps/frontend/tailwind.config.ts"),
+        },
+      },
+      plugins: ["react", "react-hooks", "jsx-a11y", "@next/next", "tailwindcss"],
       extends: [
         "plugin:@next/next/recommended",
         "plugin:react/recommended",
         "plugin:react-hooks/recommended",
         "plugin:jsx-a11y/recommended",
+        "plugin:tailwindcss/recommended",
       ],
       rules: {
         "react/react-in-jsx-scope": "off",
         "react/require-default-props": "off",
         "@next/next/no-html-link-for-pages": "off",
+        "@typescript-eslint/no-explicit-any": "error",
+        "tailwindcss/no-custom-classname": "off",
+        "tailwindcss/classnames-order": "warn",
       },
     },
     {

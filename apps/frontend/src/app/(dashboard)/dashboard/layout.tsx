@@ -32,7 +32,7 @@ export default async function DashboardLayout({
   return (
     <div className="bg-lumi-bg-secondary/60 flex min-h-screen">
       <aside className="border-lumi-border/60 hidden w-72 border-r lg:block">{sidebar}</aside>
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col" aria-live="polite">
         <DashboardTopbar user={resolvedUser} />
         <div className="border-lumi-border/60 bg-lumi-bg border-b lg:hidden">
           <details className="px-4 py-3">

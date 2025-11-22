@@ -270,9 +270,17 @@ jobs:
         run: |
           echo "Disk space before cleanup:"
           df -h
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
           docker builder prune -af || true
           docker system prune -af --volumes || true
           rm -rf .trivy-cache || true
+          rm -rf /tmp/trivy-tmp || true
+          rm -rf /tmp/trivy-cache || true
           rm -rf ${{ github.workspace }}/trivy-tmp || true
           echo "Disk space after cleanup:"
           df -h
@@ -320,6 +328,7 @@ jobs:
           rm -rf /tmp/trivy-tmp/*
           rm -rf /tmp/trivy-cache/*
           docker builder prune -af || true
+          docker system prune -af --volumes || true
           echo "Disk space after mid-cleanup:"
           df -h
       - name: Build frontend production image

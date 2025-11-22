@@ -21,7 +21,7 @@
   },
   "scripts": {
     "prisma:generate:if-needed": "node ../../tools/scripts/prisma-generate-if-needed.mjs",
-    "build": "pnpm run prisma:generate:if-needed && pnpm --filter @lumi/types build && tsc --project tsconfig.build.json",
+    "build": "pnpm run prisma:generate:if-needed && pnpm --filter @lumi/types build && tsc --build tsconfig.build.json",
     "clean": "rimraf dist",
     "lint": "eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\"",
     "test": "pnpm run test:jest",

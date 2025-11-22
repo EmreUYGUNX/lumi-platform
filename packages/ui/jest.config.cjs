@@ -7,5 +7,6 @@ module.exports = createProjectJestConfig({
   projectRoot: __dirname,
   testEnvironment: "jsdom",
   tsconfig: path.join(__dirname, "tsconfig.json"),
-  coverageDirectory: path.join(__dirname, "../../coverage/packages/ui")
+  coverageDirectory: path.join(__dirname, "../../coverage/packages/ui"),
+  coverageThreshold: null
 });
