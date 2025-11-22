@@ -1,7 +1,7 @@
 import { Children, isValidElement } from "react";
 import type { ReactElement } from "react";
 
-import { describe, it } from "@jest/globals";
+import { describe, expect, it } from "vitest";
 
 import RootLayout, { metadata } from "@/app/layout";
 

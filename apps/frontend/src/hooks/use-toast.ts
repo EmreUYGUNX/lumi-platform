@@ -184,4 +184,10 @@ function useToast() {
   };
 }
 
+export function resetToastState(): void {
+  toastTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+  toastTimeouts.clear();
+  memoryState = { toasts: [] };
+}
+
 export { useToast, toast };
