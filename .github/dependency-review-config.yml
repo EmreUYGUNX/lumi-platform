@@ -1,0 +1,5 @@
+fail-on-severity: high
+allow-ghsas:
+  # axios advisories – upstream has no patched release yet; tracked for removal once a fixed version ships.
+  - GHSA-jr5f-v2jv-69x6
+  - GHSA-4hjh-wcwx-xvwj
