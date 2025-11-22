@@ -1,5 +1,3 @@
-"use client";
-
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
 
 // Prevent prerender during build; this client page should render at runtime.

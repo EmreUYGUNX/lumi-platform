@@ -1,5 +1,3 @@
-"use client";
-
 import { TwoFactorForm } from "@/features/auth/components/TwoFactorForm";
 
 export const dynamic = "force-dynamic";

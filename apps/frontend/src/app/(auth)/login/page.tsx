@@ -1,5 +1,3 @@
-"use client";
-
 import { LoginForm } from "@/features/auth/components/LoginForm";
 
 // Prevent Next from attempting to prerender this client page during build.

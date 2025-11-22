@@ -1,5 +1,3 @@
-"use client";
-
 import { VerifyEmailForm } from "@/features/auth/components/VerifyEmailForm";
 
 export const dynamic = "force-dynamic";

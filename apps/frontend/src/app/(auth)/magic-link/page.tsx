@@ -1,5 +1,3 @@
-"use client";
-
 import { MagicLinkForm } from "@/features/auth/components/MagicLinkForm";
 
 export const dynamic = "force-dynamic";

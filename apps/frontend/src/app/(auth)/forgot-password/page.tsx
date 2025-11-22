@@ -1,5 +1,3 @@
-"use client";
-
 import { ForgotPasswordForm } from "@/features/auth/components/ForgotPasswordForm";
 
 // Avoid static prerender; run at request time.
