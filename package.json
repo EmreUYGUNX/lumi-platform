@@ -182,6 +182,7 @@
       "@radix-ui/react-context": "1.1.3",
       "@radix-ui/react-primitive": "2.1.4",
       "@radix-ui/react-slot": "1.2.4",
+      "test-exclude>glob": "7.2.3",
       "@smithy/is-array-buffer": "4.2.0",
       "@smithy/util-buffer-from": "4.2.0",
       "@smithy/util-utf8": "4.2.0",
@@ -191,8 +192,7 @@
       "jest-get-type": "29.6.3",
       "jest-matcher-utils": "29.7.0",
       "glob": "10.5.0",
-      "js-yaml": "4.1.1",
-      "axios": "1.7.9"
+      "js-yaml": "4.1.1"
     },
     "packageExtensions": {
       "react-dom@*": {
