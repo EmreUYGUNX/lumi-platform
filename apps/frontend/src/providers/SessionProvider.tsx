@@ -47,10 +47,8 @@ export const SessionProvider = ({ children }: PropsWithChildren): JSX.Element =>
   const logoutTimer = useRef<ReturnType<typeof setTimeout>>();
   const hydratedRef = useRef(false);
 
-  const { sessionExpiry, isAuthenticated } = sessionStore((state) => ({
-    sessionExpiry: state.sessionExpiry,
-    isAuthenticated: state.isAuthenticated,
-  }));
+  const sessionExpiry = sessionStore((state) => state.sessionExpiry);
+  const isAuthenticated = sessionStore((state) => state.isAuthenticated);
 
   const clearTimers = useCallback(() => {
     if (warningTimer.current) {
