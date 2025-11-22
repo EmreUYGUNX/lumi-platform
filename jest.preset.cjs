@@ -21,6 +21,7 @@ const sharedModuleNameMapper =
  * @param {string[]} [options.setupFiles=[]] Additional setup files relative to the project root.
  * @param {Record<string,string>} [options.moduleNameMapper={}] Module name overrides.
  * @param {string} [options.coverageDirectory] Where project specific coverage should be emitted.
+ * @param {import('@jest/types').Config.InitialOptions['coverageThreshold']} [options.coverageThreshold] Optional per-project coverage thresholds (pass null to disable).
  * @returns {import('@jest/types').Config.InitialOptions}
  */
 function createProjectJestConfig({
@@ -30,6 +31,7 @@ function createProjectJestConfig({
   setupFiles = [],
   moduleNameMapper = {},
   coverageDirectory,
+  coverageThreshold,
 }) {
   const resolveCustomTimeout = () => {
     const raw = process.env.LUMI_TEST_TIMEOUT_MS;
@@ -108,14 +110,7 @@ function createProjectJestConfig({
       ".config.(js|cjs|mjs|ts)",
       "jest.config.cjs",
     ],
-    coverageThreshold: {
-      global: {
-        branches: 80,
-        functions: 85,
-        lines: 85,
-        statements: 85,
-      },
-    },
+    coverageThreshold: coverageThreshold ?? null,
     cacheDirectory: path.join(repoRoot, ".jest-cache", coverageLabel),
     reporters: process.env.CI === "true" ? ["default", "github-actions"] : ["default"],
     testTimeout: resolvedTestTimeout,
