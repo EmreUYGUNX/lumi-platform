@@ -1,4 +1,4 @@
-version: 2
+version: 1
 fail-on-severity: high
 allow-ghsas:
   # axios advisories – upstream has no patched release yet; tracked for removal once a fixed version ships.
