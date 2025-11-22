@@ -9,10 +9,21 @@ interface JwtPayload {
 
 const ACCESS_TOKEN_COOKIE = "accessToken";
 const CSRF_COOKIE = "lumi.csrf";
-const AUTH_ROUTES = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
+const AUTH_ROUTES = new Set([
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/magic-link",
+]);
 
 // eslint-disable-next-line security/detect-unsafe-regex
-const PROTECTED_ROUTE_PATTERNS: RegExp[] = [/^\/dashboard(\/.*)?$/i, /^\/admin(\/.*)?$/i];
+const PROTECTED_ROUTE_PATTERNS: RegExp[] = [
+  /^\/dashboard(\/.*)?$/i,
+  /^\/admin(\/.*)?$/i,
+  /^\/account(\/.*)?$/i,
+];
 
 const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -119,6 +130,7 @@ export function middleware(request: NextRequest): NextResponse {
     ? payload.roles.map((role) => String(role).toLowerCase())
     : [];
   const isAdmin = roles.includes("admin");
+  const isStaff = roles.includes("staff") || isAdmin;
 
   if (!isAuthenticated && AUTH_ROUTES.has(pathname)) {
     return appendCsrf(request, NextResponse.next());
@@ -137,6 +149,11 @@ export function middleware(request: NextRequest): NextResponse {
 
     if (pathname.toLowerCase().startsWith("/admin") && !isAdmin) {
       console.warn("Unauthorized admin access blocked", { pathname, roles });
+      return appendCsrf(request, NextResponse.redirect(new URL("/403", request.url)));
+    }
+
+    if (pathname.toLowerCase().startsWith("/dashboard") && !isStaff) {
+      // Dashboard default requires at least staff/customer
       return appendCsrf(request, NextResponse.redirect(new URL("/403", request.url)));
     }
   }

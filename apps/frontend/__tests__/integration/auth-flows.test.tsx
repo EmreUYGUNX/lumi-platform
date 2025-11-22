@@ -1,9 +1,12 @@
+import React from "react";
+
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
+import { QueryProvider } from "@/providers/QueryProvider";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -12,10 +15,12 @@ afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
+const withProviders = (node: React.ReactNode) => <QueryProvider>{node}</QueryProvider>;
+
 describe("Authentication flows", () => {
   it("collects credentials on the login screen", async () => {
     const user = userEvent.setup();
-    render(<LoginPage />);
+    render(withProviders(<LoginPage />));
 
     await user.type(screen.getByPlaceholderText("founder@lumi.com"), "demo@lumi.com");
     await user.type(screen.getByPlaceholderText("••••••••"), "Secret123!");
@@ -29,15 +34,18 @@ describe("Authentication flows", () => {
 
   it("walks a visitor through the registration form", async () => {
     const user = userEvent.setup();
-    render(<RegisterPage />);
+    render(withProviders(<RegisterPage />));
 
     await user.type(screen.getByPlaceholderText("Leyla Işık"), "Ada Lovelace");
     await user.type(screen.getByPlaceholderText("founder@lumi.com"), "ada@analytical.com");
     await user.type(screen.getByPlaceholderText("••••••••"), "SecurePass123!");
 
-    expect(screen.getByRole("checkbox")).not.toBeChecked();
-    await user.click(screen.getByRole("checkbox"));
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    const checkboxes = screen.getAllByRole("checkbox");
+    const termsCheckbox = checkboxes[0];
+    expect(termsCheckbox).toBeDefined();
+    expect(termsCheckbox).not.toBeChecked();
+    await user.click(termsCheckbox as HTMLElement);
+    expect(termsCheckbox).toBeChecked();
 
     expect(screen.getByRole("button", { name: /create account/i })).toBeEnabled();
     expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/login");
@@ -69,7 +77,8 @@ describe("Authentication flows", () => {
       modal: <div>modal</div>,
     });
 
-    render(layout);
+    const element = layout as React.ReactElement;
+    render(element);
     expect(screen.getByText("preview dashboard")).toBeInTheDocument();
     expect(screen.getByText("sidebar")).toBeInTheDocument();
   });

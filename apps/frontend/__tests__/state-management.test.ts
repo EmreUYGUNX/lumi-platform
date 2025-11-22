@@ -15,7 +15,7 @@ describe("state management stores", () => {
   });
 
   it("hydrates preview user when requested", () => {
-    expect(sessionStore.getState().user).toBeUndefined();
+    expect(sessionStore.getState().user).toBeNull();
     sessionStore.getState().hydratePreviewUser();
     const state = sessionStore.getState();
     expect(state.status).toBe("authenticated");
@@ -30,15 +30,41 @@ describe("state management stores", () => {
     expect(sessionStore.getState().preferences.theme).toBe("dark");
   });
 
+  it("sets and clears session tokens", () => {
+    sessionStore.getState().setSession({
+      user: {
+        id: "00000000-0000-0000-0000-000000000010",
+        email: "token@lumi.com",
+        roles: ["customer"],
+        permissions: ["read"],
+        emailVerified: true,
+        status: "ACTIVE",
+        firstName: "Token",
+        lastName: "User",
+      },
+      accessToken: "access-token-123",
+      refreshToken: "refresh-token-123",
+      sessionExpiry: new Date(Date.now() + 30 * 60 * 1000),
+    });
+    expect(sessionStore.getState().isAuthenticated).toBe(true);
+    expect(sessionStore.getState().accessToken).toBe("access-token-123");
+    sessionStore.getState().clearSession();
+    expect(sessionStore.getState().isAuthenticated).toBe(false);
+    expect(sessionStore.getState().accessToken).toBeUndefined();
+  });
+
   it("stores feature flags during login", () => {
     sessionStore.getState().login({
       user: {
-        id: "user_1",
+        id: "00000000-0000-0000-0000-000000000011",
         name: "Vibe Tester",
         email: "tester@lumi.com",
         roles: ["merchant"],
+        permissions: ["read"],
+        emailVerified: true,
+        status: "ACTIVE",
         tier: "starter",
-      },
+      } as never,
       accessToken: "token_123",
       featureFlags: { beta_checkout: true },
     });
@@ -72,7 +98,7 @@ describe("state management stores", () => {
 
     sessionStore.getState().logout();
     expect(sessionStore.getState().status).toBe("anonymous");
-    expect(sessionStore.getState().user).toBeUndefined();
+    expect(sessionStore.getState().user).toBeNull();
   });
 
   it("manages toast queue with an upper bound", () => {

@@ -5,10 +5,12 @@ import type { Metadata, Viewport } from "next";
 
 import { Inter } from "next/font/google";
 
+import { NetworkStatus } from "@/components/ui/feedback/NetworkStatus";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { SessionProvider } from "@/providers/SessionProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
 import "./globals.css";
@@ -52,8 +54,19 @@ export default function RootLayout({ children }: PropsWithChildren): JSX.Element
             >
               <TooltipProvider delayDuration={150}>
                 <div className="bg-lumi-background text-lumi-text relative flex min-h-screen flex-col">
-                  <ThemeToggle className="fixed bottom-6 right-6 z-50" />
-                  {children}
+                  <SessionProvider>
+                    <a
+                      href="#main-content"
+                      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-black"
+                    >
+                      Skip to content
+                    </a>
+                    <div className="fixed left-4 top-4 z-50">
+                      <NetworkStatus />
+                    </div>
+                    <ThemeToggle className="fixed bottom-6 right-6 z-50" />
+                    {children}
+                  </SessionProvider>
                 </div>
                 <Toaster />
               </TooltipProvider>

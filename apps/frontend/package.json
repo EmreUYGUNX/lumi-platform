@@ -75,6 +75,7 @@
     "@types/react-dom": "^18.2.22",
     "@playwright/test": "^1.49.1",
     "identity-obj-proxy": "^3.0.0",
+    "msw": "^2.4.9",
     "tailwindcss": "^3.4.18",
     "@vitest/coverage-istanbul": "^2.1.9",
     "@vitest/coverage-v8": "^2.1.9",
