@@ -24,7 +24,11 @@ const nextConfig = {
   compress: true,
   output: "standalone",
   productionBrowserSourceMaps: process.env.NODE_ENV === "production",
+  typedRoutes: true,
   transpilePackages: ["@lumi/ui", "@lumi/shared"],
+  outputFileTracingIncludes: {
+    "/**/*": ["./node_modules/@swc/helpers/esm/**/*"],
+  },
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],

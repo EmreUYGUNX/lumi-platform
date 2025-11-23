@@ -25,6 +25,7 @@ const createMemoryStorage = (): Storage => {
       if (!Number.isInteger(index) || index < 0) {
         return null;
       }
+      // eslint-disable-next-line security/detect-object-injection
       return [...store.keys()][index] ?? null;
     },
     removeItem: (key: string) => {

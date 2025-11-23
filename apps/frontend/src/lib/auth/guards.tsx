@@ -1,11 +1,15 @@
 "use client";
 
+/* eslint-disable import/order */
+
 import type { ComponentType, FC, ReactNode } from "react";
 import { useMemo } from "react";
-
+import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
 import { sessionStore } from "@/store/session";
+
+import { useFeatureFlag } from "./feature-flags";
 
 const normalize = (value?: string): string | undefined =>
   value ? value.trim().toLowerCase() : undefined;
@@ -53,7 +57,7 @@ export const hasPermission = (permission: string): boolean => {
   return permissions.includes(normalized);
 };
 
-const GuardHOC = (check: () => boolean, redirectTo?: string) =>
+const GuardHOC = (check: () => boolean, redirectTo?: Route) =>
   function withGuard<TProps extends object>(Component: ComponentType<TProps>): FC<TProps> {
     const Guarded: FC<TProps> = (props) => {
       const router = useRouter();
@@ -62,7 +66,8 @@ const GuardHOC = (check: () => boolean, redirectTo?: string) =>
 
       if (!allowed) {
         if (redirectTo) {
-          router.replace(`${redirectTo}?next=${encodeURIComponent(pathname ?? "/")}`);
+          const target = `${redirectTo}?next=${encodeURIComponent(pathname ?? "/")}` as Route;
+          router.replace(target);
         }
         return <></>;
       }
@@ -74,10 +79,10 @@ const GuardHOC = (check: () => boolean, redirectTo?: string) =>
     return Guarded;
   };
 
-export const requireAuth = (redirectTo = "/login") =>
+export const requireAuth = (redirectTo: Route = "/login") =>
   GuardHOC(() => sessionStore.getState().isAuthenticated, redirectTo);
 
-export const requireRole = (role: string, redirectTo = "/403") =>
+export const requireRole = (role: string, redirectTo: Route = "/403") =>
   GuardHOC(() => {
     const normalized = normalize(role);
     return sessionStore
@@ -86,7 +91,7 @@ export const requireRole = (role: string, redirectTo = "/403") =>
       .includes(normalized);
   }, redirectTo);
 
-export const requirePermission = (permission: string, redirectTo = "/403") =>
+export const requirePermission = (permission: string, redirectTo: Route = "/403") =>
   GuardHOC(() => {
     const normalized = normalize(permission);
     const permissions = Object.keys(sessionStore.getState().permissions ?? {}).map((key) =>
@@ -104,9 +109,7 @@ export const FeatureFlag = ({
   children: ReactNode;
   fallback?: ReactNode;
 }): JSX.Element => {
-  const { featureFlags } = sessionStore.getState();
-  // eslint-disable-next-line security/detect-object-injection
-  const isEnabled = Boolean(featureFlags?.[flag]);
+  const isEnabled = useFeatureFlag(flag);
   return isEnabled ? <>{children}</> : <>{fallback}</>;
 };
 

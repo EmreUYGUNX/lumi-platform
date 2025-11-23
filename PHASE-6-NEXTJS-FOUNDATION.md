@@ -23,7 +23,7 @@
 
 ### Primary Goals
 
-1. **Next.js 14 App Router Setup** - Modern React architecture with TypeScript
+1. **Next.js 15 App Router Setup** - Modern React architecture with TypeScript
 2. **Design System Implementation** - Tailwind CSS + deneme.html brand consistency (B1)
 3. **shadcn/ui Integration** - Enterprise component library with custom theming
 4. **Layout System** - Route groups for public, auth, dashboard, admin
@@ -34,7 +34,7 @@
 
 ### Success Criteria
 
-- ✅ Next.js 14 App Router configured with TypeScript
+- ✅ Next.js 15 App Router configured with TypeScript
 - ✅ Tailwind CSS with deneme.html brand colors (B1 compliance)
 - ✅ shadcn/ui components customized and extended
 - ✅ Route groups: (public), (auth), (dashboard), (admin)
@@ -253,18 +253,18 @@ apps/frontend/
 
 ## ✅ IMPLEMENTATION CHECKLIST
 
-### 1. Next.js 14 Setup & Configuration (22 items)
+### 1. Next.js 15 Setup & Configuration (22 items)
 
 #### 1.1 Project Initialization
 
-- [ ] Verify Next.js 14 installed: `pnpm add next@latest react@latest react-dom@latest`
+- [ ] Verify Next.js 15 installed: `pnpm add next@15 react@latest react-dom@latest`
 - [ ] Create `next.config.mjs` with App Router config
-  - [ ] Enable `appDir` experimental feature
+  - [ ] App Router defaults enabled (no `appDir` flag needed on v15)
   - [ ] Configure `typedRoutes: true`
-  - [ ] Add `serverComponentsExternalPackages: ['@prisma/client']`
-  - [ ] Configure `images.remotePatterns` for Cloudinary
-  - [ ] Add `images.formats: ['image/webp', 'image/avif']`
-  - [ ] Configure `experimental.optimizeCss: true`
+- [ ] Add `serverExternalPackages: ['@prisma/client']`
+- [ ] Configure `images.remotePatterns` for Cloudinary
+- [ ] Add `images.formats: ['image/webp', 'image/avif']`
+- [ ] Configure `experimental.optimizeCss: true`
 
 #### 1.2 TypeScript Configuration
 
@@ -1130,7 +1130,7 @@ export default function Error({ error, reset }) {
 
 ### 1. Next.js Application
 
-- ✅ Next.js 14 with App Router
+- ✅ Next.js 15 with App Router
 - ✅ TypeScript strict mode configured
 - ✅ Path aliases setup
 - ✅ Environment validation

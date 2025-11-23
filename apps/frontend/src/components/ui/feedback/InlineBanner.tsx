@@ -11,10 +11,18 @@ interface InlineBannerProps {
   variant?: "info" | "warning" | "success";
 }
 
-const variantClasses: Record<NonNullable<InlineBannerProps["variant"]>, string> = {
-  info: "bg-lumi-primary/10 border-lumi-primary/30 text-lumi-primary",
-  warning: "bg-lumi-warning/10 border-lumi-warning/40 text-lumi-warning",
-  success: "bg-lumi-success/10 border-lumi-success/40 text-lumi-success",
+const getVariantClasses = (variant: NonNullable<InlineBannerProps["variant"]>): string => {
+  switch (variant) {
+    case "warning": {
+      return "bg-lumi-warning/10 border-lumi-warning/40 text-lumi-warning";
+    }
+    case "success": {
+      return "bg-lumi-success/10 border-lumi-success/40 text-lumi-success";
+    }
+    default: {
+      return "bg-lumi-primary/10 border-lumi-primary/30 text-lumi-primary";
+    }
+  }
 };
 
 export function InlineBanner({
@@ -27,7 +35,7 @@ export function InlineBanner({
     <div
       className={cn(
         "border-lumi-border/60 flex items-start gap-3 rounded-xl border px-3 py-2",
-        variantClasses[variant],
+        getVariantClasses(variant),
       )}
     >
       {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0" />}

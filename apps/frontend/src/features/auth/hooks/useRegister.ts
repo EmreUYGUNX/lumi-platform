@@ -1,14 +1,15 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import type { Route } from "next";
 
 import { useRouter } from "next/navigation";
 
+import { toast } from "@/hooks/use-toast";
 import { authApi } from "@/lib/auth/api";
+import { logAuditEvent } from "@/lib/auth/audit";
 import { addAuthBreadcrumb, trackRegister } from "@/lib/auth/metrics";
 import { ApiClientError } from "@/lib/api-client";
-import { toast } from "@/hooks/use-toast";
-import { logAuditEvent } from "@/lib/auth/audit";
 
 import type { RegisterFormValues } from "../schemas/register.schema";
 
@@ -48,7 +49,7 @@ export const useRegister = () => {
       trackRegister(true, "password");
       logAuditEvent("profile_update", { email: variables.email });
 
-      const redirect = `/verify-email?email=${encodeURIComponent(variables.email)}`;
+      const redirect = `/verify-email?email=${encodeURIComponent(variables.email)}` as Route;
       router.replace(redirect);
     },
     onError: (error) => {

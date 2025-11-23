@@ -3,6 +3,7 @@
 import { sessionStore, type SessionUser, type TrustedDevice } from "@/store/session";
 
 import { authApi } from "./api";
+import { hydrateFeatureFlags } from "./feature-flags";
 import { trackSessionRefresh } from "./metrics";
 import { transformSessionData } from "./transformers";
 
@@ -98,6 +99,7 @@ export async function performRefresh(): Promise<void> {
     const response = await authApi.refreshToken();
     const payload = transformSessionData(response.data);
     applySession(payload);
+    await hydrateFeatureFlags();
     retryCount = 0;
     scheduleRefresh(payload.refreshTokenExpiresAt);
     broadcastSessionEvent({

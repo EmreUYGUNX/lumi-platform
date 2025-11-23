@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "analyze": "ANALYZE=true node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build"
+    "analyze": "ANALYZE=true node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
+    "postbuild": "node ./scripts/fix-standalone.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -70,6 +71,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/user-event": "^14.6.1",
+    "axe-core": "^4.10.0",
     "@types/node": "^20.12.7",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

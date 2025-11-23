@@ -13,20 +13,38 @@ const scorePassword = (password: string): number => {
   return Math.min(score, 4);
 };
 
-const labels: Record<number, string> = {
-  0: "Zayıf",
-  1: "Zayıf",
-  2: "Orta",
-  3: "Güçlü",
-  4: "Çok güçlü",
+const getStrengthLabel = (strength: number): string => {
+  switch (strength) {
+    case 4: {
+      return "Çok güçlü";
+    }
+    case 3: {
+      return "Güçlü";
+    }
+    case 2: {
+      return "Orta";
+    }
+    default: {
+      return "Zayıf";
+    }
+  }
 };
 
-const colors: Record<number, string> = {
-  0: "bg-lumi-error",
-  1: "bg-lumi-error",
-  2: "bg-lumi-warning",
-  3: "bg-lumi-success",
-  4: "bg-lumi-primary",
+const getStrengthColor = (strength: number): string => {
+  switch (strength) {
+    case 4: {
+      return "bg-lumi-primary";
+    }
+    case 3: {
+      return "bg-lumi-success";
+    }
+    case 2: {
+      return "bg-lumi-warning";
+    }
+    default: {
+      return "bg-lumi-error";
+    }
+  }
 };
 
 interface PasswordStrengthProps {
@@ -41,9 +59,18 @@ export function PasswordStrength({ value }: PasswordStrengthProps): JSX.Element 
     <div className="space-y-2">
       <div className="text-lumi-text-secondary flex items-center justify-between text-xs">
         <span>Şifre Gücü</span>
-        <span className={cn("font-semibold", colors[strength])}>{labels[strength]}</span>
+        <span className={cn("font-semibold", getStrengthColor(strength))}>
+          {getStrengthLabel(strength)}
+        </span>
       </div>
-      <Progress value={percentage} className="h-2" />
+      <Progress
+        value={percentage}
+        className="h-2"
+        aria-label="Password strength indicator"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(percentage)}
+      />
     </div>
   );
 }

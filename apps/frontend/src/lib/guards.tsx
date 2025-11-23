@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import type { Route } from "next";
+
 import { usePathname, useRouter } from "next/navigation";
 
 import { shouldEnforceGuards } from "@/lib/session";
@@ -10,7 +12,7 @@ import { sessionStore } from "@/store/session";
 interface GuardProps {
   children: ReactNode;
   role?: string;
-  redirectTo?: string;
+  redirectTo?: Route;
   fallback?: ReactNode;
 }
 
@@ -26,7 +28,7 @@ const normalizeRole = (role?: string): string | undefined =>
 const Guard = ({ children, role, redirectTo = "/login", fallback }: GuardProps): JSX.Element => {
   const router = useRouter();
   const pathname = usePathname();
-  const currentPath = pathname ?? "/";
+  const currentPath = pathname && pathname.startsWith("/") ? pathname : "/";
   const [allowed, setAllowed] = useState(!shouldEnforceGuards);
 
   const { status, roles } = sessionStore((state) => ({
@@ -46,7 +48,8 @@ const Guard = ({ children, role, redirectTo = "/login", fallback }: GuardProps):
 
     if (status === "authenticated") {
       if (normalizedRole && !roles.includes(normalizedRole)) {
-        router.replace(`/403?from=${encodeURIComponent(currentPath)}`);
+        const forbidden = `/403?from=${encodeURIComponent(currentPath)}` as Route;
+        router.replace(forbidden);
         return;
       }
       setAllowed(true);
@@ -54,7 +57,8 @@ const Guard = ({ children, role, redirectTo = "/login", fallback }: GuardProps):
     }
 
     if (status === "anonymous") {
-      router.replace(`${redirectTo}?next=${encodeURIComponent(currentPath)}`);
+      const target = `${redirectTo}?next=${encodeURIComponent(currentPath)}` as Route;
+      router.replace(target);
     }
   }, [currentPath, normalizedRole, redirectTo, roles, router, shouldGuard, status]);
 

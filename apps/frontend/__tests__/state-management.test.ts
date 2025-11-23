@@ -53,6 +53,40 @@ describe("state management stores", () => {
     expect(sessionStore.getState().accessToken).toBeUndefined();
   });
 
+  it("rehydrates persisted session from storage", async () => {
+    const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const persisted = {
+      state: {
+        status: "authenticated",
+        isAuthenticated: true,
+        user: {
+          id: "persisted-user",
+          email: "persisted@lumi.com",
+          roles: ["customer"],
+          permissions: ["read"],
+          emailVerified: true,
+          status: "ACTIVE",
+        },
+        accessToken: "persisted-access",
+        refreshToken: "persisted-refresh",
+        sessionId: "persisted-session",
+        roles: ["customer"],
+        permissions: ["read"],
+        featureFlags: { persisted: true },
+        sessionExpiry: expires,
+        deviceFingerprint: "fp-123",
+        trustedDevices: [],
+        lastAuthenticatedAt: Date.now(),
+      },
+      version: 0,
+    };
+    sessionStorage.setItem("lumi.session", JSON.stringify(persisted));
+    await sessionStore.persist?.rehydrate?.();
+    expect(sessionStore.getState().isAuthenticated).toBe(true);
+    expect(sessionStore.getState().accessToken).toBe("persisted-access");
+    expect(sessionStore.getState().sessionExpiry).toBeInstanceOf(Date);
+  });
+
   it("stores feature flags during login", () => {
     sessionStore.getState().login({
       user: {
