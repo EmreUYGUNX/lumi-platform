@@ -37,6 +37,7 @@
     "e2e/**/*",
     "next-env.d.ts",
     "middleware.ts",
+    "scripts/**/*",
     "playwright.config.ts",
     "src/**/*",
     "tailwind.config.ts",

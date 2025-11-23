@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import type { Route } from "next";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,7 +20,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 import { SocialLoginButtons } from "./SocialLoginButtons";
@@ -29,6 +30,7 @@ export function LoginForm(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callback = searchParams?.get("next") ?? undefined;
+  const callbackRoute = callback && callback.startsWith("/") ? (callback as Route) : undefined;
   const [showPassword, setShowPassword] = useState(false);
 
   const defaultEmail = useMemo(() => searchParams?.get("email") ?? "", [searchParams]);
@@ -47,8 +49,10 @@ export function LoginForm(): JSX.Element {
 
   const handleSubmit = async (values: LoginFormValues) => {
     await mutateAsync(values);
-    if (callback) {
-      router.replace(callback);
+    if (callbackRoute) {
+      router.replace(callbackRoute);
+    } else {
+      router.replace("/dashboard");
     }
   };
 

@@ -165,6 +165,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/admin/:path*",
+    "/account/:path*",
     "/login",
     "/register",
     "/forgot-password",

@@ -12,6 +12,7 @@ import {
   resolveLocale,
   resolveTimeZone,
 } from "@/lib/auth/transformers";
+import { hydrateFeatureFlags } from "@/lib/auth/feature-flags";
 import { ApiClientError } from "@/lib/api-client";
 import { ensureDeviceFingerprint, registerTrustedDevice } from "@/lib/auth/device";
 import { alertSuspiciousLogin, evaluateLoginRisk } from "@/lib/auth/suspicious";
@@ -59,6 +60,7 @@ export const useLogin = () => {
         permissions: session.user.permissions,
         featureFlags: sessionStore.getState().featureFlags,
       });
+      await hydrateFeatureFlags();
       await registerTrustedDevice("Current device");
 
       trackLogin(true, "password", Date.now() - startedAt);

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ElementType } from "react";
 import { useState } from "react";
 
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
@@ -10,11 +11,21 @@ import { cn } from "@/lib/utils";
 
 type Variant = "success" | "error" | "warning" | "info";
 
-const iconMap: Record<Variant, React.ElementType> = {
-  success: CheckCircle2,
-  error: AlertCircle,
-  warning: TriangleAlert,
-  info: Info,
+const getIconForVariant = (variant: Variant): ElementType => {
+  switch (variant) {
+    case "success": {
+      return CheckCircle2;
+    }
+    case "error": {
+      return AlertCircle;
+    }
+    case "warning": {
+      return TriangleAlert;
+    }
+    default: {
+      return Info;
+    }
+  }
 };
 
 interface FormAlertProps {
@@ -35,7 +46,7 @@ export function FormAlert({
   const [open, setOpen] = useState(true);
   if (!open) return <></>;
 
-  const Icon = iconMap[variant];
+  const Icon = getIconForVariant(variant);
 
   return (
     <Alert

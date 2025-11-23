@@ -8,6 +8,7 @@ const NUMBER_REGEX = /\d/;
 const SPECIAL_CHAR_REGEX = /[^\dA-Za-z]/;
 
 const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_REQUIRED_MESSAGE = "Password is required.";
 
 const emailSchema = z
   .string({ required_error: "Email is required." })
@@ -16,7 +17,7 @@ const emailSchema = z
   .email("Email address is invalid.");
 
 export const strongPasswordSchema = z
-  .string({ required_error: "Password is required." })
+  .string({ required_error: PASSWORD_REQUIRED_MESSAGE })
   .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`)
   .superRefine((value, ctx) => {
     if (!UPPERCASE_REGEX.test(value)) {
@@ -96,7 +97,9 @@ const clientContextSchema = z
 
 export const loginRequestSchema = z.object({
   email: emailSchema,
-  password: z.string({ required_error: "Password is required." }).min(1, "Password is required."),
+  password: z
+    .string({ required_error: PASSWORD_REQUIRED_MESSAGE })
+    .min(1, PASSWORD_REQUIRED_MESSAGE),
   rememberMe: z.boolean().optional(),
   context: clientContextSchema.optional(),
 });

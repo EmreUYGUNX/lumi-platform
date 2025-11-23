@@ -30,6 +30,7 @@ vi.mock("@/lib/auth/metrics", () => ({
   trackRegister: vi.fn(),
   trackPasswordReset: vi.fn(),
   trackEmailVerification: vi.fn(),
+  trackSessionRefresh: vi.fn(),
   trackAuthEvent: vi.fn(),
   addAuthBreadcrumb: vi.fn(),
 }));
@@ -110,6 +111,21 @@ describe("auth hooks", () => {
     expect(sessionStore.getState().isAuthenticated).toBe(false);
   });
 
+  it("handles network errors on login", async () => {
+    vi.mocked(authApi.login).mockRejectedValue(new TypeError("Network down"));
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await expect(
+      result.current.mutateAsync({
+        email: "demo@lumi.com",
+        password: "Secret123!",
+        rememberMe: true,
+      }),
+    ).rejects.toThrow();
+
+    expect(sessionStore.getState().isAuthenticated).toBe(false);
+  });
+
   it("registers successfully", async () => {
     vi.mocked(authApi.register).mockResolvedValue({
       data: {
@@ -156,6 +172,24 @@ describe("auth hooks", () => {
         password: "Strong123!",
         confirmPassword: "Strong123!",
         acceptTerms: true,
+        marketingConsent: false,
+      }),
+    ).rejects.toThrow(ApiClientError);
+  });
+
+  it("handles validation error on register", async () => {
+    vi.mocked(authApi.register).mockRejectedValue(
+      new ApiClientError({ code: "VALIDATION", message: "Invalid payload" }),
+    );
+    const { result } = renderHook(() => useRegister(), { wrapper });
+
+    await expect(
+      result.current.mutateAsync({
+        fullName: "Bad User",
+        email: "bad@user",
+        password: "short",
+        confirmPassword: "short",
+        acceptTerms: false,
         marketingConsent: false,
       }),
     ).rejects.toThrow(ApiClientError);
