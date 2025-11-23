@@ -19,10 +19,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 import { PasswordStrength } from "./PasswordStrength";
 import { useRegister } from "../hooks/useRegister";
 import { registerFormSchema, type RegisterFormValues } from "../schemas/register.schema";
+
+const checkboxContainer = (checked: boolean) =>
+  cn(
+    "flex flex-row items-start gap-3 rounded-lg border p-3 text-sm transition-colors",
+    checked
+      ? "border-lumi-primary/50 bg-lumi-primary/5 shadow-sm"
+      : "border-transparent bg-transparent",
+  );
 
 export function RegisterForm(): JSX.Element {
   const [passwordPreview, setPasswordPreview] = useState("");
@@ -134,7 +143,7 @@ export function RegisterForm(): JSX.Element {
             control={form.control}
             name="acceptTerms"
             render={({ field }) => (
-              <FormItem className="border-lumi-border/70 flex flex-row items-start gap-3 rounded-lg border p-3 text-sm">
+              <FormItem className={checkboxContainer(field.value)}>
                 <FormControl>
                   <Checkbox
                     checked={field.value}
@@ -160,7 +169,7 @@ export function RegisterForm(): JSX.Element {
             control={form.control}
             name="marketingConsent"
             render={({ field }) => (
-              <FormItem className="bg-lumi-bg-secondary/40 flex flex-row items-start gap-3 rounded-lg p-3 text-sm">
+              <FormItem className={checkboxContainer(field.value)}>
                 <FormControl>
                   <Checkbox
                     checked={field.value}
