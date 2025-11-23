@@ -63,6 +63,11 @@ const nextConfig = {
         hostname: "res.cloudinary.com",
         pathname: CLOUDINARY_REMOTE_PATH,
       },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+        pathname: "/**",
+      },
     ],
   },
   onDemandEntries: {
