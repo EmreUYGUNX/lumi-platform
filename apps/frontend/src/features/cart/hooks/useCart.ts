@@ -18,17 +18,15 @@ interface UseCartOptions {
 export const useCart = (options: UseCartOptions = {}) => {
   const persistedView = useCartStore((state) => state.view);
   const sync = useCartStore((state) => state.sync);
-  const snapshot = useCartStore((state) => ({
-    items: state.items,
-    itemCount: state.itemCount,
-    subtotal: state.subtotal,
-    tax: state.tax,
-    discount: state.discount,
-    total: state.total,
-    currency: state.currency,
-    stockIssues: state.stockIssues,
-    deliveryMessage: state.deliveryMessage,
-  }));
+  const items = useCartStore((state) => state.items);
+  const itemCount = useCartStore((state) => state.itemCount);
+  const subtotal = useCartStore((state) => state.subtotal);
+  const tax = useCartStore((state) => state.tax);
+  const discount = useCartStore((state) => state.discount);
+  const total = useCartStore((state) => state.total);
+  const currency = useCartStore((state) => state.currency);
+  const stockIssues = useCartStore((state) => state.stockIssues);
+  const deliveryMessage = useCartStore((state) => state.deliveryMessage);
 
   const initialData = useMemo(
     () => options.initialData ?? persistedView,
@@ -57,21 +55,21 @@ export const useCart = (options: UseCartOptions = {}) => {
   }, [query.data, sync]);
 
   const view = query.data ?? initialData;
-  const items = view?.cart.items ?? snapshot.items;
+  const hydratedItems = view?.cart.items ?? items;
 
   return {
     ...query,
     data: view,
-    items,
-    itemCount: view?.cart.items.reduce((sum, item) => sum + item.quantity, 0) ?? snapshot.itemCount,
+    items: hydratedItems,
+    itemCount: view?.cart.items.reduce((sum, item) => sum + item.quantity, 0) ?? itemCount,
     totals: {
-      subtotal: snapshot.subtotal,
-      tax: snapshot.tax,
-      discount: snapshot.discount,
-      total: snapshot.total,
-      currency: snapshot.currency,
+      subtotal,
+      tax,
+      discount,
+      total,
+      currency,
     },
-    stockIssues: view?.stock.issues ?? snapshot.stockIssues,
-    deliveryMessage: view?.delivery.message ?? snapshot.deliveryMessage,
+    stockIssues: view?.stock.issues ?? stockIssues,
+    deliveryMessage: view?.delivery.message ?? deliveryMessage,
   };
 };
