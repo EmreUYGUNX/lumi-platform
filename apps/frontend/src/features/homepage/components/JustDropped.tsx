@@ -61,7 +61,7 @@ export function JustDropped(): JSX.Element {
               Yeni ürünler yolda. Bu arada kataloğa göz atın.
             </p>
             <Button asChild className="mt-4 uppercase tracking-[0.2em]">
-              <Link href="/products">Browse products</Link>
+              <Link href={{ pathname: "/products" }}>Browse products</Link>
             </Button>
           </div>
         ) : (
@@ -74,7 +74,7 @@ export function JustDropped(): JSX.Element {
 
             <div className="flex justify-center">
               <Link
-                href="/products"
+                href={{ pathname: "/products" }}
                 className="hover:text-lumi-primary border-b border-black pb-1 text-[11px] font-bold uppercase tracking-[0.32em] transition"
               >
                 Shop All
