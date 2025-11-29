@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { productSummarySchema } from "@lumi/shared/dto";
@@ -17,21 +17,22 @@ import { productKeys } from "./product.keys";
 
 const productListSchema = z.array(productSummarySchema);
 
-export const useProducts = (
+export const useInfiniteProducts = (
   filters: ProductListFilters = {},
   options: { enabled?: boolean; authToken?: string; staleTimeMs?: number; gcTimeMs?: number } = {},
 ) => {
-  const serializedFilters = useMemo(() => JSON.stringify(filters ?? {}), [filters]);
-  const normalizedFilters = useMemo(
-    () => normalizeProductFilters(JSON.parse(serializedFilters) as ProductListFilters),
-    [serializedFilters],
-  );
+  const normalizedFilters = useMemo(() => normalizeProductFilters(filters ?? {}), [filters]);
 
-  return useQuery<ProductListResult>({
-    queryKey: productKeys.list(normalizedFilters),
-    queryFn: async (): Promise<ProductListResult> => {
+  return useInfiniteQuery<ProductListResult>({
+    queryKey: [...productKeys.list(normalizedFilters), "infinite"],
+    initialPageParam: normalizedFilters.page ?? 1,
+    queryFn: async ({ pageParam }): Promise<ProductListResult> => {
+      const pageValue = typeof pageParam === "number" ? pageParam : (normalizedFilters.page ?? 1);
       const response = await apiClient.get("/catalog/products", {
-        query: buildProductQuery(normalizedFilters),
+        query: buildProductQuery({
+          ...normalizedFilters,
+          page: pageValue,
+        }),
         dataSchema: productListSchema,
         metaSchema: paginatedMetaSchema,
         authToken: options.authToken,
@@ -49,7 +50,8 @@ export const useProducts = (
         cursor: response.meta?.cursor ?? undefined,
       };
     },
-    placeholderData: (previousData) => previousData,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasNextPage ? lastPage.pagination.page + 1 : undefined,
     staleTime: options.staleTimeMs,
     gcTime: options.gcTimeMs,
     enabled: options.enabled ?? true,
