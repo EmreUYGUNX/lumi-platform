@@ -53,6 +53,7 @@
 ### Performance Standards (P1/P2)
 
 **P1: Data Loading**
+
 - TanStack Query caching for product lists
 - Server-side pagination
 - Skeleton placeholders during loading
@@ -60,6 +61,7 @@
 - No N+1 queries
 
 **P2: Image Optimization**
+
 - Next.js Image with Cloudinary loader
 - LCP image prioritized (priority flag)
 - Below-fold images lazy loaded
@@ -67,6 +69,7 @@
 - Responsive image sizes
 
 **P2: Code Splitting**
+
 - Route-based splitting (automatic)
 - Dynamic imports for heavy components
 - Lazy load product gallery
@@ -75,6 +78,7 @@
 ### SEO Requirements
 
 **Metadata API**
+
 - Dynamic page titles
 - Meta descriptions
 - Open Graph tags (og:title, og:image, og:description)
@@ -82,6 +86,7 @@
 - Canonical URLs
 
 **JSON-LD Schema**
+
 ```json
 {
   "@context": "https://schema.org",
@@ -111,6 +116,7 @@
 ### Security Standards (S2)
 
 **S2: Input Sanitization**
+
 - Search queries sanitized
 - Newsletter email validated
 - Contact form inputs sanitized
@@ -119,12 +125,95 @@
 
 ### Design Standards (B1)
 
-**B1: Brand Consistency**
-- deneme.html color palette only
-- Glassmorphism effects
-- Neon highlights on CTAs
-- Gradient overlays
+**B1: Brand Consistency - Premium Minimalist Aesthetic**
+
+**Inspired by ikinci.html (BLVCK PARIS) with Lumi Brand Colors:**
+
+**Visual Language:**
+
+- Clean, minimalist, premium aesthetic
+- Wide letter-spacing (0.2em - 0.4em) for luxury feel
+- Glassmorphism effects (backdrop-blur + subtle opacity)
 - Smooth animations (Framer Motion + GSAP)
+- Mix-blend-multiply for product images
+- Uppercase typography for headings and labels
+
+**Color Palette (Lumi Brand):**
+
+```css
+/* Primary - Blue spectrum (from deneme.html) */
+--lumi-primary: #3b82f6; /* Blue 500 */
+--lumi-primary-dark: #2563eb; /* Blue 600 */
+--lumi-primary-light: #60a5fa; /* Blue 400 */
+
+/* Secondary - Violet spectrum */
+--lumi-secondary: #8b5cf6; /* Violet 500 */
+--lumi-accent: #f59e0b; /* Amber 500 */
+
+/* Neutral - Minimal grayscale (ikinci.html inspired) */
+--lumi-bg: #ffffff;
+--lumi-bg-secondary: #f9fafb; /* Gray 50 */
+--lumi-bg-tertiary: #f5f5f5; /* Lighter gray */
+--lumi-text: #111827; /* Gray 900 */
+--lumi-text-secondary: #6b7280; /* Gray 500 */
+--lumi-border: #e5e7eb; /* Gray 200 */
+
+/* Dark mode (ikinci.html inspired) */
+[data-theme="dark"] {
+  --lumi-bg: #0a0a0a; /* Near black */
+  --lumi-bg-secondary: #1a1a1a;
+  --lumi-text: #ffffff;
+  --lumi-text-secondary: #9ca3af;
+  --lumi-border: #374151;
+}
+```
+
+**Typography System (Montserrat-inspired):**
+
+- Font family: Inter (fallback: system-ui)
+- Font weights: 300 (light), 400 (normal), 500 (medium), 600 (semibold), 700 (bold)
+- Letter spacing: Wide tracking for luxury feel
+  - Headlines: 0.2em - 0.4em
+  - Labels: 0.15em - 0.2em
+  - Body: normal
+- Text transform: Uppercase for all headings, labels, navigation
+- Sizes:
+  - Micro labels: text-[10px] - text-[11px]
+  - Small labels: text-xs
+  - Body: text-sm - text-base
+  - Headings: text-2xl - text-7xl
+
+**Layout Principles (ikinci.html patterns):**
+
+- Full-screen hero sections with centered content
+- 3-column grids for collections (2-col mobile, 3-col tablet, 4-col desktop)
+- Aspect ratios: aspect-[3/4] for products, aspect-square for features
+- Wide spacing: py-20, py-24 for sections
+- Consistent gaps: gap-6, gap-8, gap-10
+
+**Component Effects:**
+
+- Hover scale: scale-105 (duration-500 - duration-700)
+- Glassmorphism: backdrop-blur-sm + bg-white/10 or bg-black/10
+- Image treatment: mix-blend-multiply for product images
+- Shadows: drop-shadow-md, drop-shadow-lg for depth
+- Borders: border-b for minimal accents
+
+**Animation Style:**
+
+- Smooth, subtle transitions (duration-300 - duration-700)
+- fadeIn animations (opacity + translateY)
+- Parallax effects on hero sections (GSAP ScrollTrigger)
+- Stagger animations for product grids
+- Page transitions: fade + slight slide
+
+**Enforcement:**
+
+- ESLint rule: No hardcoded colors outside palette
+- Only use Tailwind utilities from `theme.extend.colors.lumi`
+- All headings and labels must be uppercase
+- All product images must use mix-blend-multiply
+- Minimum letter-spacing: 0.15em for labels
 
 ---
 
@@ -246,11 +335,14 @@ apps/frontend/
 │   │   │   └── __tests__/
 │   │   └── homepage/
 │   │       ├── components/
-│   │       │   ├── Hero.tsx
-│   │       │   ├── FeaturedProducts.tsx
-│   │       │   ├── CategoryShowcase.tsx
-│   │       │   ├── NewsletterSignup.tsx
-│   │       │   └── Testimonials.tsx
+│   │       │   ├── Hero.tsx                # Full-screen hero (ikinci.html style)
+│   │       │   ├── ExploreCollections.tsx  # 3-column collection grid
+│   │       │   ├── CollectionCard.tsx      # Category card with image overlay
+│   │       │   ├── CollectionsSlider.tsx   # Horizontal snap slider
+│   │       │   ├── FeatureBanner.tsx       # Full-screen feature section
+│   │       │   ├── JustDropped.tsx         # Product grid section
+│   │       │   ├── FloatingTab.tsx         # Vertical side tab (ikinci.html)
+│   │       │   └── NewsletterSignup.tsx    # Minimal inline signup
 │   │       └── __tests__/
 │   ├── components/
 │   │   ├── ui/
@@ -260,11 +352,13 @@ apps/frontend/
 │   │   │   ├── Badge.tsx
 │   │   │   └── Skeleton.tsx
 │   │   └── layout/
-│   │       ├── Header.tsx
-│   │       ├── MegaMenu.tsx
-│   │       ├── SearchBar.tsx
-│   │       ├── CartIcon.tsx
-│   │       └── Footer.tsx
+│   │       ├── Header.tsx          # Minimal fixed header (ikinci.html style)
+│   │       ├── Navigation.tsx      # Desktop nav with underline hover
+│   │       ├── MobileMenu.tsx      # Full-screen overlay (ikinci.html)
+│   │       ├── SearchBar.tsx       # Minimal search with icon
+│   │       ├── CartIcon.tsx        # Cart with badge count
+│   │       ├── Breadcrumb.tsx      # Minimal breadcrumb (uppercase)
+│   │       └── Footer.tsx          # Centered footer with grid links
 │   ├── lib/
 │   │   ├── formatters/
 │   │   │   ├── price.ts
@@ -292,164 +386,249 @@ apps/frontend/
 
 ## ✅ IMPLEMENTATION CHECKLIST
 
-### 1. Homepage (34 items)
+### 1. Homepage - Premium Minimalist Layout (34 items)
 
-#### 1.1 Hero Section
+**Inspired by ikinci.html (BLVCK PARIS) structure with Lumi branding**
+
+#### 1.1 Hero Section - Full-Screen Immersive (ikinci.html style)
+
 - [ ] Create `Hero.tsx` component
-  - [ ] Full-screen hero with deneme.html style
-  - [ ] Background video/image with overlay
-  - [ ] Glassmorphism card overlay
-  - [ ] Headline with gradient text
-  - [ ] Subheadline with neon glow
-  - [ ] CTA buttons (Shop Now, Learn More)
-  - [ ] Scroll indicator with animation
-  - [ ] GSAP parallax effect on scroll
+  - [ ] Full-screen height (h-screen) with background image
+  - [ ] Background image with opacity overlay (bg-black/10)
+  - [ ] Centered content container
+  - [ ] Season/Year label (text-xs, tracking-[0.2em], uppercase)
+  - [ ] Main headline (text-5xl md:text-7xl, font-light, tracking-wide, uppercase)
+  - [ ] Subtitle/tagline (text-sm, tracking-[0.15em], text-gray-400)
+  - [ ] Dual CTA buttons with underline animation (ikinci.html .btn-link style)
+  - [ ] Scroll indicator (animated chevron-down icon)
+  - [ ] GSAP parallax effect on background image
+  - [ ] Drop shadow on text for readability
 - [ ] Implement responsive breakpoints
-  - [ ] Mobile: Stacked layout
-  - [ ] Tablet: 60/40 split
-  - [ ] Desktop: Full-screen immersive
+  - [ ] Mobile: Centered vertical layout, text-4xl hero
+  - [ ] Tablet: Centered, text-6xl hero
+  - [ ] Desktop: Full-screen, text-7xl hero
 
-#### 1.2 Featured Products
-- [ ] Create `FeaturedProducts.tsx` component
-  - [ ] Section title with animated underline
-  - [ ] Product carousel (Swiper/Embla)
-  - [ ] Product cards with hover effects
-  - [ ] Quick view button
-  - [ ] Add to cart quick action
-  - [ ] Navigation arrows
-  - [ ] Pagination dots
-  - [ ] Auto-play with pause on hover
+#### 1.2 Explore Collections - Grid Showcase (ikinci.html "Explore the Maison's Collections")
+
+- [ ] Create `ExploreCollections.tsx` component
+  - [ ] Section container (bg-white, text-black, py-20)
+  - [ ] Section title (text-2xl, font-bold, tracking-wide, text-center, mb-16, uppercase)
+  - [ ] 3-column grid (grid-cols-1 md:grid-cols-3, gap-6)
+  - [ ] First row: 3 main categories
+  - [ ] Second row: 3 sub-categories or features
+- [ ] Create `CollectionCard.tsx` component (ikinci.html style)
+  - [ ] Container with cursor-pointer, group for hover effects
+  - [ ] Image container (bg-gray-50, aspect-[3/4], overflow-hidden)
+  - [ ] Product image (mix-blend-multiply, group-hover:scale-105, transition duration-700)
+  - [ ] Category label (text-xs, font-bold, uppercase, tracking-widest, border-b border-black, pb-1)
+  - [ ] Product count badge (optional)
+  - [ ] Link to category page (onclick navigation)
+
+#### 1.3 Featured Collections Slider - Horizontal Scroll (ikinci.html "Collections Slider")
+
+- [ ] Create `CollectionsSlider.tsx` component
+  - [ ] Section container (h-[85vh], bg-black, overflow-hidden)
+  - [ ] Slider container (flex, overflow-x-auto, scroll-smooth, scrollbar-hide, snap-x snap-mandatory)
+  - [ ] Navigation buttons (chevron-left, chevron-right, absolute positioning, hidden md:block)
+  - [ ] Auto-scroll functionality (optional)
+- [ ] Create slider items
+  - [ ] Each slide: min-w-full md:min-w-[33.333%], snap-center
+  - [ ] Background image with overlay (opacity-70, group-hover:opacity-90)
+  - [ ] Collection title centered at bottom (text-2xl md:text-3xl, font-bold, uppercase, tracking-widest)
+  - [ ] Border-r between slides (border-gray-900/50)
+  - [ ] Click to navigate to collection
+
+#### 1.4 Just Dropped - Product Grid (ikinci.html style)
+
+- [ ] Create `JustDropped.tsx` component
+  - [ ] Section container (bg-white, text-black, py-20)
+  - [ ] Section title (text-2xl, font-bold, tracking-wide, text-center, mb-12, uppercase)
+  - [ ] 4-column product grid (grid-cols-2 md:grid-cols-4, gap-4)
+  - [ ] "Shop All" button at bottom (text-xs, font-bold, uppercase, border-b, tracking-widest)
+- [ ] Create mini `ProductCard.tsx` for homepage
+  - [ ] Image container (bg-gray-50, aspect-square, overflow-hidden)
+  - [ ] Product image (mix-blend-multiply, group-hover:scale-105, transition duration-500)
+  - [ ] Product title (text-xs, font-bold, uppercase)
+  - [ ] Price (text-xs, text-gray-500)
+  - [ ] Link to product detail
 - [ ] Fetch featured products
-  - [ ] useQuery hook
+  - [ ] useQuery hook with 'just-dropped' tag filter
   - [ ] Cache for 5 minutes
-  - [ ] Loading skeleton
-  - [ ] Error state
+  - [ ] Loading skeleton (24 items)
+  - [ ] Error state with retry
 
-#### 1.3 Category Showcase
-- [ ] Create `CategoryShowcase.tsx` component
-  - [ ] Grid layout (2x3 on desktop, 2x2 on mobile)
-  - [ ] Category cards with image
-  - [ ] Category name overlay
-  - [ ] Product count badge
-  - [ ] Hover zoom effect
-  - [ ] Link to category page
+#### 1.5 Feature Banners - Full-Screen Sections (ikinci.html "BLVCK|UFC", "Harry Potter")
 
-#### 1.4 Newsletter Signup
-- [ ] Create `NewsletterSignup.tsx` component
-  - [ ] Section with background gradient
-  - [ ] Email input with validation
-  - [ ] Subscribe button with loading state
+- [ ] Create `FeatureBanner.tsx` component
+  - [ ] Full-screen section (h-screen, relative, overflow-hidden)
+  - [ ] Background image (absolute inset-0, object-cover, opacity-60)
+  - [ ] Glassmorphism overlay option (backdrop-blur-sm)
+  - [ ] Centered content (z-10, text-center)
+  - [ ] "New" badge (text-[10px], font-bold, tracking-[0.3em], uppercase, mb-4)
+  - [ ] Feature title (text-4xl md:text-5xl, font-light, tracking-[0.2em], uppercase)
+  - [ ] Dual CTA buttons (text-[11px], font-bold, tracking-[0.2em], uppercase, .btn-link style)
+- [ ] Create 2-3 feature banners
+  - [ ] New collection announcement
+  - [ ] Collaboration highlight
+  - [ ] Seasonal campaign
+
+#### 1.6 Newsletter Signup - Minimal Inline (optional)
+
+- [ ] Create `NewsletterSignup.tsx` component (if needed)
+  - [ ] Minimal inline form in footer
+  - [ ] Email input (text-sm, border-b only)
+  - [ ] Subscribe button (text-xs, uppercase, tracking-widest)
   - [ ] Privacy policy link
   - [ ] Success toast on subscribe
-  - [ ] Error handling
 - [ ] Create `useNewsletterSignup` hook
   - [ ] useMutation for subscription
   - [ ] Email validation (Zod)
   - [ ] Sanitize email input (S2)
   - [ ] Analytics event tracking
 
-#### 1.5 Testimonials Section
-- [ ] Create `Testimonials.tsx` component
-  - [ ] Testimonial carousel
-  - [ ] Customer avatar
-  - [ ] Quote with stars
-  - [ ] Customer name and role
-  - [ ] Auto-rotate every 5s
+#### 1.7 SEO & Metadata
 
-#### 1.6 SEO & Metadata
 - [ ] Homepage metadata
-  - [ ] Title: "Lumi - Modern E-commerce Platform"
-  - [ ] Description (155 chars)
-  - [ ] Open Graph tags
+  - [ ] Title: "Lumi - Premium E-commerce Platform"
+  - [ ] Description (155 chars, luxury/premium keywords)
+  - [ ] Open Graph tags (og:image with hero banner)
   - [ ] Twitter Card tags
 - [ ] JSON-LD schema
   - [ ] Organization schema
   - [ ] WebSite schema with search action
+  - [ ] BreadcrumbList schema
 
 ---
 
-### 2. Product Catalog (46 items)
+### 2. Product Catalog - Minimal Grid Layout (46 items)
 
-#### 2.1 Product List Page
-- [ ] Create `app/(shop)/products/page.tsx`
+**Inspired by ikinci.html (Men's Collection, Women's Collection) with enhanced filtering**
+
+#### 2.1 Category Header - Minimal Banner (ikinci.html style)
+
+- [ ] Create category header component
+  - [ ] Small hero section (h-[40vh], bg-gray-900, relative)
+  - [ ] Background image (opacity-50, grayscale filter optional)
+  - [ ] Category title (text-5xl, font-bold, uppercase, tracking-widest, centered, z-10)
+  - [ ] Breadcrumb navigation (text-xs, uppercase, tracking-wide)
+
+#### 2.2 Filter Bar - Horizontal Minimal (ikinci.html style)
+
+- [ ] Create `FilterBar.tsx` component
+  - [ ] Horizontal layout (flex, justify-between, items-center)
+  - [ ] Filter chips on left (text-[10px], font-bold, uppercase, tracking-widest)
+  - [ ] Active filter: text-white, others: text-gray-400, cursor-pointer, hover:text-white
+  - [ ] Sort dropdown on right (text-[10px], uppercase, cursor-pointer)
+  - [ ] Mobile: Drawer/sheet for filters
+- [ ] Filter options
+  - [ ] All (default active)
+  - [ ] Category filters (e.g., Hoodies, Tees, Bottoms, Jackets)
+  - [ ] "Sort by: Featured" dropdown (minimal)
+
+#### 2.3 Product Grid - Clean 4-Column Layout (ikinci.html style)
+
 - [ ] Create `ProductGrid.tsx` component
-  - [ ] Grid layout (responsive: 1-4 columns)
-  - [ ] Product cards with consistent styling
-  - [ ] Empty state (no products found)
-  - [ ] Loading skeleton (24 items)
+  - [ ] Container (max-w-[1600px], mx-auto, px-6)
+  - [ ] Grid layout (grid-cols-2 md:grid-cols-4, gap-x-4, gap-y-10)
+  - [ ] Responsive: 2-col mobile, 3-col tablet, 4-col desktop
+  - [ ] Empty state (centered message, "Browse products" button)
+  - [ ] Loading skeleton (24 items, shimmer effect)
 
-#### 2.2 Product Card
+#### 2.4 Product Card - Minimal Premium (ikinci.html style)
+
 - [ ] Create `ProductCard.tsx` component
-  - [ ] Product image with aspect ratio 1:1
-  - [ ] Product title (2 lines, ellipsis)
-  - [ ] Price display (current + compare-at)
-  - [ ] Rating stars + review count
-  - [ ] Badge (New, Sale, Out of Stock)
-  - [ ] Quick add to cart button
-  - [ ] Add to wishlist icon
-  - [ ] Hover effects (lift, shadow)
-  - [ ] Link to product detail page
+  - [ ] Container (group, cursor-pointer)
+  - [ ] Image container (aspect-[3/4], bg-gray-900, overflow-hidden, relative, mb-3)
+  - [ ] Product image (object-cover, group-hover:scale-105, transition duration-500)
+  - [ ] Badge overlay (absolute top-2 left-2, if New/Sale)
+  - [ ] Product title (text-[11px], font-bold, uppercase, tracking-widest)
+  - [ ] Price display (text-[11px], text-gray-400)
+    - [ ] Current price
+    - [ ] Compare-at price (line-through, text-gray-600, mr-2, if on sale)
+    - [ ] Sale badge (text-accent color)
+  - [ ] Quick add to cart (absolute, opacity-0, group-hover:opacity-100, transition)
+  - [ ] Add to wishlist icon (absolute top-2 right-2, opacity-0, group-hover:opacity-100)
+  - [ ] Link to product detail (entire card clickable)
 
-#### 2.3 Filters & Search
-- [ ] Create `FilterSidebar.tsx` component
-  - [ ] Category filter (tree structure)
-  - [ ] Price range slider (min-max)
-  - [ ] Attribute filters (size, color, brand)
-  - [ ] Rating filter (stars)
-  - [ ] Availability filter (in stock)
-  - [ ] Apply filters button
-  - [ ] Clear all filters button
-  - [ ] Active filters display
-  - [ ] Collapsible sections
+#### 2.5 Advanced Filters - Sidebar/Drawer (enhanced from ikinci.html)
+
+- [ ] Create `FilterSidebar.tsx` component (desktop sidebar, mobile drawer)
+  - [ ] Desktop: Fixed sidebar (w-64, border-r)
+  - [ ] Mobile: Sheet/drawer from left
+  - [ ] Filter sections (collapsible accordions)
+- [ ] Filter categories
+  - [ ] Category filter (tree structure, checkboxes)
+  - [ ] Price range slider (min-max, with input fields)
+  - [ ] Attribute filters (size chips, color swatches)
+  - [ ] Rating filter (star icons, clickable)
+  - [ ] Availability filter (In Stock checkbox)
+  - [ ] Brand filter (checkboxes)
+- [ ] Filter actions
+  - [ ] Apply filters button (text-xs, uppercase, border-b, w-full)
+  - [ ] Clear all filters button (text-xs, text-gray-500)
+  - [ ] Active filters chips (removable, x icon)
+  - [ ] Filter count indicator
+
+#### 2.6 Search - Minimal Inline (enhanced)
+
 - [ ] Create `SearchBar.tsx` component
-  - [ ] Search input with icon
-  - [ ] Search suggestions dropdown
+  - [ ] Search input (border-b only, text-sm, placeholder uppercase)
+  - [ ] Search icon (left, gray)
+  - [ ] Clear button (right, only when has value)
   - [ ] Debounced search (300ms)
-  - [ ] Recent searches
-  - [ ] Popular searches
-  - [ ] Clear search button
-- [ ] Create `useProductFilters` hook
-  - [ ] Filter state management
-  - [ ] URL sync (query params)
-  - [ ] Apply filters to query
-  - [ ] Reset filters
+- [ ] Search suggestions dropdown
+  - [ ] Recent searches (text-xs, gray)
+  - [ ] Popular searches (text-xs, white)
+  - [ ] Product suggestions (image + title, clickable)
+  - [ ] "View all results" button at bottom
 
-#### 2.4 Sorting & Pagination
+#### 2.7 Sorting & Pagination
+
 - [ ] Create `SortDropdown.tsx` component
-  - [ ] Sort options:
-    - [ ] Relevance (default)
+  - [ ] Minimal dropdown (text-[10px], uppercase, tracking-widest)
+  - [ ] Options:
+    - [ ] Featured (default)
     - [ ] Price: Low to High
     - [ ] Price: High to Low
     - [ ] Newest First
+    - [ ] Best Selling
     - [ ] Rating: High to Low
   - [ ] Update URL param on change
-- [ ] Implement pagination
+- [ ] Pagination controls
   - [ ] Page-based pagination (default)
-  - [ ] Infinite scroll (optional, toggle)
-  - [ ] Load more button
-  - [ ] Results count display
-  - [ ] Items per page (24, 48, 96)
+  - [ ] Infinite scroll (optional toggle, "Load More" button)
+  - [ ] Results count (text-xs, "Showing X-Y of Z products")
+  - [ ] Items per page toggle (24, 48, 96)
+  - [ ] Scroll to top on page change
 
-#### 2.5 Data Fetching
+#### 2.8 Data Fetching & State
+
 - [ ] Create `useProducts` hook
-  - [ ] useQuery with filters
-  - [ ] Cache for 60s
-  - [ ] Pagination support
-  - [ ] SSR hydration
+  - [ ] useQuery with filters, sort, pagination
+  - [ ] Cache for 60s (staleTime)
+  - [ ] SSR hydration with prefetchQuery
+  - [ ] Optimistic updates for filters
 - [ ] Create `useInfiniteProducts` hook
-  - [ ] useInfiniteQuery
+  - [ ] useInfiniteQuery for infinite scroll
   - [ ] Load next page
   - [ ] Has more pages check
+  - [ ] Scroll detection
 - [ ] Create `useProductSearch` hook
-  - [ ] Debounced search
-  - [ ] Search suggestions
-  - [ ] Analytics tracking
+  - [ ] Debounced search (300ms)
+  - [ ] Search suggestions query
+  - [ ] Analytics tracking (search term, results count)
+- [ ] Create `useProductFilters` hook
+  - [ ] Zustand store for filter state
+  - [ ] URL sync (query params)
+  - [ ] Apply/reset filters
+  - [ ] Filter validation
 
 ---
 
 ### 3. Product Detail Page (52 items)
 
 #### 3.1 Product Gallery
+
 - [ ] Create `ProductGallery.tsx` component
   - [ ] Main image display
   - [ ] Thumbnail strip (horizontal scroll)
@@ -466,6 +645,7 @@ apps/frontend/
   - [ ] Smooth zoom in/out
 
 #### 3.2 Product Information
+
 - [ ] Create `ProductInfo.tsx` component
   - [ ] Product title (H1)
   - [ ] SKU display
@@ -480,6 +660,7 @@ apps/frontend/
   - [ ] Share buttons (social media)
 
 #### 3.3 Variant Selection
+
 - [ ] Create `VariantSelector.tsx` component
   - [ ] Attribute options (size, color, etc.)
   - [ ] Visual swatches for colors
@@ -494,6 +675,7 @@ apps/frontend/
   - [ ] Update URL on selection
 
 #### 3.4 Add to Cart
+
 - [ ] Create `AddToCartButton.tsx` component
   - [ ] Quantity selector (+ / -)
   - [ ] Min: 1, Max: 10 (or stock level)
@@ -511,6 +693,7 @@ apps/frontend/
   - [ ] Analytics event
 
 #### 3.5 Product Tabs
+
 - [ ] Create `ProductTabs.tsx` component
   - [ ] Description tab
     - [ ] Full product description (HTML)
@@ -527,6 +710,7 @@ apps/frontend/
     - [ ] Delivery estimates
 
 #### 3.6 Reviews & Ratings
+
 - [ ] Create `ReviewsList.tsx` component
   - [ ] Review cards
   - [ ] Reviewer name and avatar
@@ -549,6 +733,7 @@ apps/frontend/
   - [ ] Vote helpful mutation
 
 #### 3.7 Related Products
+
 - [ ] Create `RelatedProducts.tsx` component
   - [ ] Section title
   - [ ] Product carousel
@@ -556,6 +741,7 @@ apps/frontend/
   - [ ] Same category products
 
 #### 3.8 SEO & Schema
+
 - [ ] Product metadata
   - [ ] Dynamic title: "{Product Name} | Lumi"
   - [ ] Meta description (from product)
@@ -573,6 +759,7 @@ apps/frontend/
 ### 4. Shopping Cart (38 items)
 
 #### 4.1 Cart State Management
+
 - [ ] Create `cart.store.ts` (Zustand)
   - [ ] Cart items state
   - [ ] Add item action
@@ -585,6 +772,7 @@ apps/frontend/
   - [ ] Persist to sessionStorage
 
 #### 4.2 Mini Cart
+
 - [ ] Create `MiniCart.tsx` component
   - [ ] Cart icon in header with badge (item count)
   - [ ] Dropdown/drawer on click
@@ -605,6 +793,7 @@ apps/frontend/
   - [ ] Same content as dropdown
 
 #### 4.3 Full Cart Page
+
 - [ ] Create `app/(checkout)/cart/page.tsx`
 - [ ] Create cart item list
   - [ ] Product image (link to product)
@@ -631,6 +820,7 @@ apps/frontend/
   - [ ] Recently viewed products
 
 #### 4.4 Cart Operations
+
 - [ ] Create `useCart` hook (query)
   - [ ] Fetch cart from API
   - [ ] Merge with local cart
@@ -657,6 +847,7 @@ apps/frontend/
 ### 5. Checkout Flow (44 items)
 
 #### 5.1 Checkout Wizard
+
 - [ ] Create `CheckoutWizard.tsx` component
   - [ ] Multi-step form (3 steps)
   - [ ] Step indicator with progress
@@ -666,6 +857,7 @@ apps/frontend/
   - [ ] URL sync (step in query param)
 
 #### 5.2 Step 1: Shipping Address
+
 - [ ] Create `ShippingForm.tsx` component
   - [ ] Use existing address (if logged in)
     - [ ] Address selector (radio buttons)
@@ -688,12 +880,14 @@ apps/frontend/
   - [ ] Continue to payment button
 
 #### 5.3 Step 2: Payment (Placeholder)
+
 - [ ] Create `PaymentForm.tsx` component
   - [ ] Placeholder for Phase 10
   - [ ] Message: "Payment integration coming soon"
   - [ ] Continue to review button
 
 #### 5.4 Step 3: Order Review
+
 - [ ] Create `OrderReview.tsx` component
   - [ ] Order summary
     - [ ] Line items with image, title, quantity, price
@@ -710,6 +904,7 @@ apps/frontend/
   - [ ] Place order button with loading state
 
 #### 5.5 Order Confirmation
+
 - [ ] Create `app/(checkout)/checkout/success/page.tsx`
 - [ ] Create `OrderConfirmation.tsx` component
   - [ ] Success animation (checkmark)
@@ -722,6 +917,7 @@ apps/frontend/
   - [ ] Print receipt button
 
 #### 5.6 Checkout State
+
 - [ ] Create `checkout.store.ts` (Zustand)
   - [ ] Current step
   - [ ] Shipping address
@@ -746,6 +942,7 @@ apps/frontend/
 ### 6. Wishlist (16 items)
 
 #### 6.1 Wishlist Page
+
 - [ ] Create `app/wishlist/page.tsx`
 - [ ] Create `WishlistGrid.tsx` component
   - [ ] Grid layout (same as product catalog)
@@ -754,6 +951,7 @@ apps/frontend/
   - [ ] Loading skeleton
 
 #### 6.2 Wishlist Item
+
 - [ ] Create `WishlistItem.tsx` component
   - [ ] Product image
   - [ ] Product title
@@ -763,6 +961,7 @@ apps/frontend/
   - [ ] Remove from wishlist button
 
 #### 6.3 Wishlist Operations
+
 - [ ] Create `useWishlist` hook (query)
   - [ ] Fetch wishlist
   - [ ] Requires authentication
@@ -780,6 +979,7 @@ apps/frontend/
 ### 7. SEO & Metadata (22 items)
 
 #### 7.1 Metadata Helpers
+
 - [ ] Create `src/lib/seo/metadata.ts`
   - [ ] `generateMetadata()` helper
   - [ ] Dynamic title generation
@@ -789,6 +989,7 @@ apps/frontend/
   - [ ] Canonical URL
 
 #### 7.2 JSON-LD Schema Builders
+
 - [ ] Create `src/lib/seo/schema.ts`
   - [ ] `buildProductSchema(product)`
   - [ ] `buildBreadcrumbSchema(path)`
@@ -801,6 +1002,7 @@ apps/frontend/
   - [ ] Validate against schema.org spec
 
 #### 7.3 Sitemap Generation
+
 - [ ] Install `next-sitemap`: `pnpm add next-sitemap`
 - [ ] Create `next-sitemap.config.js`
   - [ ] Include product pages
@@ -810,6 +1012,7 @@ apps/frontend/
 - [ ] Generate sitemap on build
 
 #### 7.4 Robots.txt
+
 - [ ] Create `public/robots.txt`
   - [ ] Allow all search engines
   - [ ] Disallow admin pages
@@ -820,6 +1023,7 @@ apps/frontend/
 ### 8. Performance Optimization (26 items)
 
 #### 8.1 Image Optimization
+
 - [ ] Use Next.js Image for all images
 - [ ] Configure Cloudinary loader
 - [ ] Set priority for above-fold images
@@ -832,6 +1036,7 @@ apps/frontend/
   - [ ] Product detail: 800px, 1200px, 1600px
 
 #### 8.2 Code Splitting
+
 - [ ] Dynamic import for product gallery
   - [ ] `dynamic(() => import('./ProductGallery'), { ssr: false })`
 - [ ] Dynamic import for review form
@@ -840,6 +1045,7 @@ apps/frontend/
 - [ ] Analyze bundle with `ANALYZE=true pnpm build`
 
 #### 8.3 Data Loading Strategies
+
 - [ ] SSR for product detail pages
 - [ ] ISR for product catalog (revalidate: 60s)
 - [ ] Client-side for cart operations
@@ -847,6 +1053,7 @@ apps/frontend/
 - [ ] Prefetch product links on hover
 
 #### 8.4 Caching Strategy
+
 - [ ] TanStack Query cache config
   - [ ] Products: staleTime 60s
   - [ ] Product detail: staleTime 5min
@@ -863,6 +1070,7 @@ apps/frontend/
 ### 9. Mobile Optimization (18 items)
 
 #### 9.1 Responsive Design
+
 - [ ] Test on mobile viewports
   - [ ] 375px (iPhone SE)
   - [ ] 390px (iPhone 12/13/14)
@@ -882,6 +1090,7 @@ apps/frontend/
 - [ ] Swipe gestures for carousels
 
 #### 9.2 PWA Setup
+
 - [ ] Install `next-pwa`: `pnpm add next-pwa`
 - [ ] Create `manifest.json`
   - [ ] App name: "Lumi"
@@ -900,6 +1109,7 @@ apps/frontend/
 ### 10. Analytics & Tracking (20 items)
 
 #### 10.1 Event Tracking
+
 - [ ] Create `src/lib/analytics/events.ts`
   - [ ] `trackPageView(url, title)`
   - [ ] `trackProductView(product)`
@@ -911,12 +1121,14 @@ apps/frontend/
   - [ ] `trackPurchase(order)`
 
 #### 10.2 Google Analytics Integration
+
 - [ ] Install `@next/third-parties`: `pnpm add @next/third-parties`
 - [ ] Add GA4 script to root layout
 - [ ] Configure custom events
 - [ ] Track enhanced e-commerce events
 
 #### 10.3 Web Vitals Monitoring
+
 - [ ] Create `src/lib/analytics/web-vitals.ts`
   - [ ] Track LCP (Largest Contentful Paint)
   - [ ] Track FID (First Input Delay)
@@ -926,6 +1138,7 @@ apps/frontend/
   - [ ] Send to analytics
 
 #### 10.4 Error Tracking
+
 - [ ] Sentry integration
   - [ ] Capture React errors
   - [ ] Capture API errors
@@ -938,6 +1151,7 @@ apps/frontend/
 ### 11. Testing & Quality Assurance (38 items)
 
 #### 11.1 Unit Tests
+
 - [ ] Test `ProductCard` component
   - [ ] Renders product info correctly
   - [ ] Displays correct price
@@ -959,6 +1173,7 @@ apps/frontend/
   - [ ] Resets filters
 
 #### 11.2 Integration Tests
+
 - [ ] Test product catalog flow
   - [ ] Load products
   - [ ] Apply filters
@@ -978,6 +1193,7 @@ apps/frontend/
   - [ ] Place order (mock)
 
 #### 11.3 E2E Tests (Playwright)
+
 - [ ] Create `tests/e2e/storefront.spec.ts`
 - [ ] Test homepage
   - [ ] Hero loads
@@ -1003,6 +1219,7 @@ apps/frontend/
   - [ ] Terms checkbox required
 
 #### 11.4 Average/Error/Recovery Tests
+
 - [ ] Create `tests/average/storefront-average.test.ts`
 - [ ] **Average Test**
   - [ ] Homepage → Search → Product detail → Add to cart → Checkout review
@@ -1019,6 +1236,7 @@ apps/frontend/
   - [ ] Restore checkout state after refresh
 
 #### 11.5 Performance Tests
+
 - [ ] Lighthouse audit
   - [ ] Homepage: Performance ≥90
   - [ ] Product catalog: Performance ≥90
@@ -1031,6 +1249,7 @@ apps/frontend/
   - [ ] No duplicate dependencies
 
 #### 11.6 Visual Regression Tests
+
 - [ ] Setup Chromatic or Playwright snapshots
 - [ ] Capture critical components
   - [ ] ProductCard
@@ -1088,13 +1307,13 @@ pnpm --filter @lumi/frontend test -- --runTestsByPath "src/lib/seo/__tests__/**"
 
 ```typescript
 // Test add to cart
-test('adds product to cart', async () => {
+test("adds product to cart", async () => {
   const { result } = renderHook(() => useAddToCart());
 
   await act(async () => {
     await result.current.mutateAsync({
-      variantId: 'variant-123',
-      quantity: 2
+      variantId: "variant-123",
+      quantity: 2,
     });
   });
 
@@ -1104,16 +1323,16 @@ test('adds product to cart', async () => {
 });
 
 // Test product filters
-test('applies category filter', async () => {
+test("applies category filter", async () => {
   const { result } = renderHook(() => useProducts());
 
   await act(async () => {
-    result.current.setFilters({ category: 'electronics' });
+    result.current.setFilters({ category: "electronics" });
   });
 
   await waitFor(() => {
     expect(result.current.data?.products).toBeDefined();
-    expect(result.current.data?.products.every(p => p.category === 'electronics')).toBe(true);
+    expect(result.current.data?.products.every((p) => p.category === "electronics")).toBe(true);
   });
 });
 ```
@@ -1123,24 +1342,28 @@ test('applies category filter', async () => {
 ## 📊 SUCCESS METRICS
 
 ### Code Quality Metrics
+
 - ✅ Test coverage: ≥80%
 - ✅ TypeScript: 0 errors
 - ✅ ESLint: 0 errors
 - ✅ Lighthouse: ≥90 (Performance)
 
 ### Performance Metrics
+
 - ✅ LCP: <1.9s (mobile & desktop)
 - ✅ CLS: <0.1
 - ✅ Bundle size: <180KB (initial)
 - ✅ TTI: <2s
 
 ### SEO Metrics
+
 - ✅ Dynamic metadata: 100% pages
 - ✅ JSON-LD schema: Product, Breadcrumb, Organization
 - ✅ Sitemap: Generated
 - ✅ Open Graph: All pages
 
 ### UX Metrics
+
 - ✅ Mobile responsive: 375px - 1440px
 - ✅ Touch-friendly: 44px min touch targets
 - ✅ Animations: Smooth 60fps
@@ -1151,12 +1374,15 @@ test('applies category filter', async () => {
 ## 🚨 COMMON PITFALLS TO AVOID
 
 ### 1. Unoptimized Images
+
 ❌ **Wrong:**
+
 ```tsx
 <img src="/product.jpg" alt="Product" />
 ```
 
 ✅ **Correct:**
+
 ```tsx
 <Image
   src={product.image}
@@ -1171,13 +1397,16 @@ test('applies category filter', async () => {
 ```
 
 ### 2. No Loading States
+
 ❌ **Wrong:**
+
 ```tsx
 const { data } = useProducts();
 return <ProductGrid products={data.products} />; // Crashes on undefined
 ```
 
 ✅ **Correct:**
+
 ```tsx
 const { data, isLoading, error } = useProducts();
 
@@ -1189,7 +1418,9 @@ return <ProductGrid products={data.products} />;
 ```
 
 ### 3. Missing SEO
+
 ❌ **Wrong:**
+
 ```tsx
 // No metadata, poor SEO
 export default function ProductPage() {
@@ -1198,6 +1429,7 @@ export default function ProductPage() {
 ```
 
 ✅ **Correct:**
+
 ```tsx
 export async function generateMetadata({ params }) {
   const product = await getProduct(params.slug);
@@ -1214,40 +1446,46 @@ export async function generateMetadata({ params }) {
 ```
 
 ### 4. No Optimistic Updates
+
 ❌ **Wrong:**
+
 ```tsx
 // No feedback until server responds
 const addToCart = useMutation(api.addToCart);
 ```
 
 ✅ **Correct:**
+
 ```tsx
 const addToCart = useMutation(api.addToCart, {
   onMutate: async (newItem) => {
     // Optimistic update
-    queryClient.setQueryData(['cart'], (old) => ({
+    queryClient.setQueryData(["cart"], (old) => ({
       ...old,
-      items: [...old.items, newItem]
+      items: [...old.items, newItem],
     }));
   },
   onError: (err, newItem, context) => {
     // Rollback on error
-    queryClient.setQueryData(['cart'], context.previousCart);
+    queryClient.setQueryData(["cart"], context.previousCart);
   },
   onSettled: () => {
-    queryClient.invalidateQueries(['cart']);
-  }
+    queryClient.invalidateQueries(["cart"]);
+  },
 });
 ```
 
 ### 5. Poor Mobile UX
+
 ❌ **Wrong:**
+
 ```tsx
 // Fixed width, not responsive
 <div className="w-[1200px]">
 ```
 
 ✅ **Correct:**
+
 ```tsx
 // Responsive container
 <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1258,6 +1496,7 @@ const addToCart = useMutation(api.addToCart, {
 ## 📦 DELIVERABLES
 
 ### 1. Pages
+
 - ✅ Homepage (hero, featured, categories, newsletter)
 - ✅ Product catalog (grid, filters, search, sort)
 - ✅ Product detail (gallery, variants, reviews)
@@ -1266,6 +1505,7 @@ const addToCart = useMutation(api.addToCart, {
 - ✅ Wishlist
 
 ### 2. Components
+
 - ✅ 50+ UI components
 - ✅ Product cards, filters, gallery
 - ✅ Cart components
@@ -1273,23 +1513,27 @@ const addToCart = useMutation(api.addToCart, {
 - ✅ SEO components (metadata, schema)
 
 ### 3. State Management
+
 - ✅ Cart store (Zustand)
 - ✅ Checkout store (Zustand)
 - ✅ TanStack Query hooks (products, cart, etc.)
 
 ### 4. SEO
+
 - ✅ Dynamic metadata
 - ✅ JSON-LD schemas
 - ✅ Sitemap
 - ✅ Robots.txt
 
 ### 5. Testing
+
 - ✅ Unit tests (≥80% coverage)
 - ✅ Integration tests
 - ✅ E2E tests (Playwright)
 - ✅ Performance tests (Lighthouse)
 
 ### 6. Documentation
+
 - ✅ Storefront guide
 - ✅ Component documentation
 - ✅ SEO best practices
@@ -1303,12 +1547,14 @@ const addToCart = useMutation(api.addToCart, {
 # PHASE 8: E-commerce Interface - Completion Report
 
 ## Implementation Summary
+
 - **Start Date**: [Date]
 - **End Date**: [Date]
 - **Duration**: [Days]
 - **Team Members**: [Names]
 
 ## Completed Items
+
 - [x] Total Items: 354/354 (100%)
 - [x] Homepage: 34/34
 - [x] Product Catalog: 46/46
@@ -1323,6 +1569,7 @@ const addToCart = useMutation(api.addToCart, {
 - [x] Testing: 38/38
 
 ## Metrics Achieved
+
 - **Test Coverage**: X% (Target: ≥80%)
 - **Lighthouse Performance**: X (Target: ≥90)
 - **LCP**: Xms (Target: <1900ms)
@@ -1330,9 +1577,11 @@ const addToCart = useMutation(api.addToCart, {
 - **SEO Score**: X/100
 
 ## Known Issues
+
 - [List any known issues or technical debt]
 
 ## Next Phase Preparation
+
 - Phase 9 (Admin Dashboard) ready: ✅
 - Phase 10 (Payment Integration) ready: ✅
 ```
@@ -1342,6 +1591,7 @@ const addToCart = useMutation(api.addToCart, {
 ## 🎯 NEXT PHASE PREVIEW
 
 **Phase 9: Admin Dashboard**
+
 - Comprehensive admin panel
 - Analytics dashboard (sales, visitors, conversion)
 - Product management (CRUD, bulk ops)
@@ -1349,6 +1599,7 @@ const addToCart = useMutation(api.addToCart, {
 - User management (roles, activity logs)
 
 **Phase 10: Payment Integration**
+
 - Iyzico integration (3D Secure, installments)
 - Card tokenization
 - Payment processing

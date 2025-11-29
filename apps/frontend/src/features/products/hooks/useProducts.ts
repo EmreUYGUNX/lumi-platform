@@ -31,6 +31,9 @@ const normalizeFilters = (filters: ProductListFilters = {}): ProductListFilters 
   if (filters.search) {
     normalized.search = filters.search.trim();
   }
+  if (filters.tags?.length) {
+    normalized.tags = [...new Set(filters.tags.map((tag) => tag.trim()))].filter(Boolean).sort();
+  }
 
   if (filters.categoryId) {
     normalized.categoryId = filters.categoryId;
@@ -66,6 +69,9 @@ const buildQuery = (filters: ProductListFilters = {}) => {
   if (filters.search) {
     query.search = filters.search;
   }
+  if (filters.tags?.length) {
+    query.tags = filters.tags;
+  }
   if (filters.categoryId) {
     query.categoryId = filters.categoryId;
   }
@@ -96,7 +102,7 @@ const FALLBACK_PAGINATION = {
 
 export const useProducts = (
   filters: ProductListFilters = {},
-  options: { enabled?: boolean; authToken?: string } = {},
+  options: { enabled?: boolean; authToken?: string; staleTimeMs?: number; gcTimeMs?: number } = {},
 ) => {
   const serializedFilters = useMemo(() => JSON.stringify(filters ?? {}), [filters]);
   const normalizedFilters = useMemo(
@@ -106,7 +112,7 @@ export const useProducts = (
 
   return useQuery<ProductListResult>({
     queryKey: productKeys.list(normalizedFilters),
-    queryFn: async () => {
+    queryFn: async (): Promise<ProductListResult> => {
       const response = await apiClient.get("/catalog/products", {
         query: buildQuery(normalizedFilters),
         dataSchema: productListSchema,
@@ -123,10 +129,12 @@ export const useProducts = (
       return {
         items: response.data,
         pagination,
-        cursor: response.meta?.cursor,
+        cursor: response.meta?.cursor ?? undefined,
       };
     },
     placeholderData: (previousData) => previousData,
+    staleTime: options.staleTimeMs,
+    gcTime: options.gcTimeMs,
     enabled: options.enabled ?? true,
   });
 };

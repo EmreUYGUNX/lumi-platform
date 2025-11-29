@@ -9,6 +9,7 @@ export interface ProductListFilters {
   page?: number;
   pageSize?: number;
   search?: string;
+  tags?: string[];
   categoryId?: string;
   categorySlug?: string;
   sort?:

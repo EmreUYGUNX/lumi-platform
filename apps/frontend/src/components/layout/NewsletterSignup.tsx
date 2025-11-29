@@ -1,90 +1,100 @@
 "use client";
 
+import type { infer as ZodInfer } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  useNewsletterSignup,
+  newsletterPayloadSchema,
+} from "@/features/homepage/hooks/useNewsletterSignup";
 import { toast } from "@/hooks/use-toast";
 
-const newsletterSchema = z.object({
-  email: z.string().email("Geçerli bir e-posta adresi girin."),
-});
-
-type NewsletterValues = z.infer<typeof newsletterSchema>;
+type NewsletterValues = ZodInfer<typeof newsletterPayloadSchema>;
 
 export function NewsletterSignup(): JSX.Element {
   const form = useForm<NewsletterValues>({
-    resolver: zodResolver(newsletterSchema),
-    defaultValues: {
-      email: "",
-    },
+    resolver: zodResolver(newsletterPayloadSchema),
+    defaultValues: { email: "" },
   });
+  const mutation = useNewsletterSignup();
 
-  const handleSubmit = (values: NewsletterValues) => {
-    toast({
-      title: "Subscribed to Lumi Dispatch",
-      description: `We'll keep ${values.email} updated with platform releases.`,
-    });
-    form.reset();
+  const handleSubmit = async (values: NewsletterValues) => {
+    try {
+      await mutation.mutateAsync(values);
+      toast({
+        title: "Subscribed to Lumi Dispatch",
+        description: `${values.email} kaydedildi.`,
+      });
+      form.reset();
+    } catch (error) {
+      toast({
+        title: "Subscription failed",
+        description: error instanceof Error ? error.message : "Tekrar deneyin.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    <section className="bg-gradient-lumi-soft border-lumi-border/60 border-y py-12">
-      <div className="container grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-3">
-          <p className="text-lumi-text-secondary text-sm uppercase tracking-[0.3em]">Newsletter</p>
-          <h2 className="text-lumi-text text-2xl font-semibold">Stay ahead of the roadmap.</h2>
-          <p className="text-lumi-text-secondary text-sm">
-            Weekly drop of release highlights, architecture notes, and growth playbooks from the
-            Lumi studio.
+    <section className="border-lumi-border/60 bg-lumi-bg border-t py-10">
+      <div className="container space-y-4 md:flex md:items-center md:justify-between md:space-y-0">
+        <div className="space-y-2">
+          <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.3em]">
+            Newsletter
           </p>
-          <div className="text-lumi-text-secondary flex items-center gap-2 text-xs">
-            <CheckCircle2 className="text-lumi-success h-4 w-4" />
-            Zero spam. Unsubscribe anytime.
-          </div>
+          <h2 className="text-lg font-semibold uppercase tracking-[0.22em]">
+            Stay in the Lumi circuit
+          </h2>
         </div>
-
-        <Form {...form}>
-          <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email address</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="product@lumi.com"
-                      className="border-lumi-border/70 focus-visible:ring-lumi-primary"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>We’ll send a verification link to this address.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              type="submit"
-              className="bg-lumi-primary hover:bg-lumi-primary-dark w-full font-semibold tracking-tight"
+        <div className="md:min-w-[420px]">
+          <Form {...form}>
+            <form
+              className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4"
+              onSubmit={form.handleSubmit(handleSubmit)}
             >
-              Subscribe
-            </Button>
-          </form>
-        </Form>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className="w-full md:flex-1">
+                    <FormControl>
+                      <Input
+                        type="email"
+                        inputMode="email"
+                        placeholder="you@lumi.com"
+                        className="border-lumi-border/70 rounded-none border-0 border-b bg-transparent px-0 text-sm tracking-[0.18em] focus-visible:ring-0"
+                        autoComplete="email"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                className="text-lumi-text border-b border-white/40 px-0 text-[11px] font-semibold uppercase tracking-[0.32em]"
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? "Sending..." : "Subscribe"}
+              </Button>
+            </form>
+          </Form>
+          <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.16em]">
+            By subscribing you agree to our{" "}
+            <Link href="/terms" className="underline decoration-1 underline-offset-4">
+              privacy policy
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </section>
   );
