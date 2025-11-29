@@ -18,6 +18,7 @@ const publicNavLinks = [
   { href: homeRoute, label: "Experience" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
+  { href: "/wishlist", label: "Wishlist" },
   { href: "/login", label: "Login" },
 ] as const;
 

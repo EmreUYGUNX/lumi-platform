@@ -120,8 +120,9 @@ export function CartItem({
             {!compact && (
               <button
                 type="button"
-                className="text-lumi-text-secondary hover:text-lumi-text text-[10px] uppercase tracking-[0.16em] underline decoration-dotted underline-offset-4"
+                className="text-lumi-text-secondary hover:text-lumi-text text-[10px] uppercase tracking-[0.16em] underline decoration-dotted underline-offset-4 transition disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onMoveToWishlist}
+                disabled={disabled}
               >
                 Move to wishlist
               </button>
