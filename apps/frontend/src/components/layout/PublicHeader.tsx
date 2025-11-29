@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { MiniCart } from "@/features/cart/components/MiniCart";
 import { cn } from "@/lib/utils";
 
 const homeRoute = "/" as Route;
@@ -51,6 +52,7 @@ export function PublicHeader(): JSX.Element {
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
+          <MiniCart />
           <Button asChild variant="ghost" className="text-sm font-semibold">
             <Link href="/register">Create account</Link>
           </Button>
@@ -59,15 +61,17 @@ export function PublicHeader(): JSX.Element {
           </Button>
         </div>
 
-        <Button
-          size="icon"
-          variant="ghost"
-          className="md:hidden"
-          aria-label="Toggle navigation menu"
-          onClick={toggleMenu}
-        >
-          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-2 md:hidden">
+          <MiniCart />
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Toggle navigation menu"
+            onClick={toggleMenu}
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
       </div>
 
       {isMobileMenuOpen && (
