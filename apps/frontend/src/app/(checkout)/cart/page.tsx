@@ -12,9 +12,9 @@ import { useCart } from "@/features/cart/hooks/useCart";
 import { useClearCart } from "@/features/cart/hooks/useClearCart";
 import { useRemoveCartItem } from "@/features/cart/hooks/useRemoveCartItem";
 import { useUpdateCartItem } from "@/features/cart/hooks/useUpdateCartItem";
+import { useAddToWishlist } from "@/features/wishlist/hooks/useAddToWishlist";
 import type { CartItemWithProduct, CartStockIssue } from "@/features/cart/types/cart.types";
 import { cn } from "@/lib/utils";
-import { uiStore } from "@/store";
 
 const clampQuantity = (item: CartItemWithProduct, next: number) => {
   const safeMax = Math.min(10, item.availableStock || 10);
@@ -59,23 +59,17 @@ const StockAlerts = ({ issues }: { issues: CartStockIssue[] }) => {
   );
 };
 
-const notifyWishlist = (item: CartItemWithProduct) => {
-  uiStore.getState().enqueueToast({
-    variant: "warning",
-    title: "Wishlist yakında",
-    description: `${item.product.title} favorilere yakında eklenebilecek.`,
-  });
-};
-
 export default function CartPage(): JSX.Element {
   const cart = useCart();
   const updateItem = useUpdateCartItem();
   const removeItem = useRemoveCartItem();
   const clearCart = useClearCart();
+  const addToWishlist = useAddToWishlist();
 
   const items = cart.items ?? [];
   const { totals } = cart;
-  const isMutating = updateItem.isPending || removeItem.isPending || clearCart.isPending;
+  const isMutating =
+    updateItem.isPending || removeItem.isPending || clearCart.isPending || addToWishlist.isPending;
 
   const handleDecrement = (item: CartItemWithProduct) => {
     const nextQty = clampQuantity(item, item.quantity - 1);
@@ -93,6 +87,17 @@ export default function CartPage(): JSX.Element {
 
   const handleRemove = (item: CartItemWithProduct) => {
     removeItem.mutate({ itemId: item.id });
+  };
+
+  const handleMoveToWishlist = (item: CartItemWithProduct) => {
+    addToWishlist.mutate(
+      { productId: item.product.id },
+      {
+        onSuccess: () => {
+          removeItem.mutate({ itemId: item.id });
+        },
+      },
+    );
   };
 
   const emptyState = cart.isLoading ? <CartSkeleton /> : <CartEmpty className="mt-4" />;
@@ -119,7 +124,7 @@ export default function CartPage(): JSX.Element {
           onDecrement={() => handleDecrement(item)}
           onIncrement={() => handleIncrement(item)}
           onRemove={() => handleRemove(item)}
-          onMoveToWishlist={() => notifyWishlist(item)}
+          onMoveToWishlist={() => handleMoveToWishlist(item)}
         />
       ))}
     </div>

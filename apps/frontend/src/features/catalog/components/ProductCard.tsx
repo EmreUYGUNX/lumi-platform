@@ -10,11 +10,16 @@ import Link from "next/link";
 import type { ProductSummary } from "@/features/products/types/product.types";
 import { Button } from "@/components/ui/button";
 import { useAddToCart } from "@/features/cart/hooks/useAddToCart";
-import { buildBlurPlaceholder, buildCloudinaryUrl, buildSizesAttribute } from "@/lib/cloudinary";
+import {
+  deriveProductAvailability,
+  getPrimaryVariant,
+  resolveProductMedia,
+} from "@/features/products/utils/product-helpers";
+import { useAddToWishlist } from "@/features/wishlist/hooks/useAddToWishlist";
+import { buildBlurPlaceholder, buildSizesAttribute } from "@/lib/cloudinary";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { formatMoney } from "@/lib/formatters/price";
 import { cn } from "@/lib/utils";
-import { uiStore } from "@/store";
 
 const blur = buildBlurPlaceholder("#0a0a0a");
 const sizes = buildSizesAttribute("gallery");
@@ -24,28 +29,6 @@ const parseAmount = (value: string | undefined): number => {
   const normalized = value.replace(",", ".");
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const resolveMedia = (product: ProductSummary): { src: string; alt: string } => {
-  const primary = product.media.find((item) => item.isPrimary)?.media ?? product.media[0]?.media;
-  if (primary?.url) {
-    return { src: primary.url, alt: primary.alt ?? product.title };
-  }
-
-  return {
-    src: buildCloudinaryUrl({
-      publicId: "sample",
-      transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_960,h_1280"],
-    }),
-    alt: product.title,
-  };
-};
-
-const deriveAvailability = (product: ProductSummary): "in_stock" | "low_stock" | "out_of_stock" => {
-  const totalStock = product.variants.reduce((sum, variant) => sum + (variant.stock ?? 0), 0);
-  if (totalStock <= 0) return "out_of_stock";
-  if (totalStock <= 5) return "low_stock";
-  return "in_stock";
 };
 
 const deriveBadge = (product: ProductSummary): string | undefined => {
@@ -66,29 +49,21 @@ const deriveBadge = (product: ProductSummary): string | undefined => {
   return undefined;
 };
 
-const showWishlistToast = () => {
-  uiStore.getState().enqueueToast({
-    variant: "success",
-    title: "Wishlist yakında",
-    description: "Favorilere ekleme yakında aktif olacak.",
-  });
-};
-
 interface ProductCardProps {
   product: ProductSummary;
   className?: string;
 }
 
 export function ProductCard({ product, className }: ProductCardProps): JSX.Element {
-  const { src, alt } = useMemo(() => resolveMedia(product), [product]);
+  const { src, alt } = useMemo(() => resolveProductMedia(product), [product]);
   const price = formatMoney(product.price);
   const compareAt = product.compareAtPrice ? formatMoney(product.compareAtPrice) : undefined;
   const badge = deriveBadge(product);
-  const availability = deriveAvailability(product);
+  const availability = deriveProductAvailability(product);
 
   const addToCart = useAddToCart();
-  const primaryVariant =
-    product.variants.find((variant) => variant.isPrimary) ?? product.variants[0];
+  const addToWishlist = useAddToWishlist();
+  const primaryVariant = useMemo(() => getPrimaryVariant(product), [product]);
   const canQuickAdd = availability !== "out_of_stock" && primaryVariant !== undefined;
 
   const handleQuickAdd = () => {
@@ -133,10 +108,12 @@ export function ProductCard({ product, className }: ProductCardProps): JSX.Eleme
             aria-label="Add to wishlist"
             onClick={(event) => {
               event.preventDefault();
-              showWishlistToast();
+              addToWishlist.mutate({ productId: product.id, product });
             }}
+            disabled={addToWishlist.isPending}
+            aria-busy={addToWishlist.isPending}
           >
-            <Heart className="h-4 w-4" />
+            <Heart className="h-4 w-4 transition duration-300" />
           </button>
           <div className="absolute inset-x-4 bottom-3 flex justify-center">
             <Button
