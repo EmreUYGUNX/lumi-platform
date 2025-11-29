@@ -12,6 +12,9 @@ const normalizeKeyFilters = (filters: ProductListFilters = {}) => {
   if (filters.search) {
     normalized.search = filters.search;
   }
+  if (filters.tags?.length) {
+    normalized.tags = [...new Set(filters.tags)].sort();
+  }
   if (filters.categoryId) {
     normalized.categoryId = filters.categoryId;
   }

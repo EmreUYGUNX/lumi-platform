@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLVCK PARIS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Özel Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Floating Tab */
+        .floating-tab {
+            position: fixed;
+            top: 40%;
+            left: 0;
+            transform: translateY(-50%) rotate(-180deg);
+            writing-mode: vertical-rl;
+            background: white;
+            color: black;
+            padding: 12px 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            z-index: 50;
+            cursor: pointer;
+        }
+
+        /* Nav Link Efekti */
+        .nav-link { position: relative; cursor: pointer; }
+        .nav-link::after {
+            content: ''; position: absolute; width: 0; height: 1px;
+            bottom: -2px; left: 0; background-color: white; transition: width 0.3s;
+        }
+        .nav-link:hover::after { width: 100%; }
+
+        /* Buton Altı Çizgi Animasyonu */
+        .btn-link {
+            position: relative;
+            padding-bottom: 4px;
+        }
+        .btn-link::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            bottom: 0;
+            left: 0;
+            background-color: white;
+            transition: width 0.3s;
+        }
+        .btn-link:hover::after {
+            width: 50%;
+        }
+
+        /* Sayfa Geçişleri */
+        .page-section { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .page-section.active { display: block; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Yumuşak Scroll */
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="bg-black text-white antialiased">
+
+    <!-- Sol Yüzen Etiket -->
+    <div class="floating-tab uppercase">20% Off</div>
+
+    <!-- Header / Navbar -->
+    <header class="fixed w-full top-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-900 transition-all duration-300" id="main-header">
+        <div class="max-w-[1800px] mx-auto px-6 h-20 flex items-center justify-between">
+            <!-- Sol -->
+            <div class="flex items-center gap-6">
+                <button onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-6 h-6 text-white"></i></button>
+                <button><i data-lucide="search" class="w-5 h-5 text-white"></i></button>
+            </div>
+            
+            <!-- Logo -->
+            <div class="absolute left-1/2 -translate-x-1/2 text-center cursor-pointer" onclick="showPage('home')">
+                <span class="text-2xl font-bold tracking-[0.2em]">BLVCK</span>
+                <span class="block text-[7px] tracking-[0.4em] uppercase text-gray-400 mt-0.5">Paris</span>
+            </div>
+
+            <!-- Sağ -->
+            <div class="flex items-center gap-6">
+                <button><i data-lucide="user" class="w-5 h-5 text-white"></i></button>
+                <button class="relative">
+                    <i data-lucide="shopping-bag" class="w-5 h-5 text-white"></i>
+                    <span class="absolute -top-1 -right-1 bg-white text-black text-[9px] font-bold h-3.5 w-3.5 rounded-full flex items-center justify-center">0</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Desktop Menu -->
+        <div class="hidden md:flex justify-center gap-10 pb-4 text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400">
+            <span onclick="showPage('men')" class="nav-link hover:text-white transition">Men</span>
+            <span onclick="showPage('women')" class="nav-link hover:text-white transition">Women</span>
+            <span onclick="showPage('home-goods')" class="nav-link hover:text-white transition">Blvck Home</span>
+            <span onclick="showPage('digital')" class="nav-link hover:text-white transition">Digital</span>
+            <span onclick="showPage('collab')" class="nav-link hover:text-white transition">Collab</span>
+            <span onclick="showPage('outlet')" class="nav-link hover:text-white transition text-red-500">Outlet</span>
+        </div>
+    </header>
+
+    <!-- Mobil Menü -->
+    <div id="mobile-menu" class="fixed inset-0 bg-black z-[60] hidden flex-col justify-center items-center text-center space-y-8">
+        <button onclick="toggleMobileMenu()" class="absolute top-6 right-6"><i data-lucide="x" class="w-8 h-8"></i></button>
+        <span onclick="showPage('men'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer">Men</span>
+        <span onclick="showPage('women'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer">Women</span>
+        <span onclick="showPage('home-goods'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer">Blvck Home</span>
+        <span onclick="showPage('digital'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer">Digital</span>
+        <span onclick="showPage('collab'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer">Collab</span>
+        <span onclick="showPage('outlet'); toggleMobileMenu()" class="text-2xl font-bold uppercase tracking-widest cursor-pointer text-red-500">Outlet</span>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 1. HOME PAGE (Ana Sayfa - En Güncel Tasarım) -->
+    <!-- ============================================== -->
+    <div id="page-home" class="page-section active">
+        
+        <!-- Hero Section -->
+        <section class="relative h-screen w-full overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=2200&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover">
+            <div class="absolute inset-0 bg-black/10"></div>
+            <div class="absolute inset-0 flex flex-col justify-center items-center text-center z-10 pt-20">
+                <span class="text-xs font-medium tracking-[0.2em] mb-3 drop-shadow-md">2025/26</span>
+                <h1 class="text-5xl md:text-7xl font-light tracking-wide mb-10 drop-shadow-lg">Ready to Wear</h1>
+                <div class="flex gap-16 text-[11px] font-bold tracking-[0.2em] uppercase">
+                    <span onclick="showPage('men')" class="btn-link cursor-pointer">Men</span>
+                    <span onclick="showPage('women')" class="btn-link cursor-pointer">Women</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Explore Maison's Collections (Part 1) -->
+        <section class="bg-white text-black py-20 px-4">
+            <h2 class="text-center text-2xl font-bold tracking-wide mb-16">Explore the Maison's Collections</h2>
+            <div class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Men -->
+                <div onclick="showPage('men')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative">
+                        <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Men</span>
+                </div>
+                <!-- Women -->
+                <div onclick="showPage('women')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative">
+                        <img src="https://images.unsplash.com/photo-1582142327373-5b6d7671894d?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Women</span>
+                </div>
+                <!-- Men's Accessories -->
+                <div onclick="showPage('men')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative flex items-center justify-center">
+                        <img src="https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=600&auto=format&fit=crop" class="w-2/3 object-contain mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Men's Accessories</span>
+                </div>
+            </div>
+
+            <!-- Explore Maison's Collections (Part 2) -->
+            <div class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Women's Accessories -->
+                <div onclick="showPage('women')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative flex items-center justify-center">
+                        <img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=600&auto=format&fit=crop" class="w-3/4 object-contain mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Women's Accessories</span>
+                </div>
+                <!-- Blvck Home -->
+                <div onclick="showPage('home-goods')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative flex items-center justify-center">
+                        <img src="https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=600&auto=format&fit=crop" class="w-3/4 object-contain mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Blvck Home</span>
+                </div>
+                <!-- Digital -->
+                <div onclick="showPage('digital')" class="group cursor-pointer text-center">
+                    <div class="bg-[#f5f5f5] aspect-[3/4] mb-4 overflow-hidden relative flex items-center justify-center">
+                        <img src="https://images.unsplash.com/photo-1616348436168-de43ad0db179?q=80&w=600&auto=format&fit=crop" class="w-2/3 object-contain mix-blend-multiply group-hover:scale-105 transition duration-700">
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest border-b border-black pb-1">Digital</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- BLVCK | UFC -->
+        <section class="relative h-screen w-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?q=80&w=2000&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover opacity-60">
+            <div class="relative z-10 text-center">
+                <h3 class="text-[10px] font-bold tracking-[0.3em] uppercase mb-4">New</h3>
+                <h2 class="text-4xl md:text-5xl font-light tracking-[0.2em] mb-8 uppercase text-white">BLVCK | UFC</h2>
+                <div class="flex justify-center gap-12 text-[11px] font-bold tracking-[0.2em] uppercase">
+                    <span onclick="showPage('men')" class="btn-link cursor-pointer">Men</span>
+                    <span onclick="showPage('women')" class="btn-link cursor-pointer">Women</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- HARRY POTTER X BLVCK -->
+        <section class="relative h-screen w-full bg-[#1a1a1a] flex items-center justify-center overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1618393895513-d4d2916c5268?q=80&w=2000&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover opacity-60 grayscale">
+            <div class="relative z-10 text-center">
+                <h2 class="text-3xl md:text-5xl font-light tracking-[0.1em] mb-10 uppercase text-white">Harry Potter x Blvck</h2>
+                <div class="flex justify-center gap-12 text-[11px] font-bold tracking-[0.2em] uppercase">
+                    <span onclick="showPage('men')" class="btn-link cursor-pointer">Men</span>
+                    <span onclick="showPage('women')" class="btn-link cursor-pointer">Women</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ACCESSORIES (Closet) -->
+        <section class="relative h-screen w-full bg-black flex items-end pb-32 justify-center overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?q=80&w=2000&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover opacity-90">
+            <div class="relative z-10 text-center w-full">
+                <h2 class="text-4xl md:text-6xl font-light tracking-wide mb-8 text-white">Accessories</h2>
+                <div class="flex justify-center gap-12 text-[11px] font-bold tracking-[0.2em] uppercase">
+                    <span onclick="showPage('men')" class="btn-link cursor-pointer">Men</span>
+                    <span onclick="showPage('women')" class="btn-link cursor-pointer">Women</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLLECTIONS SLIDER -->
+        <section class="relative w-full h-[85vh] bg-black group overflow-hidden">
+            <button onclick="scrollSlider(-1)" class="absolute left-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white z-30 transition hidden md:block">
+                <i data-lucide="chevron-left" class="w-12 h-12"></i>
+            </button>
+            <button onclick="scrollSlider(1)" class="absolute right-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white z-30 transition hidden md:block">
+                <i data-lucide="chevron-right" class="w-12 h-12"></i>
+            </button>
+
+            <div id="collection-slider" class="flex h-full w-full overflow-x-auto scroll-smooth scrollbar-hide snap-x snap-mandatory">
+                
+                <!-- Slide 1: Basquiat -->
+                <div onclick="showPage('collab')" class="min-w-full md:min-w-[33.333%] h-full relative snap-center border-r border-gray-900/50 group/item cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1620799140408-ed5341cd2431?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover opacity-70 group-hover/item:opacity-90 transition duration-500">
+                    <div class="absolute bottom-12 left-0 w-full text-center">
+                        <span class="text-2xl font-bold uppercase tracking-widest text-white drop-shadow-md">Jean-Michel Basquiat</span>
+                    </div>
+                </div>
+
+                <!-- Slide 2: Casetify -->
+                <div onclick="showPage('collab')" class="min-w-full md:min-w-[33.333%] h-full relative snap-center border-r border-gray-900/50 group/item cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1592899677977-9c10ca63a16d?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover opacity-70 group-hover/item:opacity-90 transition duration-500">
+                    <div class="absolute bottom-12 left-0 w-full text-center">
+                        <span class="text-3xl font-extrabold uppercase tracking-tighter bg-white text-black px-2 py-1">CASETiFY</span>
+                    </div>
+                </div>
+
+                <!-- Slide 3: UFC -->
+                <div onclick="showPage('collab')" class="min-w-full md:min-w-[33.333%] h-full relative snap-center border-r border-gray-900/50 group/item cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover opacity-70 group-hover/item:opacity-90 transition duration-500">
+                    <div class="absolute bottom-12 left-0 w-full text-center">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/UFC_logo.svg/2560px-UFC_logo.svg.png" class="h-8 mx-auto filter invert brightness-0 saturate-100 invert-[.3] sepia-[1] hue-rotate-[0deg] opacity-80">
+                    </div>
+                </div>
+
+                <!-- Slide 4: Harry Potter -->
+                <div onclick="showPage('collab')" class="min-w-full md:min-w-[33.333%] h-full relative snap-center border-r border-gray-900/50 group/item cursor-pointer">
+                    <img src="https://images.unsplash.com/photo-1618393895513-d4d2916c5268?q=80&w=1000&auto=format&fit=crop" class="w-full h-full object-cover opacity-70 group-hover/item:opacity-90 transition duration-500 grayscale">
+                    <div class="absolute bottom-12 left-0 w-full text-center">
+                            <span class="text-2xl font-serif font-bold uppercase tracking-widest text-gray-400">Harry Potter</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- JUST DROPPED -->
+        <section class="bg-white text-black py-20 px-6">
+            <h2 class="text-center text-2xl font-bold tracking-wide mb-12">Just Dropped</h2>
+            <div class="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="group cursor-pointer">
+                    <div class="bg-[#f0f0f0] aspect-square mb-3 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1603130983389-18335016e3c5?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-500">
+                    </div>
+                    <h3 class="text-xs font-bold uppercase">Blvck x UFC Candle</h3>
+                    <p class="text-xs text-gray-500 mt-1">$60.00</p>
+                </div>
+                <div class="group cursor-pointer">
+                    <div class="bg-[#f0f0f0] aspect-square mb-3 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-500">
+                    </div>
+                    <h3 class="text-xs font-bold uppercase">Blvck x UFC 'Glory' Tee</h3>
+                    <p class="text-xs text-gray-500 mt-1">$75.00</p>
+                </div>
+                <div class="group cursor-pointer">
+                    <div class="bg-[#f0f0f0] aspect-square mb-3 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1556906781-9a412961d28c?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-500">
+                    </div>
+                    <h3 class="text-xs font-bold uppercase">Blvck x UFC 'Glory' Hoodie</h3>
+                    <p class="text-xs text-gray-500 mt-1">$140.00</p>
+                </div>
+                <div class="group cursor-pointer">
+                    <div class="bg-[#f0f0f0] aspect-square mb-3 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition duration-500">
+                    </div>
+                    <h3 class="text-xs font-bold uppercase">Blvck x UFC Acid Wash Tee</h3>
+                    <p class="text-xs text-gray-500 mt-1">$80.00</p>
+                </div>
+            </div>
+            <div class="text-center mt-12">
+                <span onclick="showPage('men')" class="text-xs font-bold uppercase border-b border-black pb-1 tracking-widest cursor-pointer">Shop All</span>
+            </div>
+        </section>
+
+        <!-- SHADES OF BLVCK -->
+        <section class="relative h-screen w-full bg-[#e5e5e5] text-black overflow-hidden flex items-center justify-center">
+            <img src="https://images.unsplash.com/photo-1515347619252-60a6bf4fffce?q=80&w=2000&auto=format&fit=crop" class="absolute inset-0 w-full h-full object-cover opacity-20 grayscale">
+            <div class="relative z-10 text-center">
+                <h2 class="text-4xl md:text-5xl font-light tracking-wide mb-8">Shades of Blvck</h2>
+                <div class="flex justify-center gap-12 text-[11px] font-bold tracking-[0.2em] uppercase">
+                    <span onclick="showPage('men')" class="border-b border-black pb-1 cursor-pointer">Men</span>
+                    <span onclick="showPage('women')" class="border-b border-black pb-1 cursor-pointer">Women</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- LATEST BLOG POSTS -->
+        <section class="bg-white text-black py-24 px-6">
+            <h2 class="text-center text-xl font-bold tracking-wide mb-12 uppercase">Latest blog posts</h2>
+            <div class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+                <article class="group cursor-pointer">
+                    <div class="aspect-square bg-[#eee] mb-4 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1503342394128-c104d54dba01?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                    </div>
+                    <h3 class="text-sm font-bold uppercase mb-2 border-b border-transparent inline-block group-hover:border-black transition">Blvck x UFC</h3>
+                    <p class="text-xs text-gray-500 line-clamp-2">Blvck Paris and UFC Unite for a Bold, All-Black Capsule Collection...</p>
+                    <span class="text-[10px] font-bold uppercase underline mt-2 block">Read more</span>
+                </article>
+                <article class="group cursor-pointer">
+                    <div class="aspect-square bg-[#eee] mb-4 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                    </div>
+                    <h3 class="text-sm font-bold uppercase mb-2 border-b border-transparent inline-block group-hover:border-black transition">Harry Potter x Blvck</h3>
+                    <p class="text-xs text-gray-500 line-clamp-2">Exclusive Harry Potter-Inspired Capsule Collection is finally here...</p>
+                    <span class="text-[10px] font-bold uppercase underline mt-2 block">Read more</span>
+                </article>
+                <article class="group cursor-pointer">
+                    <div class="aspect-square bg-[#eee] mb-4 overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                    </div>
+                    <h3 class="text-sm font-bold uppercase mb-2 border-b border-transparent inline-block group-hover:border-black transition">Blvck's coziest hoodie yet</h3>
+                    <p class="text-xs text-gray-500 line-clamp-2">Meet the Blvck Sherpa Hoodie: a plush, ultra-soft essential...</p>
+                    <span class="text-[10px] font-bold uppercase underline mt-2 block">Read more</span>
+                </article>
+            </div>
+            <div class="text-center mt-12">
+                <span class="text-[10px] font-bold uppercase border-b border-black pb-1 cursor-pointer">See all blog post</span>
+            </div>
+        </section>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 2. MEN PAGE -->
+    <!-- ============================================== -->
+    <div id="page-men" class="page-section pt-24">
+        <!-- Men Hero -->
+        <div class="relative h-[40vh] bg-[#111] flex items-center justify-center mb-12">
+            <img src="https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?q=80&w=2000" class="absolute inset-0 w-full h-full object-cover opacity-50 grayscale">
+            <h1 class="relative z-10 text-5xl font-bold uppercase tracking-widest">Men's Collection</h1>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="max-w-[1600px] mx-auto px-6 mb-8 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            <div class="flex gap-6">
+                <span class="text-white cursor-pointer">All</span>
+                <span class="cursor-pointer hover:text-white">Hoodies</span>
+                <span class="cursor-pointer hover:text-white">Tees</span>
+                <span class="cursor-pointer hover:text-white">Bottoms</span>
+                <span class="cursor-pointer hover:text-white">Jackets</span>
+            </div>
+            <div class="cursor-pointer hover:text-white">Sort by: Featured</div>
+        </div>
+
+        <!-- Product Grid -->
+        <div class="max-w-[1600px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-10 pb-20">
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1556906781-9a412961d28c?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Essential Hoodie</h3>
+                <p class="text-[11px] text-gray-400">$120.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Bold Stripe Tee</h3>
+                <p class="text-[11px] text-gray-400">$75.00</p>
+            </div>
+             <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Denim Jacket</h3>
+                <p class="text-[11px] text-gray-400">$220.00</p>
+            </div>
+             <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1603252109303-2751440ee78d?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Signature Joggers</h3>
+                <p class="text-[11px] text-gray-400">$110.00</p>
+            </div>
+             <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1556906781-9a412961d28c?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Essential Hoodie</h3>
+                <p class="text-[11px] text-gray-400">$120.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Bold Stripe Tee</h3>
+                <p class="text-[11px] text-gray-400">$75.00</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 3. WOMEN PAGE -->
+    <!-- ============================================== -->
+    <div id="page-women" class="page-section pt-24">
+        <div class="relative h-[40vh] bg-[#111] flex items-center justify-center mb-12">
+            <img src="https://images.unsplash.com/photo-1504198458649-3128b932f49e?q=80&w=2000" class="absolute inset-0 w-full h-full object-cover opacity-50 grayscale">
+            <h1 class="relative z-10 text-5xl font-bold uppercase tracking-widest">Women's Collection</h1>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto px-6 mb-8 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
+             <div class="flex gap-6">
+                <span class="text-white cursor-pointer">All</span>
+                <span class="cursor-pointer hover:text-white">Dresses</span>
+                <span class="cursor-pointer hover:text-white">Activewear</span>
+                <span class="cursor-pointer hover:text-white">Tops</span>
+                <span class="cursor-pointer hover:text-white">Accessories</span>
+            </div>
+             <div class="cursor-pointer hover:text-white">Sort by: Featured</div>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-10 pb-20">
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1582142327373-5b6d7671894d?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Pleated Skirt</h3>
+                <p class="text-[11px] text-gray-400">$95.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1503342394128-c104d54dba01?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Crop Top</h3>
+                <p class="text-[11px] text-gray-400">$60.00</p>
+            </div>
+             <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Oversized Blazer</h3>
+                <p class="text-[11px] text-gray-400">$180.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1550928431-ee0ec6db30d3?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Sherpa Hoodie</h3>
+                <p class="text-[11px] text-gray-400">$140.00</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 4. BLVCK HOME PAGE -->
+    <!-- ============================================== -->
+    <div id="page-home-goods" class="page-section pt-24">
+         <div class="relative h-[40vh] bg-[#111] flex items-center justify-center mb-12">
+            <img src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?q=80&w=2000" class="absolute inset-0 w-full h-full object-cover opacity-60 grayscale">
+            <h1 class="relative z-10 text-5xl font-bold uppercase tracking-widest">Blvck Home</h1>
+        </div>
+         <div class="max-w-[1600px] mx-auto px-6 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-12 pb-20">
+            <div class="group cursor-pointer">
+                <div class="aspect-square bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1577900232427-18219b9166a0?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Teddy Bear</h3>
+                <p class="text-[11px] text-gray-400">$150.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-square bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Matte Black Tumbler</h3>
+                <p class="text-[11px] text-gray-400">$45.00</p>
+            </div>
+            <div class="group cursor-pointer">
+                <div class="aspect-square bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Blvck Notebook</h3>
+                <p class="text-[11px] text-gray-400">$30.00</p>
+            </div>
+         </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 5. DIGITAL PAGE -->
+    <!-- ============================================== -->
+    <div id="page-digital" class="page-section pt-24">
+        <div class="relative h-[50vh] bg-[#050505] flex flex-col items-center justify-center mb-12 text-center px-4">
+             <h1 class="text-4xl md:text-6xl font-bold uppercase tracking-widest mb-4">Digital Lifestyle</h1>
+             <p class="text-gray-400 max-w-xl text-xs leading-6">Transform your digital experience with our exclusive iOS icon sets, wallpapers, and NFTs. Welcome to the metaverse.</p>
+        </div>
+         <div class="max-w-[1200px] mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
+            <div class="group cursor-pointer border border-gray-900 p-6 hover:border-gray-700 transition">
+                <div class="aspect-video bg-[#111] mb-4 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1616348436168-de43ad0db179?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500"></div>
+                <h3 class="text-lg font-bold uppercase tracking-widest mb-2">iOS 17 Icon Set</h3>
+                <p class="text-xs text-gray-500 mb-4">Over 500+ custom icons in pure black style.</p>
+                <span class="text-xs font-bold border-b border-white pb-1">Purchase - $10.00</span>
+            </div>
+             <div class="group cursor-pointer border border-gray-900 p-6 hover:border-gray-700 transition">
+                <div class="aspect-video bg-[#111] mb-4 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-70"></div>
+                <h3 class="text-lg font-bold uppercase tracking-widest mb-2">Blvck Genesis NFT</h3>
+                <p class="text-xs text-gray-500 mb-4">Join the exclusive Blvck Paris members club.</p>
+                <span class="text-xs font-bold border-b border-white pb-1">View on Opensea</span>
+            </div>
+         </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 6. COLLAB PAGE -->
+    <!-- ============================================== -->
+    <div id="page-collab" class="page-section pt-24">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold uppercase tracking-[0.2em] mb-4">Collaborations</h1>
+            <p class="text-xs text-gray-500">Limited edition capsules with world-renowned brands.</p>
+        </div>
+        
+        <div class="space-y-4 px-4 pb-20">
+            <!-- Collab 1 -->
+            <div class="relative h-[400px] w-full group overflow-hidden cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?q=80&w=2000" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition duration-500">
+                <div class="absolute inset-0 flex flex-col justify-center items-center">
+                    <h2 class="text-5xl font-bold uppercase tracking-tighter mb-4">BLVCK x UFC</h2>
+                    <span class="bg-white text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest">Shop Collection</span>
+                </div>
+            </div>
+             <!-- Collab 2 -->
+            <div class="relative h-[400px] w-full group overflow-hidden cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1618393895513-d4d2916c5268?q=80&w=2000" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition duration-500 grayscale">
+                <div class="absolute inset-0 flex flex-col justify-center items-center">
+                    <h2 class="text-5xl font-serif font-bold uppercase tracking-widest mb-4">Harry Potter</h2>
+                    <span class="bg-white text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest">Shop Collection</span>
+                </div>
+            </div>
+             <!-- Collab 3 -->
+            <div class="relative h-[400px] w-full group overflow-hidden cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1620799140408-ed5341cd2431?q=80&w=2000" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition duration-500">
+                <div class="absolute inset-0 flex flex-col justify-center items-center">
+                    <h2 class="text-4xl font-bold uppercase tracking-widest mb-4">Basquiat</h2>
+                    <span class="bg-white text-black px-6 py-2 text-[10px] font-bold uppercase tracking-widest">Shop Collection</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 7. OUTLET PAGE -->
+    <!-- ============================================== -->
+    <div id="page-outlet" class="page-section pt-24">
+        <div class="bg-red-900/20 py-8 mb-12 text-center">
+             <h1 class="text-3xl font-bold uppercase tracking-widest text-red-500 mb-2">Outlet Sale</h1>
+             <p class="text-red-400 text-xs">Final sale items. No returns.</p>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-10 pb-20">
+             <div class="group cursor-pointer relative">
+                <span class="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold px-2 py-1 z-10">-40%</span>
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 grayscale"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Denim Jacket</h3>
+                <p class="text-[11px] text-gray-400"><span class="line-through text-gray-600 mr-2">$220.00</span><span class="text-red-500">$132.00</span></p>
+            </div>
+            <div class="group cursor-pointer relative">
+                <span class="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold px-2 py-1 z-10">-30%</span>
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1548611716-ad274e2df435?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 grayscale"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Logo Hoodie</h3>
+                <p class="text-[11px] text-gray-400"><span class="line-through text-gray-600 mr-2">$160.00</span><span class="text-red-500">$112.00</span></p>
+            </div>
+            <!-- Tekrar eden indirimli ürünler -->
+            <div class="group cursor-pointer relative">
+                <span class="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold px-2 py-1 z-10">-50%</span>
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1627123424574-18bd03b4e985?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 grayscale"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Leather Wallet</h3>
+                <p class="text-[11px] text-gray-400"><span class="line-through text-gray-600 mr-2">$100.00</span><span class="text-red-500">$50.00</span></p>
+            </div>
+            <div class="group cursor-pointer relative">
+                <span class="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold px-2 py-1 z-10">-30%</span>
+                <div class="aspect-[3/4] bg-[#111] mb-3 overflow-hidden relative"><img src="https://images.unsplash.com/photo-1578587018452-892bacefd3f2?q=80&w=800" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 grayscale"></div>
+                <h3 class="text-[11px] font-bold uppercase tracking-widest">Teddy Hoodie</h3>
+                <p class="text-[11px] text-gray-400"><span class="line-through text-gray-600 mr-2">$140.00</span><span class="text-red-500">$98.00</span></p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Footer (Tüm Sayfalar için Ortak) -->
+    <footer class="bg-black text-white pt-20 pb-8 border-t border-gray-900">
+        <div class="max-w-[1600px] mx-auto px-6 text-center">
+            <h4 class="text-2xl font-bold tracking-[0.2em] mb-6">BLVCK</h4>
+            <div class="flex justify-center gap-6 mb-10 text-gray-400">
+                <i data-lucide="instagram" class="w-5 h-5 hover:text-white cursor-pointer"></i>
+                <i data-lucide="twitter" class="w-5 h-5 hover:text-white cursor-pointer"></i>
+                <i data-lucide="facebook" class="w-5 h-5 hover:text-white cursor-pointer"></i>
+                <i data-lucide="youtube" class="w-5 h-5 hover:text-white cursor-pointer"></i>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-[10px] uppercase tracking-widest text-gray-500 mb-12">
+                <div class="space-y-3">
+                    <h5 class="text-white">Shop</h5>
+                    <p class="hover:text-white cursor-pointer" onclick="showPage('men')">Men</p>
+                    <p class="hover:text-white cursor-pointer" onclick="showPage('women')">Women</p>
+                </div>
+                <div class="space-y-3">
+                    <h5 class="text-white">Help</h5>
+                    <p class="hover:text-white cursor-pointer">Shipping</p>
+                    <p class="hover:text-white cursor-pointer">Returns</p>
+                </div>
+                <div class="space-y-3">
+                    <h5 class="text-white">About</h5>
+                    <p class="hover:text-white cursor-pointer">Our Story</p>
+                    <p class="hover:text-white cursor-pointer">Contact</p>
+                </div>
+                <div class="space-y-3">
+                    <h5 class="text-white">Legal</h5>
+                    <p class="hover:text-white cursor-pointer">Privacy</p>
+                    <p class="hover:text-white cursor-pointer">Terms</p>
+                </div>
+            </div>
+            
+            <p class="text-[9px] text-gray-700 tracking-widest">© 2025 BLVCK PARIS. ALL RIGHTS RESERVED.</p>
+        </div>
+        
+        <div class="fixed bottom-6 right-6 bg-white text-black p-3 rounded-full shadow-lg cursor-pointer hover:scale-110 transition z-50">
+            <i data-lucide="message-circle" class="w-6 h-6"></i>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+        
+        // Header efekt
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if(window.scrollY > 50) {
+                header.classList.add('py-0');
+            } else {
+                header.classList.remove('py-0');
+            }
+        });
+
+        // Slider Fonksiyonu
+        function scrollSlider(direction) {
+            const slider = document.getElementById('collection-slider');
+            const scrollAmount = window.innerWidth < 768 ? window.innerWidth : window.innerWidth / 3;
+            slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+        }
+
+        // Mobil Menü Toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+            document.body.style.overflow = menu.classList.contains('hidden') ? 'auto' : 'hidden';
+        }
+
+        // Sayfa Değiştirme Fonksiyonu
+        function showPage(pageId) {
+            // Tüm sayfaları gizle
+            const pages = document.querySelectorAll('.page-section');
+            pages.forEach(page => {
+                page.classList.remove('active');
+            });
+
+            // İstenen sayfayı göster
+            const targetPage = document.getElementById('page-' + pageId);
+            if(targetPage) {
+                targetPage.classList.add('active');
+                window.scrollTo(0, 0); // Sayfa başına git
+            }
+        }
+    </script>
+</body>
+</html>

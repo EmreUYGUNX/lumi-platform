@@ -30,19 +30,19 @@ const getStrengthLabel = (strength: number): string => {
   }
 };
 
-const getStrengthColor = (strength: number): string => {
+const getStrengthTone = (strength: number): string => {
   switch (strength) {
     case 4: {
-      return "bg-lumi-primary";
+      return "bg-lumi-primary/10 text-lumi-primary";
     }
     case 3: {
-      return "bg-lumi-success";
+      return "bg-lumi-success/10 text-lumi-success";
     }
     case 2: {
-      return "bg-lumi-warning";
+      return "bg-lumi-warning/10 text-lumi-warning";
     }
     default: {
-      return "bg-lumi-error";
+      return "bg-lumi-error/10 text-lumi-error";
     }
   }
 };
@@ -59,7 +59,12 @@ export function PasswordStrength({ value }: PasswordStrengthProps): JSX.Element 
     <div className="space-y-2">
       <div className="text-lumi-text-secondary flex items-center justify-between text-xs">
         <span>Şifre Gücü</span>
-        <span className={cn("font-semibold", getStrengthColor(strength))}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+            getStrengthTone(strength),
+          )}
+        >
           {getStrengthLabel(strength)}
         </span>
       </div>
