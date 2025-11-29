@@ -40,6 +40,9 @@ export const createCatalogRouter = (
   router.get("/products/:slug", controller.getProduct);
   registerRoute(options.registerRoute, "GET", "/products/:slug");
 
+  router.get("/products/:slug/reviews", controller.listProductReviews);
+  registerRoute(options.registerRoute, "GET", "/products/:slug/reviews");
+
   router.get("/products/:id/variants", controller.listVariants);
   registerRoute(options.registerRoute, "GET", "/products/:id/variants");
 

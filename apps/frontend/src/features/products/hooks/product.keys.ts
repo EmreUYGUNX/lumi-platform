@@ -81,4 +81,5 @@ export const productKeys = {
   ],
   detail: (slug: string) => [...productKeys.all(), "detail", slug] as const,
   search: (term: string) => [...productKeys.all(), "search", term.trim().toLowerCase()] as const,
+  reviews: (productId: string) => [...productKeys.all(), "reviews", productId] as const,
 };

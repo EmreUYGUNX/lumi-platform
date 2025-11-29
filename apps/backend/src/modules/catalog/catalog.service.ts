@@ -43,6 +43,25 @@ export interface ProductDetailResult {
   reviewSummary: ReviewSummary;
 }
 
+export interface ProductReviewPublic {
+  id: string;
+  productId: string;
+  userName: string;
+  avatarUrl?: string | null;
+  rating: number;
+  title: string;
+  content: string | null;
+  isVerifiedPurchase: boolean;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  createdAt: string;
+  media: {
+    id: string;
+    url: string;
+    alt: string | null;
+  }[];
+}
+
 export interface ProductVariantSummary {
   id: string;
   title: string;
@@ -336,6 +355,77 @@ export class CatalogService {
       product: summary,
       reviewSummary,
     };
+  }
+
+  async listProductReviews(_slug: string): Promise<ProductReviewPublic[]> {
+    const slug = _slug.trim();
+    const product = await this.productRepository.findBySlug(slug, {
+      select: {
+        id: true,
+        slug: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!product || product.status !== ProductStatus.ACTIVE || product.deletedAt) {
+      throw new NotFoundError("Product not found.", { details: { slug } });
+    }
+
+    type ReviewWithRelations = Prisma.ReviewGetPayload<{
+      include: {
+        user: {
+          select: {
+            firstName: true;
+            lastName: true;
+            email: true;
+          };
+        };
+        media: {
+          include: { media: true };
+        };
+      };
+    }>;
+
+    const reviews = (await this.prisma.review.findMany({
+      where: { productId: product.id, status: ReviewStatus.APPROVED },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        media: {
+          include: { media: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    })) as ReviewWithRelations[];
+
+    return reviews.map((review) => ({
+      id: review.id,
+      productId: review.productId,
+      userName:
+        [review.user?.firstName, review.user?.lastName].filter(Boolean).join(" ").trim() ||
+        review.user?.email ||
+        "Lumi Customer",
+      avatarUrl: null,
+      rating: review.rating,
+      title: review.title,
+      content: review.content ?? null,
+      isVerifiedPurchase: review.isVerifiedPurchase,
+      helpfulCount: review.helpfulCount,
+      notHelpfulCount: review.notHelpfulCount,
+      createdAt: review.createdAt.toISOString(),
+      media: review.media.map((entry) => ({
+        id: entry.mediaId,
+        url: entry.media.url,
+        alt: entry.media.alt ?? null,
+      })),
+    }));
   }
 
   async listProductVariants(
