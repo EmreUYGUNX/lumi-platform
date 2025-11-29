@@ -187,6 +187,29 @@
   }
 }
 
+@layer base {
+  input[type="range"].range-thumb-lumi {
+    accent-color: hsl(var(--lumi-text-hsl));
+  }
+
+  input[type="range"].range-thumb-lumi::-webkit-slider-thumb {
+    appearance: none;
+    background: hsl(var(--lumi-text-hsl));
+    border-radius: 9999px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
+    height: 16px;
+    width: 16px;
+  }
+
+  input[type="range"].range-thumb-lumi::-moz-range-thumb {
+    background: hsl(var(--lumi-text-hsl));
+    border: 3px solid rgba(255, 255, 255, 0.6);
+    border-radius: 9999px;
+    height: 16px;
+    width: 16px;
+  }
+}
+
 @keyframes glowPulse {
   0% {
     opacity: 0.65;

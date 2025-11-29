@@ -1,10 +1,12 @@
 "use client";
 
+import type { Route } from "next";
+
 import Link, { type LinkProps } from "next/link";
 
 import { cn } from "@/lib/utils";
 
-type LinkHref = LinkProps<string>["href"];
+type LinkHref = LinkProps<Route>["href"];
 
 type Tone = "light" | "dark";
 
