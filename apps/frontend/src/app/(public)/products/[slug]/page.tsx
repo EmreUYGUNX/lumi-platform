@@ -8,7 +8,7 @@ import type { ProductDetail } from "@/features/product/types/product-detail.type
 import { productDetailSchema } from "@/features/product/types/product-detail.types";
 
 interface ProductPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://lumi-commerce.dev";
@@ -51,8 +51,8 @@ const deriveAvailabilityUrl = (product: ProductDetail["product"]): string => {
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { slug: rawSlug } = params;
-  const slug = decodeURIComponent(rawSlug);
+  const resolvedParams = await params;
+  const slug = decodeURIComponent(resolvedParams.slug);
   const detail = await fetchProductDetail(slug);
   if (!detail) {
     return {
@@ -86,8 +86,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps): Promise<JSX.Element> {
-  const { slug: rawSlug } = params;
-  const slug = decodeURIComponent(rawSlug);
+  const resolvedParams = await params;
+  const slug = decodeURIComponent(resolvedParams.slug);
   const detail = await fetchProductDetail(slug);
 
   if (!detail) {
