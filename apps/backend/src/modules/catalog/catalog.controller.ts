@@ -41,6 +41,8 @@ export class CatalogController {
 
   public readonly getProduct: RequestHandler;
 
+  public readonly listProductReviews: RequestHandler;
+
   public readonly listVariants: RequestHandler;
 
   public readonly createProduct: RequestHandler;
@@ -73,6 +75,7 @@ export class CatalogController {
     this.listProducts = asyncHandler(this.handleListProducts.bind(this));
     this.listPopularProducts = asyncHandler(this.handleListPopularProducts.bind(this));
     this.getProduct = asyncHandler(this.handleGetProduct.bind(this));
+    this.listProductReviews = asyncHandler(this.handleListProductReviews.bind(this));
     this.listVariants = asyncHandler(this.handleListVariants.bind(this));
     this.createProduct = asyncHandler(this.handleCreateProduct.bind(this));
     this.updateProduct = asyncHandler(this.handleUpdateProduct.bind(this));
@@ -195,6 +198,24 @@ export class CatalogController {
     res.setHeader("ETag", etag);
     res.setHeader("Cache-Control", "private, max-age=60");
     res.json(successResponse(payload));
+  }
+
+  private async handleListProductReviews(req: Request, res: Response): Promise<void> {
+    const { slug } = req.params;
+    if (!slug) {
+      throw new ValidationError("Product slug is required.", {
+        issues: [
+          {
+            path: "slug",
+            message: "Product slug must be provided in the route.",
+          },
+        ],
+      });
+    }
+
+    const reviews = await this.service.listProductReviews(slug);
+    res.setHeader("Cache-Control", "public, max-age=120");
+    res.json(successResponse(reviews));
   }
 
   private async handleListVariants(req: Request, res: Response): Promise<void> {
