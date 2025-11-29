@@ -18,8 +18,8 @@ export const heroContent = {
   tagline:
     "Glassmorphic silhouettes, wide tracking, and electric cobalt highlights crafted for the new Lumi house codes.",
   backgroundId: resolvePublicId("lumi/banners/fall-hero", FALLBACK_SAMPLE_FIVE),
-  primaryCta: { label: "Shop collection", href: PRODUCTS_PATH },
-  secondaryCta: { label: "View lookbook", href: ABOUT_PATH },
+  primaryCta: { label: "Shop collection", href: { pathname: PRODUCTS_PATH } },
+  secondaryCta: { label: "View lookbook", href: { pathname: ABOUT_PATH } },
 };
 
 export const primaryCollections = [

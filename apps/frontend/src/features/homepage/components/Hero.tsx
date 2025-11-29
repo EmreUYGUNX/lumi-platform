@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 
 import { ChevronDown } from "lucide-react";
+import type { Route } from "next";
 
 import Image from "next/image";
 import type { LinkProps } from "next/link";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 import { CtaLink } from "./CtaLink";
 
-type LinkHref = LinkProps<string>["href"];
+type LinkHref = LinkProps<Route>["href"];
 
 interface HeroProps {
   label: string;
