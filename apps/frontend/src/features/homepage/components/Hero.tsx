@@ -1,12 +1,11 @@
 "use client";
 
-import type { UrlObject } from "node:url";
-
 import { useMemo, useRef } from "react";
 
 import { ChevronDown } from "lucide-react";
 
 import Image from "next/image";
+import type { LinkProps } from "next/link";
 
 import { useGSAP } from "@/animations/gsap";
 import { buildBlurPlaceholder, buildCloudinaryUrl, buildSizesAttribute } from "@/lib/cloudinary";
@@ -15,13 +14,15 @@ import { cn } from "@/lib/utils";
 
 import { CtaLink } from "./CtaLink";
 
+type LinkHref = LinkProps<string>["href"];
+
 interface HeroProps {
   label: string;
   title: string;
   tagline: string;
   backgroundId: string;
-  primaryCta: { label: string; href: string | UrlObject };
-  secondaryCta: { label: string; href: string | UrlObject };
+  primaryCta: { label: string; href: LinkHref };
+  secondaryCta: { label: string; href: LinkHref };
 }
 
 const blur = buildBlurPlaceholder("#0b1220");

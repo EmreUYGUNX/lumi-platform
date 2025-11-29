@@ -217,7 +217,8 @@
       "cookie": "1.0.2",
       "tough-cookie": "6.0.0",
       "fsevents": "2.3.3",
-      "test-exclude": "7.0.1"
+      "test-exclude": "7.0.1",
+      "body-parser": "2.2.1"
     },
     "packageExtensions": {
       "react-dom@*": {
