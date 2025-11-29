@@ -28,6 +28,7 @@ interface CartSummaryProps {
   onCheckout?: () => void;
   isSubmitting?: boolean;
   showPromo?: boolean;
+  checkoutLabel?: string;
 }
 
 const toMoney = (amount: number, currency: string) =>
@@ -45,6 +46,7 @@ export function CartSummary({
   onCheckout,
   isSubmitting = false,
   showPromo = true,
+  checkoutLabel = "Proceed to checkout",
 }: CartSummaryProps): JSX.Element {
   const [promoCode, setPromoCode] = useState("");
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
@@ -164,7 +166,7 @@ export function CartSummary({
           onClick={onCheckout}
         >
           <Link href={checkoutHref ?? ("/checkout" as Route)}>
-            Proceed to checkout
+            {checkoutLabel}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
