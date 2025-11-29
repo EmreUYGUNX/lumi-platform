@@ -115,3 +115,5 @@ export const addCartItemInputSchema = z
 export type CartSummaryView = z.infer<typeof cartSummaryViewSchema>;
 export type CartStockIssue = z.infer<typeof cartStockIssueSchema>;
 export type AddCartItemInput = z.infer<typeof addCartItemInputSchema>;
+export type CartItemWithProduct = z.infer<typeof cartItemWithProductSchema>;
+export type CartSummaryWithProducts = z.infer<typeof cartSummaryWithProductsSchema>;
