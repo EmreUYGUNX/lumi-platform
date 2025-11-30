@@ -1,20 +1,34 @@
 "use client";
 
+/* eslint-disable import/order */
+
 import { useEffect } from "react";
 
-import { Loader2 } from "lucide-react";
 import type { Route } from "next";
-
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { CartSummary } from "@/features/cart/components/CartSummary";
 import { useCart } from "@/features/cart/hooks/useCart";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { SHIPPING_METHODS, useCheckout } from "../hooks/useCheckout";
 import { CheckoutProgress } from "./CheckoutProgress";
-import { OrderReview } from "./OrderReview";
-import { PaymentForm } from "./PaymentForm";
-import { ShippingForm } from "./ShippingForm";
+
+const StepSkeleton = () => <Skeleton className="min-h-[380px] w-full rounded-2xl" />;
+
+const ShippingStep = dynamic(() => import("./ShippingForm").then((module) => module.ShippingForm), {
+  loading: () => <StepSkeleton />,
+});
+
+const PaymentStep = dynamic(() => import("./PaymentForm").then((module) => module.PaymentForm), {
+  loading: () => <StepSkeleton />,
+});
+
+const ReviewStep = dynamic(() => import("./OrderReview").then((module) => module.OrderReview), {
+  loading: () => <StepSkeleton />,
+});
 
 export function CheckoutWizard(): JSX.Element {
   const searchParams = useSearchParams();
@@ -43,16 +57,16 @@ export function CheckoutWizard(): JSX.Element {
   const renderStep = () => {
     switch (step) {
       case "shipping": {
-        return <ShippingForm />;
+        return <ShippingStep />;
       }
       case "payment": {
-        return <PaymentForm />;
+        return <PaymentStep />;
       }
       case "review": {
-        return <OrderReview />;
+        return <ReviewStep />;
       }
       default: {
-        return <ShippingForm />;
+        return <ShippingStep />;
       }
     }
   };

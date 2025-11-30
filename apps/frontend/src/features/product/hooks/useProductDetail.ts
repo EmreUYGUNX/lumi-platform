@@ -43,8 +43,8 @@ export const useProductDetail = (
       };
     },
     enabled: Boolean(normalizedSlug) && (options.enabled ?? true),
-    staleTime: options.staleTimeMs ?? 60_000,
-    gcTime: options.gcTimeMs ?? 120_000,
+    staleTime: options.staleTimeMs ?? 300_000,
+    gcTime: options.gcTimeMs ?? 600_000,
     initialData: options.initialData,
   });
 };

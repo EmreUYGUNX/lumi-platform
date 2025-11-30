@@ -1,12 +1,15 @@
 "use client";
 
-import { Minus, Plus, Trash2 } from "lucide-react";
+/* eslint-disable import/order */
 
+import { Minus, Plus, Trash2 } from "lucide-react";
+import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { buildCloudinaryUrl } from "@/lib/cloudinary";
+import { buildBlurPlaceholder, buildCloudinaryUrl } from "@/lib/cloudinary";
 import { formatMoney } from "@/lib/formatters/price";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { cn } from "@/lib/utils";
@@ -17,6 +20,7 @@ const fallbackImage = buildCloudinaryUrl({
   publicId: "lumi/products/board-001",
   transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_480,h_640"],
 });
+const blur = buildBlurPlaceholder("#0a0a0a");
 
 const parseAmount = (value: string): number => {
   const normalised = value.replace(",", ".");
@@ -51,6 +55,11 @@ const resolveVariantLabel = (item: CartItemWithProduct): string => {
   return entries.length > 0 ? entries.join(" / ") : item.variant.title;
 };
 
+const resolveItemMedia = (item: CartItemWithProduct): { src: string; alt: string } => {
+  // Cart API does not include media payload; fall back to a stable placeholder.
+  return { src: fallbackImage, alt: item.product.title };
+};
+
 interface CartItemProps {
   item: CartItemWithProduct;
   compact?: boolean;
@@ -73,6 +82,11 @@ export function CartItem({
   const lineTotal = buildLineTotal(item);
   const unitPrice = formatMoney(item.unitPrice);
   const variantLabel = resolveVariantLabel(item);
+  const media = resolveItemMedia(item);
+  const router = useRouter();
+  const productHref = { pathname: "/products/[slug]", query: { slug: item.product.slug } } as const;
+  const productHrefString = `/products/${item.product.slug}` as Route;
+  const prefetchProduct = () => router.prefetch(productHrefString);
   const lowStock =
     item.availableStock <= 0
       ? "Out of stock"
@@ -88,26 +102,33 @@ export function CartItem({
       )}
     >
       <Link
-        href={{ pathname: "/products/[slug]", query: { slug: item.product.slug } }}
+        href={productHref}
         className="bg-lumi-bg relative block h-24 w-20 overflow-hidden rounded-xl"
         aria-label={item.product.title}
+        onMouseEnter={prefetchProduct}
+        onFocus={prefetchProduct}
       >
         <Image
           loader={cloudinaryImageLoader}
-          src={fallbackImage}
-          alt={item.product.title}
+          src={media.src}
+          alt={media.alt}
           fill
           sizes="120px"
+          placeholder="blur"
+          blurDataURL={blur}
           className="object-cover mix-blend-multiply transition duration-500 hover:scale-105"
           priority={false}
+          loading="lazy"
         />
       </Link>
       <div className="flex flex-1 flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <Link
-              href={{ pathname: "/products/[slug]", query: { slug: item.product.slug } }}
+              href={productHref}
               className="text-lumi-text hover:text-lumi-primary line-clamp-1 text-sm font-semibold uppercase tracking-[0.22em]"
+              onMouseEnter={prefetchProduct}
+              onFocus={prefetchProduct}
             >
               {item.product.title}
             </Link>

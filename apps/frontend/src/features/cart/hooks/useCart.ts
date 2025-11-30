@@ -45,7 +45,8 @@ export const useCart = (options: UseCartOptions = {}) => {
     initialData,
     placeholderData: (previous) => previous ?? initialData,
     enabled: options.enabled ?? true,
-    staleTime: 30_000,
+    staleTime: 0,
+    gcTime: 90_000,
   });
 
   useEffect(() => {

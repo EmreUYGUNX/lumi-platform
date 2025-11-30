@@ -4,6 +4,8 @@ import { Suspense, useMemo } from "react";
 
 import { AlertCircle } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProductDetail } from "@/features/product/hooks/useProductDetail";
@@ -12,7 +14,6 @@ import { useVariantSelection } from "@/features/product/hooks/useVariantSelectio
 import type { ProductDetail } from "@/features/product/types/product-detail.types";
 
 import { AddToCartButton } from "./AddToCartButton";
-import { ProductGallery } from "./ProductGallery";
 import { ProductInfo } from "./ProductInfo";
 import { ProductTabs } from "./ProductTabs";
 import { RelatedProducts } from "./RelatedProducts";
@@ -38,6 +39,13 @@ const ProductDetailSkeleton = () => (
     </div>
     <Skeleton className="h-64 w-full" />
   </div>
+);
+
+const LazyProductGallery = dynamic(
+  () => import("./ProductGallery").then((module) => module.ProductGallery),
+  {
+    loading: () => <Skeleton className="aspect-[4/5] w-full rounded-2xl" />,
+  },
 );
 
 export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps): JSX.Element {
@@ -98,7 +106,10 @@ export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps)
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <ProductGallery product={product} activeVariantId={variantState.selectedVariant?.id} />
+          <LazyProductGallery
+            product={product}
+            activeVariantId={variantState.selectedVariant?.id}
+          />
 
           <div className="space-y-4">
             <ProductInfo

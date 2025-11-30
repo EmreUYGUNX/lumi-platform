@@ -50,8 +50,8 @@ export const useProducts = (
       };
     },
     placeholderData: (previousData) => previousData,
-    staleTime: options.staleTimeMs,
-    gcTime: options.gcTimeMs,
+    staleTime: options.staleTimeMs ?? 60_000,
+    gcTime: options.gcTimeMs ?? 120_000,
     enabled: options.enabled ?? true,
   });
 };
