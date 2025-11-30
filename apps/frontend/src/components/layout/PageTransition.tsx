@@ -5,7 +5,7 @@ import { useEffect, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Route } from "next";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { pageTransitionVariants } from "@/animations/motion-presets";
 
@@ -64,8 +64,7 @@ export function PageTransition({
   preserveScroll: _preserveScroll = false,
 }: PageTransitionProps): JSX.Element {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const routeKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
+  const routeKey = pathname ?? "";
 
   useEffect(() => {
     // On mount only; prevents hydration mismatch and ensures client can animate safely

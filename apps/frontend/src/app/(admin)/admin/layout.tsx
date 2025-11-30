@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps): Promi
       <div className="flex flex-1 flex-col">
         <AdminTopbar />
         <main className="flex-1 px-6 py-8">
-          <Suspense fallback={children}>
+          <Suspense fallback={<div className="min-h-[200px]" />}>
             <PageTransition preserveScroll>{children}</PageTransition>
           </Suspense>
         </main>

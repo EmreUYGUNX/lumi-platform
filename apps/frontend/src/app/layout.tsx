@@ -6,6 +6,7 @@ import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { MotionConfig } from "framer-motion";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 
 import { NetworkStatus } from "@/components/ui/feedback/NetworkStatus";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -79,7 +80,9 @@ export default function RootLayout({ children }: PropsWithChildren): JSX.Element
               <TooltipProvider delayDuration={150}>
                 <div className="bg-lumi-background text-lumi-text relative flex min-h-screen flex-col">
                   <SessionProvider>
-                    <AnalyticsProvider />
+                    <Suspense fallback={undefined}>
+                      <AnalyticsProvider />
+                    </Suspense>
                     <a
                       href="#main-content"
                       className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-black"
