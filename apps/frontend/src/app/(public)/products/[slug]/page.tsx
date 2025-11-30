@@ -13,6 +13,8 @@ interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
+export const revalidate = 300;
+
 const fetchProductDetail = async (slug: string): Promise<ProductDetail | undefined> => {
   try {
     const response = await apiClient.get(`/catalog/products/${encodeURIComponent(slug)}`, {

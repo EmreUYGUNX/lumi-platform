@@ -1,11 +1,15 @@
 "use client";
 
+/* eslint-disable import/order */
+
 import { useMemo } from "react";
 
 import { Heart, ShoppingBag } from "lucide-react";
 
+import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import type { ProductSummary } from "@/features/products/types/product.types";
 import { Button } from "@/components/ui/button";
@@ -52,14 +56,20 @@ const deriveBadge = (product: ProductSummary): string | undefined => {
 interface ProductCardProps {
   product: ProductSummary;
   className?: string;
+  priority?: boolean;
 }
 
-export function ProductCard({ product, className }: ProductCardProps): JSX.Element {
+export function ProductCard({
+  product,
+  className,
+  priority = false,
+}: ProductCardProps): JSX.Element {
   const { src, alt } = useMemo(() => resolveProductMedia(product), [product]);
   const price = formatMoney(product.price);
   const compareAt = product.compareAtPrice ? formatMoney(product.compareAtPrice) : undefined;
   const badge = deriveBadge(product);
   const availability = deriveProductAvailability(product);
+  const router = useRouter();
 
   const addToCart = useAddToCart();
   const addToWishlist = useAddToWishlist();
@@ -76,6 +86,11 @@ export function ProductCard({ product, className }: ProductCardProps): JSX.Eleme
   };
 
   const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
+  const hrefString = `/products/${product.slug}` as Route;
+
+  const prefetchProduct = () => {
+    router.prefetch(hrefString);
+  };
 
   return (
     <div
@@ -84,7 +99,13 @@ export function ProductCard({ product, className }: ProductCardProps): JSX.Eleme
         className,
       )}
     >
-      <Link href={href} aria-label={`View ${product.title}`} className="relative block">
+      <Link
+        href={href}
+        aria-label={`View ${product.title}`}
+        className="relative block"
+        onMouseEnter={prefetchProduct}
+        onFocus={prefetchProduct}
+      >
         <div className="bg-lumi-text relative aspect-[3/4] overflow-hidden rounded-xl">
           <Image
             loader={cloudinaryImageLoader}
@@ -95,6 +116,8 @@ export function ProductCard({ product, className }: ProductCardProps): JSX.Eleme
             placeholder="blur"
             blurDataURL={blur}
             className="object-cover mix-blend-multiply transition duration-700 group-hover:scale-105"
+            priority={priority}
+            loading={priority ? "eager" : "lazy"}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/30 opacity-0 transition duration-500 group-hover:opacity-100" />
           {badge && (
@@ -140,7 +163,12 @@ export function ProductCard({ product, className }: ProductCardProps): JSX.Eleme
         </div>
       </Link>
 
-      <Link href={href} className="space-y-1">
+      <Link
+        href={href}
+        className="space-y-1"
+        onMouseEnter={prefetchProduct}
+        onFocus={prefetchProduct}
+      >
         <p className="text-[11px] font-bold uppercase tracking-[0.3em]">{product.title}</p>
         <div className="text-lumi-text-secondary flex items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
           <span>{price}</span>

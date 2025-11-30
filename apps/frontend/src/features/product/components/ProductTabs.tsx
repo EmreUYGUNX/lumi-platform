@@ -4,12 +4,14 @@ import { useMemo, useState } from "react";
 
 import { Check } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ProductReviewStats } from "@/features/product/types/product-detail.types";
 import type { ProductReview } from "@/features/product/types/review.types";
 import type { ProductSummary } from "@/features/products/types/product.types";
 
-import { ReviewForm } from "./ReviewForm";
 import { ReviewsList } from "./ReviewsList";
 
 interface ProductTabsProps {
@@ -66,6 +68,10 @@ const deriveSpecifications = (product?: ProductSummary) => {
           : String(value ?? "-"),
   }));
 };
+
+const ReviewForm = dynamic(() => import("./ReviewForm").then((mod) => mod.ReviewForm), {
+  loading: () => <Skeleton className="h-64 w-full rounded-2xl" />,
+});
 
 export function ProductTabs({
   product,

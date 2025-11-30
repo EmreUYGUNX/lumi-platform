@@ -52,8 +52,8 @@ export const useInfiniteProducts = (
     },
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasNextPage ? lastPage.pagination.page + 1 : undefined,
-    staleTime: options.staleTimeMs,
-    gcTime: options.gcTimeMs,
+    staleTime: options.staleTimeMs ?? 60_000,
+    gcTime: options.gcTimeMs ?? 120_000,
     enabled: options.enabled ?? true,
   });
 };

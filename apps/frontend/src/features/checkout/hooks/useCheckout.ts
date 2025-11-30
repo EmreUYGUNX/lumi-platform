@@ -148,6 +148,7 @@ export const useCheckout = () => {
 
   const advance = (): boolean => {
     const nextIndex = Math.min(CHECKOUT_STEPS.indexOf(step) + 1, CHECKOUT_STEPS.length - 1);
+    // eslint-disable-next-line security/detect-object-injection -- CHECKOUT_STEPS is a trusted constant list
     const target = (CHECKOUT_STEPS[nextIndex] ?? CHECKOUT_STEPS.at(-1)) as CheckoutStep;
     if (!canNavigateTo(target)) {
       return false;

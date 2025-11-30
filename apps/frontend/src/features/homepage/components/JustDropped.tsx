@@ -67,8 +67,8 @@ export function JustDropped(): JSX.Element {
         ) : (
           <div className="space-y-8">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+              {products.map((product, index) => (
+                <ProductCard key={product.id} product={product} priority={index < 3} />
               ))}
             </div>
 

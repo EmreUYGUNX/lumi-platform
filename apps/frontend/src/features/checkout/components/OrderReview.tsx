@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/features/cart/hooks/useCart";
 import type { CartItemWithProduct } from "@/features/cart/types/cart.types";
-import { buildCloudinaryUrl } from "@/lib/cloudinary";
+import { buildBlurPlaceholder, buildCloudinaryUrl } from "@/lib/cloudinary";
 import { formatMoney } from "@/lib/formatters/price";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 
@@ -24,6 +24,7 @@ const fallbackImage = buildCloudinaryUrl({
   publicId: "lumi/products/board-001",
   transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_480,h_640"],
 });
+const blur = buildBlurPlaceholder("#0a0a0a");
 
 const buildLineTotal = (item: CartItemWithProduct) => {
   const amount = Number.parseFloat(item.unitPrice.amount.replace(",", "."));
@@ -31,6 +32,11 @@ const buildLineTotal = (item: CartItemWithProduct) => {
     amount: (amount * item.quantity).toFixed(2),
     currency: item.unitPrice.currency,
   });
+};
+
+const resolveItemMedia = (item: CartItemWithProduct): { src: string; alt: string } => {
+  // Cart payload omits media; rely on fallback visual for review step.
+  return { src: fallbackImage, alt: item.product.title };
 };
 
 export function OrderReview(): JSX.Element {
@@ -108,37 +114,43 @@ export function OrderReview(): JSX.Element {
 
     return (
       <div className="space-y-3">
-        {cart.items.map((item) => (
-          <div
-            key={item.id}
-            className="border-lumi-border/60 flex items-center gap-3 rounded-xl border bg-white/80 p-3 shadow-sm"
-          >
-            <div className="relative h-16 w-14 overflow-hidden rounded-lg">
-              <Image
-                loader={cloudinaryImageLoader}
-                src={fallbackImage}
-                alt={item.product.title}
-                fill
-                sizes="80px"
-                className="object-cover mix-blend-multiply"
-              />
+        {cart.items.map((item) => {
+          const media = resolveItemMedia(item);
+          return (
+            <div
+              key={item.id}
+              className="border-lumi-border/60 flex items-center gap-3 rounded-xl border bg-white/80 p-3 shadow-sm"
+            >
+              <div className="relative h-16 w-14 overflow-hidden rounded-lg">
+                <Image
+                  loader={cloudinaryImageLoader}
+                  src={media.src}
+                  alt={media.alt}
+                  fill
+                  sizes="80px"
+                  placeholder="blur"
+                  blurDataURL={blur}
+                  loading="lazy"
+                  className="object-cover mix-blend-multiply"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-lumi-text text-sm font-semibold uppercase tracking-[0.22em]">
+                  {item.product.title}
+                </p>
+                <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.18em]">
+                  Qty {item.quantity}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-lumi-text text-sm font-semibold">{buildLineTotal(item)}</p>
+                <p className="text-lumi-text-secondary text-[10px] uppercase tracking-[0.16em]">
+                  {formatMoney(item.unitPrice)}
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-lumi-text text-sm font-semibold uppercase tracking-[0.22em]">
-                {item.product.title}
-              </p>
-              <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.18em]">
-                Qty {item.quantity}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-lumi-text text-sm font-semibold">{buildLineTotal(item)}</p>
-              <p className="text-lumi-text-secondary text-[10px] uppercase tracking-[0.16em]">
-                {formatMoney(item.unitPrice)}
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };

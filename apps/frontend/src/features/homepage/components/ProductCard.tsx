@@ -1,7 +1,11 @@
 "use client";
 
+/* eslint-disable import/order */
+
+import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import type { ProductSummary } from "@/features/products/types/product.types";
 import { buildBlurPlaceholder, buildCloudinaryUrl, buildSizesAttribute } from "@/lib/cloudinary";
@@ -17,6 +21,7 @@ const sizes = buildSizesAttribute(
 
 interface ProductCardProps {
   product: ProductSummary;
+  priority?: boolean;
 }
 
 const resolveMediaUrl = (product: ProductSummary): { src: string; alt: string } => {
@@ -34,10 +39,12 @@ const resolveMediaUrl = (product: ProductSummary): { src: string; alt: string } 
   };
 };
 
-export function ProductCard({ product }: ProductCardProps): JSX.Element {
+export function ProductCard({ product, priority = false }: ProductCardProps): JSX.Element {
   const { src, alt } = resolveMediaUrl(product);
   const price = formatMoney(product.price);
   const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
+  const router = useRouter();
+  const prefetchProduct = () => router.prefetch(`/products/${product.slug}` as Route);
 
   return (
     <Link
@@ -45,6 +52,8 @@ export function ProductCard({ product }: ProductCardProps): JSX.Element {
       className="group flex flex-col gap-3"
       aria-label={`View ${product.title}`}
       prefetch
+      onMouseEnter={prefetchProduct}
+      onFocus={prefetchProduct}
     >
       <div className="bg-lumi-background-secondary border-lumi-border/60 relative aspect-square overflow-hidden rounded-xl border">
         <Image
@@ -56,6 +65,8 @@ export function ProductCard({ product }: ProductCardProps): JSX.Element {
           placeholder="blur"
           blurDataURL={blur}
           className="ease-emphasis object-cover mix-blend-multiply transition duration-500 group-hover:scale-105"
+          priority={priority}
+          loading={priority ? "eager" : "lazy"}
         />
       </div>
       <div className="space-y-1">

@@ -5,6 +5,7 @@ import { useMemo, useState, type MouseEvent, type KeyboardEvent } from "react";
 import Image from "next/image";
 
 import { cloudinaryImageLoader } from "@/lib/image-loader";
+import { buildBlurPlaceholder } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 
 interface ImageZoomProps {
@@ -26,6 +27,7 @@ export function ImageZoom({
 }: ImageZoomProps): JSX.Element {
   const [isZooming, setIsZooming] = useState(false);
   const [backgroundPosition, setBackgroundPosition] = useState("50% 50%");
+  const blur = useMemo(() => buildBlurPlaceholder("#0a0a0a"), []);
 
   const backgroundImage = useMemo(() => `url(${src})`, [src]);
 
@@ -75,6 +77,9 @@ export function ImageZoom({
           priority={priority}
           width={1080}
           height={1350}
+          placeholder="blur"
+          blurDataURL={blur}
+          loading={priority ? "eager" : "lazy"}
           className="aspect-[4/5] w-full object-cover mix-blend-multiply transition duration-500"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-0 transition duration-500 group-hover:opacity-100" />

@@ -1,11 +1,15 @@
 "use client";
 
+/* eslint-disable import/order */
+
 import { useMemo } from "react";
 
 import { ShoppingBag, Trash2 } from "lucide-react";
 
+import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +58,9 @@ export function WishlistItem({
       : availability === "low_stock"
         ? "text-lumi-warning"
         : "text-lumi-text-secondary";
+  const router = useRouter();
+  const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
+  const prefetchProduct = () => router.prefetch(`/products/${product.slug}` as Route);
 
   const handleAdd = () => {
     if (disabled || !onAddToCart) return;
@@ -65,11 +72,15 @@ export function WishlistItem({
     onRemove(item);
   };
 
-  const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
-
   return (
     <div className="glass-panel border-lumi-border/70 group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white/80 shadow-md transition duration-500 hover:-translate-y-1 hover:shadow-lg">
-      <Link href={href} aria-label={product.title} className="relative block">
+      <Link
+        href={href}
+        aria-label={product.title}
+        className="relative block"
+        onMouseEnter={prefetchProduct}
+        onFocus={prefetchProduct}
+      >
         <div className="bg-lumi-bg relative aspect-[3/4] overflow-hidden">
           <Image
             loader={cloudinaryImageLoader}
@@ -104,6 +115,8 @@ export function WishlistItem({
           <Link
             href={href}
             className="text-lumi-text hover:text-lumi-primary line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.28em]"
+            onMouseEnter={prefetchProduct}
+            onFocus={prefetchProduct}
           >
             {product.title}
           </Link>
