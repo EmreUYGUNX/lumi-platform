@@ -2,7 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 
 import { CLOUDINARY_BREAKPOINTS, getCloudinaryBreakpoints } from "../src/media/cloudinary.js";
 
-const EXPECTED_BREAKPOINTS = [320, 640, 768, 1024, 1280, 1536, 1920];
+const EXPECTED_BREAKPOINTS = [
+  300, 320, 480, 600, 640, 768, 900, 1024, 1200, 1280, 1536, 1600, 1920,
+];
 
 describe("media cloudinary helpers", () => {
   it("exposes canonical frozen breakpoints", () => {
