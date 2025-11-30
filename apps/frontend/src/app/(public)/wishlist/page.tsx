@@ -1,27 +1,16 @@
-import type { Metadata } from "next";
-
 import { WishlistPage } from "@/features/wishlist/components/WishlistPage";
+import { generateMetadata } from "@/lib/seo/metadata";
 
 const title = "Wishlist | Lumi Commerce";
 const description =
   "Kaydettiğin ürünlere hızlıca geri dön, stok durumunu takip et ve tek dokunuşla sepete ekle.";
-const url = "https://lumi-commerce.dev/wishlist";
 
-export const metadata: Metadata = {
+export const metadata = generateMetadata({
   title,
   description,
-  alternates: { canonical: url },
-  openGraph: {
-    title,
-    description,
-    url,
-  },
-  twitter: {
-    card: "summary",
-    title,
-    description,
-  },
-};
+  path: "/wishlist",
+  twitterCard: "summary",
+});
 
 export default function WishlistRoute(): JSX.Element {
   return <WishlistPage />;

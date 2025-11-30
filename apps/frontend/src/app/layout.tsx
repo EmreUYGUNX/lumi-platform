@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { SessionProvider } from "@/providers/SessionProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { env } from "@/lib/env";
 
 import "./globals.css";
 
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
   description: "Next.js foundation for the Lumi commerce platform.",
   applicationName: "Lumi Commerce",
   authors: [{ name: "Lumi Platform" }],
-  metadataBase: new URL("https://lumi-commerce.dev"),
+  metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
 };
 
 export const viewport: Viewport = {
