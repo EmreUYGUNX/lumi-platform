@@ -40,7 +40,12 @@ export function WishlistPage(): JSX.Element {
       return;
     }
 
-    addToCart.mutate({ productVariantId: preferred.id, quantity: 1 });
+    addToCart.mutate({
+      productVariantId: preferred.id,
+      quantity: 1,
+      product: entry.product,
+      variant: preferred,
+    });
   };
 
   const handleRemove = (entry: WishlistItem) => {

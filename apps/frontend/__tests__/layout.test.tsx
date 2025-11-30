@@ -5,6 +5,23 @@ import { describe, expect, it } from "vitest";
 
 import RootLayout, { metadata } from "@/app/layout";
 
+const assertElement = (node: unknown, label: string): ReactElement => {
+  expect(isValidElement(node)).toBe(true);
+  if (!isValidElement(node)) {
+    throw new Error(`${label} is not a valid React element`);
+  }
+  return node as ReactElement;
+};
+
+const findElementByName = (nodes: unknown[], name: string): ReactElement => {
+  const target = nodes.find((child) => {
+    if (!isValidElement(child)) return false;
+    const elementType = (child as ReactElement).type;
+    return typeof elementType === "function" && elementType.name === name;
+  });
+  return assertElement(target, name);
+};
+
 describe("RootLayout component", () => {
   it("declares the public metadata for the application shell", () => {
     expect(metadata.title).toBe("Lumi Commerce Experience");
@@ -21,34 +38,14 @@ describe("RootLayout component", () => {
     expect(bodyElement.type).toBe("body");
     expect(bodyElement.props.className).toContain("bg-lumi-background");
 
-    const themeProvider = bodyElement.props.children;
-    expect(isValidElement(themeProvider)).toBe(true);
-    if (!isValidElement(themeProvider)) {
-      throw new Error("ThemeProvider failed to mount in RootLayout");
-    }
-    const themeProviderElement = themeProvider as ReactElement;
-
-    const queryProvider = themeProviderElement.props.children;
-    expect(isValidElement(queryProvider)).toBe(true);
-    if (!isValidElement(queryProvider)) {
-      throw new Error("QueryProvider failed to mount in RootLayout");
-    }
-    const queryProviderElement = queryProvider as ReactElement;
-
-    const motionConfig = queryProviderElement.props.children;
-    expect(isValidElement(motionConfig)).toBe(true);
-    if (!isValidElement(motionConfig)) {
-      throw new Error("MotionConfig failed to mount in RootLayout");
-    }
-    const motionConfigElement = motionConfig as ReactElement;
-
-    const tooltipProvider = motionConfigElement.props.children;
-    expect(isValidElement(tooltipProvider)).toBe(true);
-    if (!isValidElement(tooltipProvider)) {
-      throw new Error("TooltipProvider failed to mount in RootLayout");
-    }
-
-    const tooltipElement = tooltipProvider as ReactElement;
+    const bodyChildren = Children.toArray(bodyElement.props.children);
+    const themeProviderElement = findElementByName(bodyChildren, "ThemeProvider");
+    const queryProviderElement = assertElement(
+      themeProviderElement.props.children,
+      "QueryProvider",
+    );
+    const motionConfigElement = assertElement(queryProviderElement.props.children, "MotionConfig");
+    const tooltipElement = assertElement(motionConfigElement.props.children, "TooltipProvider");
     const tooltipChildren = Children.toArray(tooltipElement.props.children);
     const appShell = tooltipChildren.find((child) => isValidElement(child));
     const toaster = tooltipChildren.find((child) => {

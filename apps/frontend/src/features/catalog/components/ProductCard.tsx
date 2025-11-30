@@ -82,6 +82,8 @@ export function ProductCard({
     addToCart.mutate({
       productVariantId: primaryVariant.id,
       quantity: 1,
+      product,
+      variant: primaryVariant,
     });
   };
 

@@ -7,6 +7,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_AMPLITUDE_API_KEY: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url(),
   NEXT_PUBLIC_GA4_MEASUREMENT_ID: z.string().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: z.string().optional(),
 });
 
 const rawEnv = {
@@ -20,8 +22,13 @@ const rawEnv = {
   NEXT_PUBLIC_AMPLITUDE_API_KEY: process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? "https://lumi-commerce.dev",
   NEXT_PUBLIC_GA4_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
+  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || undefined,
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT:
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ??
+    process.env.SENTRY_ENVIRONMENT ??
+    process.env.NEXT_PUBLIC_VERCEL_ENV ??
+    process.env.NODE_ENV,
 };
-
 const parsedEnv = envSchema.safeParse(rawEnv);
 
 if (!parsedEnv.success) {

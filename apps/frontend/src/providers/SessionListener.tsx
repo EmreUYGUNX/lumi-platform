@@ -5,6 +5,7 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 
 import type { SessionBroadcastEvent } from "@/lib/auth/session";
+import { setSentryUser } from "@/lib/analytics/sentry";
 import { broadcastSessionEvent } from "@/lib/auth/session";
 import { sessionStore } from "@/store/session";
 
@@ -107,6 +108,8 @@ const handleSentryScope = (): void => {
   if (typeof window === "undefined") {
     return;
   }
+  const { user: currentUser } = sessionStore.getState();
+  setSentryUser(currentUser);
   const sentry = (
     window as { Sentry?: { setUser?: (user: { id: string; email: string } | null) => void } }
   ).Sentry;
@@ -114,9 +117,8 @@ const handleSentryScope = (): void => {
     return;
   }
 
-  const { user } = sessionStore.getState();
-  if (user) {
-    sentry.setUser({ id: user.id, email: user.email });
+  if (currentUser) {
+    sentry.setUser({ id: currentUser.id, email: currentUser.email });
   } else {
     sentry.setUser(null);
   }

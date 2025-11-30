@@ -57,6 +57,8 @@ export function AddToCartButton({
       await addToCart.mutateAsync({
         productVariantId: variant.id,
         quantity,
+        product,
+        variant,
       });
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1400);
