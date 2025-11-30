@@ -28,6 +28,23 @@ export const metadata: Metadata = {
   description: "Next.js foundation for the Lumi commerce platform.",
   applicationName: "Lumi Commerce",
   authors: [{ name: "Lumi Platform" }],
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Lumi Commerce",
+  },
+  themeColor: "#3B82F6",
   metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
 };
 

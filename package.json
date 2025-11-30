@@ -184,12 +184,14 @@
       "@radix-ui/react-slot": "1.2.4",
       "axe-core": "^4.10.0",
       "test-exclude>glob": "7.2.3",
+      "globby@6.1.0>glob": "7.2.3",
       "openapi-validator>axios": "1.12.0",
       "axios": "1.12.0",
       "@smithy/is-array-buffer": "4.2.0",
       "@smithy/util-buffer-from": "4.2.0",
       "@smithy/util-utf8": "4.2.0",
       "@swc/helpers": "0.5.17",
+      "rimraf>glob": "10.5.0",
       "diff-sequences": "29.6.3",
       "jest-diff": "29.7.0",
       "jest-get-type": "29.6.3",
@@ -225,6 +227,11 @@
       "react-dom@*": {
         "peerDependencies": {
           "react": "*"
+        }
+      },
+      "globby@6.1.0": {
+        "dependencies": {
+          "minimatch": "3.1.2"
         }
       }
     },

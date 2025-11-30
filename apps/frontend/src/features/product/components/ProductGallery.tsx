@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
 import { ChevronLeft, ChevronRight, Maximize2, Play } from "lucide-react";
 
@@ -14,6 +14,7 @@ import { buildBlurPlaceholder, buildCloudinaryUrl, buildSizesAttribute } from "@
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { cn } from "@/lib/utils";
 import type { ProductSummary } from "@/features/products/types/product.types";
+import { useSwipeScroll } from "@/hooks/useSwipeScroll";
 
 import { ImageZoom } from "./ImageZoom";
 
@@ -77,6 +78,8 @@ export function ProductGallery({
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | undefined>();
+  const thumbnailRef = useRef<HTMLDivElement | null>(null);
+  useSwipeScroll(thumbnailRef);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -204,7 +207,10 @@ export function ProductGallery({
         </Button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div
+        ref={thumbnailRef}
+        className="flex touch-pan-y snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {media.map((item, index) => (
           <button
             key={item.id}

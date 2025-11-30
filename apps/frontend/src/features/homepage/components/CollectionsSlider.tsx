@@ -12,6 +12,7 @@ import Link, { type LinkProps } from "next/link";
 import { buildBlurPlaceholder, buildCloudinaryUrl, buildSizesAttribute } from "@/lib/cloudinary";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { cn } from "@/lib/utils";
+import { useSwipeScroll } from "@/hooks/useSwipeScroll";
 
 type LinkHref = LinkProps<string>["href"];
 
@@ -31,6 +32,7 @@ const imageSizes = buildSizesAttribute(undefined, "(max-width: 768px) 100vw, 33v
 export function CollectionsSlider({ items }: CollectionsSliderProps): JSX.Element {
   const sliderRef = useRef<HTMLDivElement | null>(null);
   const isHoveredRef = useRef(false);
+  useSwipeScroll(sliderRef);
 
   const scrollBy = (direction: "next" | "prev") => {
     const slider = sliderRef.current;
@@ -54,7 +56,7 @@ export function CollectionsSlider({ items }: CollectionsSliderProps): JSX.Elemen
       <div
         ref={sliderRef}
         className={cn(
-          "relative flex h-full snap-x snap-mandatory items-stretch overflow-x-auto scroll-smooth",
+          "relative flex h-full touch-pan-y snap-x snap-mandatory items-stretch overflow-x-auto scroll-smooth",
           "[-ms-overflow-style:none] [scrollbar-width:none] md:gap-0 [&::-webkit-scrollbar]:hidden",
         )}
         onMouseEnter={() => {
@@ -103,7 +105,7 @@ export function CollectionsSlider({ items }: CollectionsSliderProps): JSX.Elemen
 
       <button
         type="button"
-        className="absolute left-6 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur-md transition hover:bg-white/20 md:flex"
+        className="absolute left-6 top-1/2 hidden min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur-md transition hover:bg-white/20 md:flex"
         aria-label="Previous collection"
         onClick={() => scrollBy("prev")}
       >
@@ -111,7 +113,7 @@ export function CollectionsSlider({ items }: CollectionsSliderProps): JSX.Elemen
       </button>
       <button
         type="button"
-        className="absolute right-6 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur-md transition hover:bg-white/20 md:flex"
+        className="absolute right-6 top-1/2 hidden min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 p-3 backdrop-blur-md transition hover:bg-white/20 md:flex"
         aria-label="Next collection"
         onClick={() => scrollBy("next")}
       >

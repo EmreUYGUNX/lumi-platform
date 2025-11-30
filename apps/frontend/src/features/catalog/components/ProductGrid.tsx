@@ -34,7 +34,7 @@ export function ProductGrid({
 }: ProductGridProps): JSX.Element {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
         {Array.from({ length: LOADING_PLACEHOLDERS }).map((_, index) => (
           <div key={`skeleton-${index}`} className="space-y-3">
             <Skeleton className="aspect-[3/4] w-full rounded-xl" />
@@ -86,7 +86,7 @@ export function ProductGrid({
 
   return (
     <div className="space-y-10">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
         {products.map((product, index) => (
           <ProductCard key={product.id} product={product} priority={index < 3} />
         ))}

@@ -13,6 +13,85 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   analyzerMode: "static",
   openAnalyzer: false,
 });
+const withPWA = require("next-pwa")({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+  buildExcludes: [/middleware-manifest\.json$/],
+  runtimeCaching: [
+    {
+      urlPattern: /^https?:\/\/[^/]+\/?$/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "lumi-homepage",
+        expiration: {
+          maxEntries: 2,
+          maxAgeSeconds: 60 * 60 * 24,
+        },
+      },
+    },
+    {
+      urlPattern: /^https?:\/\/res\.cloudinary\.com\/.*\.(?:png|jpg|jpeg|gif|webp|avif)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "lumi-product-images",
+        expiration: {
+          maxEntries: 120,
+          maxAgeSeconds: 60 * 60 * 24 * 30,
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: ({ url }) => url.pathname.startsWith("/api/v1/products"),
+      handler: "StaleWhileRevalidate",
+      method: "GET",
+      options: {
+        cacheName: "lumi-product-data",
+        expiration: {
+          maxEntries: 40,
+          maxAgeSeconds: 60 * 10,
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: ({ url }) => url.pathname.startsWith("/api/v1/cart"),
+      handler: "NetworkFirst",
+      method: "GET",
+      options: {
+        cacheName: "lumi-cart",
+        networkTimeoutSeconds: 4,
+        expiration: {
+          maxEntries: 15,
+          maxAgeSeconds: 60,
+        },
+        cacheableResponse: {
+          statuses: [0, 200, 404],
+        },
+      },
+    },
+    {
+      urlPattern: /\/_next\/image\?url=/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "lumi-next-images",
+        expiration: {
+          maxEntries: 60,
+          maxAgeSeconds: 60 * 60 * 24 * 7,
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+  ],
+});
 const CLOUDINARY_BREAKPOINTS = require("../../packages/shared/media/cloudinary-breakpoints.json");
 const CLOUDINARY_CLOUD_NAME =
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? process.env.CLOUDINARY_CLOUD_NAME;
@@ -139,4 +218,4 @@ const nextConfig = {
   },
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default withBundleAnalyzer(withPWA(nextConfig));
