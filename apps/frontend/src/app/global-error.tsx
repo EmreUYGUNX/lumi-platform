@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 
+import { usePathname } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
+import { captureException } from "@/lib/analytics/sentry";
 
 interface GlobalErrorProps {
   error: Error;
@@ -10,9 +13,14 @@ interface GlobalErrorProps {
 }
 
 export default function GlobalError({ error, reset }: GlobalErrorProps): JSX.Element {
+  const pathname = usePathname();
+
   useEffect(() => {
     console.error("Global Next.js error", error);
-  }, [error]);
+    captureException(error, {
+      tags: { boundary: "global", route: pathname ?? "unknown" },
+    });
+  }, [error, pathname]);
 
   return (
     <html lang="en">

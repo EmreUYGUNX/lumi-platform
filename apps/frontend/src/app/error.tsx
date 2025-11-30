@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 
+import { usePathname } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
+import { captureException } from "@/lib/analytics/sentry";
 
 interface RootErrorProps {
   error: Error;
@@ -10,9 +13,12 @@ interface RootErrorProps {
 }
 
 export default function RootError({ error, reset }: RootErrorProps): JSX.Element {
+  const pathname = usePathname();
+
   useEffect(() => {
     console.error("Root segment error", error);
-  }, [error]);
+    captureException(error, { tags: { boundary: "root", route: pathname ?? "unknown" } });
+  }, [error, pathname]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-center">

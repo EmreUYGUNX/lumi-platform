@@ -1,12 +1,24 @@
+"use client";
+
+/* eslint-disable import/order */
+
 import type { Route } from "next";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { captureMessage } from "@/lib/analytics/sentry";
 
 export default function NotFound(): JSX.Element {
   const homeRoute = "/" as Route;
+  const pathname = usePathname();
+
+  useEffect(() => {
+    captureMessage("404_not_found", { tags: { route: pathname ?? "unknown" } }, "warning");
+  }, [pathname]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 text-center">

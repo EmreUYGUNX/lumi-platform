@@ -16,7 +16,7 @@ export default function CheckoutLayout({ children }: CheckoutLayoutProps): JSX.E
       <div className="bg-lumi-bg flex min-h-screen flex-col">
         <PublicHeader />
         <main className="flex-1">
-          <Suspense fallback={children}>
+          <Suspense fallback={<div className="min-h-[160px]" />}>
             <PageTransition>{children}</PageTransition>
           </Suspense>
         </main>

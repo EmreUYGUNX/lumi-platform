@@ -48,7 +48,7 @@ export default async function DashboardLayout({
           <CommandPaletteTrigger />
         </div>
         <main className="flex-1 px-6 py-8">
-          <Suspense fallback={children}>
+          <Suspense fallback={<div className="min-h-[160px]" />}>
             <PageTransition preserveScroll>{children}</PageTransition>
           </Suspense>
         </main>

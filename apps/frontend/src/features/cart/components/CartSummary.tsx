@@ -1,20 +1,23 @@
 "use client";
 
+/* eslint-disable import/order */
+
 import type { UrlObject } from "node:url";
-
-import { useMemo, useState, type FormEvent } from "react";
-
-import { ArrowRight, Sparkles } from "lucide-react";
 import type { Route } from "next";
 
+import { useMemo, useState, type FormEvent } from "react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { trackCheckoutStarted } from "@/lib/analytics/events";
 import { formatMoney } from "@/lib/formatters/price";
 import { cn } from "@/lib/utils";
 import { uiStore } from "@/store";
+import { useCartStore } from "../store/cart.store";
 
 interface CartSummaryProps {
   subtotal: number;
@@ -48,6 +51,8 @@ export function CartSummary({
   showPromo = true,
   checkoutLabel = "Proceed to checkout",
 }: CartSummaryProps): JSX.Element {
+  const pathname = usePathname();
+  const cartItems = useCartStore((state) => state.items);
   const [promoCode, setPromoCode] = useState("");
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
   const formatted = useMemo(
@@ -77,6 +82,13 @@ export function CartSummary({
       title: "Kupon doğrulanıyor",
       description: "İndirimler ödeme adımında doğrulanacak.",
     });
+  };
+
+  const handleCheckout = () => {
+    if (!pathname?.startsWith("/checkout") && cartItems.length > 0) {
+      trackCheckoutStarted(total, cartItems);
+    }
+    onCheckout?.();
   };
 
   return (
@@ -163,7 +175,7 @@ export function CartSummary({
           asChild
           disabled={isSubmitting}
           className="bg-lumi-text hover:bg-lumi-text/90 rounded-full uppercase tracking-[0.22em] text-white"
-          onClick={onCheckout}
+          onClick={handleCheckout}
         >
           <Link href={checkoutHref ?? ("/checkout" as Route)}>
             {checkoutLabel}

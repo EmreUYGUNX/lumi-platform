@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 
 import { AlertCircle } from "lucide-react";
 
@@ -12,6 +12,7 @@ import { useProductDetail } from "@/features/product/hooks/useProductDetail";
 import { useProductReviews } from "@/features/product/hooks/useProductReviews";
 import { useVariantSelection } from "@/features/product/hooks/useVariantSelection";
 import type { ProductDetail } from "@/features/product/types/product-detail.types";
+import { trackProductView } from "@/lib/analytics/events";
 
 import { AddToCartButton } from "./AddToCartButton";
 import { ProductInfo } from "./ProductInfo";
@@ -62,6 +63,19 @@ export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps)
   });
 
   const pageTitle = useMemo(() => product?.title ?? "Product detail", [product?.title]);
+
+  useEffect(() => {
+    if (!product) return;
+    trackProductView({
+      id: product.id,
+      title: product.title,
+      slug: product.slug,
+      sku: product.sku ?? undefined,
+      price: product.price,
+      currency: product.currency,
+      categories: product.categories,
+    });
+  }, [product]);
 
   if (detailQuery.isLoading) {
     return (

@@ -9,6 +9,7 @@ import { orderDetailSchema, paymentSummarySchema } from "@lumi/shared/dto";
 import { cartKeys } from "@/features/cart/hooks/cart.keys";
 import { cartStore } from "@/features/cart/store/cart.store";
 import { apiClient } from "@/lib/api-client";
+import { trackPurchase } from "@/lib/analytics/events";
 import { uiStore } from "@/store";
 
 import { CHECKOUT_STEPS, checkoutStore } from "../store/checkout.store";
@@ -145,6 +146,13 @@ export const useCreateOrder = () => {
         currency: data.order.totalAmount.currency,
         shippingMethod,
         step: CHECKOUT_STEPS.at(-1),
+      });
+
+      trackPurchase({
+        id: data.order.id,
+        reference: data.order.reference,
+        totalAmount: data.order.totalAmount,
+        items: data.order.items,
       });
 
       router.push("/checkout/success");

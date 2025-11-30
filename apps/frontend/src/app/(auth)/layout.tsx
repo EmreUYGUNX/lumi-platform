@@ -30,7 +30,7 @@ export default async function AuthLayout({ children }: AuthLayoutProps): Promise
           Lumi Commerce
         </Link>
         <div className="border-lumi-border/60 bg-lumi-bg/90 shadow-glow mt-10 w-full max-w-md rounded-3xl border p-8">
-          <Suspense fallback={children}>
+          <Suspense fallback={<div className="min-h-[160px]" />}>
             <PageTransition>{children}</PageTransition>
           </Suspense>
         </div>

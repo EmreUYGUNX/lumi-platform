@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env } from "@/lib/env";
+import { captureApiError } from "@/lib/analytics/sentry";
 import { sessionStore } from "@/store";
 
 const API_BASE_URL = env.NEXT_PUBLIC_API_URL.replace(/\/+$/u, "");
@@ -244,6 +245,7 @@ const waitFor = (delayMs: number) =>
 
 const nextDelay = (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 5000);
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export async function apiRequest<
   TDataSchema extends z.ZodTypeAny,
   TMetaSchema extends z.ZodTypeAny | undefined = undefined,
@@ -300,6 +302,13 @@ export async function apiRequest<
       throw parseErrorPayload(payload, response.status);
     } catch (error) {
       if (!isRetriable(attemptIndex, attempts, error)) {
+        captureApiError(error, {
+          path,
+          method,
+          status: error instanceof ApiClientError ? error.status : undefined,
+          code: error instanceof ApiClientError ? error.code : undefined,
+          attempt: attemptIndex + 1,
+        });
         if (error instanceof Error) {
           throw error;
         }

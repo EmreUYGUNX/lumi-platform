@@ -2,13 +2,14 @@
 
 /* eslint-disable import/order */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { Route } from "next";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import { trackCheckoutStarted, trackCheckoutStep } from "@/lib/analytics/events";
 import { CartSummary } from "@/features/cart/components/CartSummary";
 import { useCart } from "@/features/cart/hooks/useCart";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +39,7 @@ export function CheckoutWizard(): JSX.Element {
   const cart = useCart();
   const methodMeta = SHIPPING_METHODS.find((entry) => entry.id === shippingMethod);
   const shippingCost = methodMeta?.cost ?? 0;
+  const checkoutStartedRef = useRef(false);
 
   const urlStep = searchParams?.get("step");
   useEffect(() => {
@@ -53,6 +55,30 @@ export function CheckoutWizard(): JSX.Element {
     params.set("step", step);
     router.replace(`${pathname}?${params.toString()}` as Route, { scroll: false });
   }, [pathname, router, searchParams, step]);
+
+  useEffect(() => {
+    if (checkoutStartedRef.current || cart.isLoading || cart.items.length === 0) return;
+    trackCheckoutStarted(cart.totals.total, cart.items);
+    checkoutStartedRef.current = true;
+  }, [cart.isLoading, cart.items, cart.totals.total]);
+
+  useEffect(() => {
+    if (cart.isLoading || cart.items.length === 0) return;
+    trackCheckoutStep(step, {
+      cartValue: cart.totals.total + shippingCost,
+      currency: cart.totals.currency,
+      items: cart.items,
+      shippingMethod,
+    });
+  }, [
+    cart.isLoading,
+    cart.items,
+    cart.totals.currency,
+    cart.totals.total,
+    shippingCost,
+    shippingMethod,
+    step,
+  ]);
 
   const renderStep = () => {
     switch (step) {

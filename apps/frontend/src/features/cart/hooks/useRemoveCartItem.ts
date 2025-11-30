@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { cuidSchema } from "@lumi/shared/dto";
+import { trackRemoveFromCart } from "@/lib/analytics/events";
 import { apiClient } from "@/lib/api-client";
 import { uiStore } from "@/store";
 
@@ -57,7 +58,7 @@ export const useRemoveCartItem = () => {
 
       return { previous };
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables, context) => {
       queryClient.setQueryData(cartKeys.summary(), data);
       cartStore.getState().sync(data);
       uiStore.getState().enqueueToast({
@@ -65,6 +66,13 @@ export const useRemoveCartItem = () => {
         title: "Ürün kaldırıldı",
         description: "Ürün sepetten çıkarıldı.",
       });
+
+      const removed =
+        context?.previous?.cart.items.find((item) => item.id === variables.itemId) ??
+        context?.previous?.cart.items.find((item) => item.productVariantId === variables.itemId);
+      if (removed) {
+        trackRemoveFromCart(removed, removed.quantity);
+      }
     },
     onError: (error, _variables, context) => {
       if (context?.previous) {
