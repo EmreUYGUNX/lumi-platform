@@ -23,7 +23,7 @@
     "isolatedModules": true,
     "incremental": true,
     "strict": true,
-    "tsBuildInfoFile": ".next/tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": ".next-build/tsconfig.tsbuildinfo",
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "plugins": [
       {
@@ -32,18 +32,19 @@
     ]
   },
   "include": [
+    ".next/types/**/*.ts",
     "__mocks__/**/*",
     "__tests__/**/*",
     "e2e/**/*",
-    "next-env.d.ts",
     "middleware.ts",
-    "scripts/**/*",
+    "next-env.d.ts",
     "playwright.config.ts",
+    "scripts/**/*",
     "src/**/*",
     "tailwind.config.ts",
-    ".next/types/**/*.ts",
     "vitest.config.ts",
-    "vitest.setup.tsx"
+    "vitest.setup.tsx",
+    ".next-build/types/**/*.ts"
   ],
   "references": [
     {

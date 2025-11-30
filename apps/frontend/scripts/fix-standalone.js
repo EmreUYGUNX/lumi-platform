@@ -8,7 +8,8 @@ const fsPromises = require("node:fs/promises");
 const path = require("node:path");
 
 const appRoot = path.join(__dirname, "..");
-const standaloneRoot = path.join(appRoot, ".next", "standalone");
+const distDir = ".next-build";
+const standaloneRoot = path.join(appRoot, distDir, "standalone");
 
 const helpersPackagePath = require.resolve("@swc/helpers/package.json", { paths: [appRoot] });
 const sourceHelpers = path.join(path.dirname(helpersPackagePath), "esm");
@@ -18,7 +19,7 @@ const sourceManifest = path.join(
   standaloneRoot,
   "apps",
   "frontend",
-  ".next",
+  distDir,
   "server",
   "app",
   "page_client-reference-manifest.js",
@@ -27,7 +28,7 @@ const targetManifest = path.join(
   standaloneRoot,
   "apps",
   "frontend",
-  ".next",
+  distDir,
   "server",
   "app",
   "(public)",

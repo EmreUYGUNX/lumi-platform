@@ -5,7 +5,7 @@
   "description": "Future Next.js web client for Lumi commerce platform.",
   "scripts": {
     "dev": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next dev",
-    "build": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
+    "build": "rimraf .next-build && node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
     "start": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

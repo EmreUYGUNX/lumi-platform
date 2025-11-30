@@ -13,9 +13,12 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   analyzerMode: "static",
   openAnalyzer: false,
 });
+const isCI = process.env.CI === "true";
+const enablePWA = process.env.NEXT_PWA_ENABLED === "true" && !isCI;
 const withPWA = require("next-pwa")({
   dest: "public",
-  disable: process.env.NODE_ENV === "development",
+  disable:
+    !enablePWA || process.env.NEXT_DISABLE_PWA === "true" || process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
   buildExcludes: [/middleware-manifest\.json$/],
@@ -108,6 +111,7 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/**/*": ["./node_modules/@swc/helpers/esm/**/*"],
   },
+  distDir: ".next-build",
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],

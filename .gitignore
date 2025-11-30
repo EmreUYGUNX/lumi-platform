@@ -63,3 +63,4 @@ storybook-static/
 *.Zone.Identifier
 apps/backend/logs-*/
 .trivy/
+apps/**/.next-build/
