@@ -234,7 +234,10 @@
       "@next/env": "15.5.4",
       "fsevents": "2.3.3",
       "test-exclude": "7.0.1",
-      "body-parser": "2.2.1"
+      "body-parser": "2.2.1",
+      "@rollup/plugin-commonjs": "28.0.1",
+      "@rollup/pluginutils": "5.3.0",
+      "webpack-sources": "3.3.3"
     },
     "packageExtensions": {
       "react-dom@*": {
