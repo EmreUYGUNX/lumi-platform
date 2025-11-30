@@ -127,7 +127,7 @@ export function ProductCard({
           )}
           <button
             type="button"
-            className="text-lumi-text absolute right-2 top-2 rounded-full bg-white/90 p-2 opacity-0 shadow-sm transition duration-500 hover:bg-white group-hover:opacity-100"
+            className="text-lumi-text absolute right-2 top-2 min-h-[44px] min-w-[44px] rounded-full bg-white/90 p-2 opacity-0 shadow-sm transition duration-500 hover:bg-white group-hover:opacity-100"
             aria-label="Add to wishlist"
             onClick={(event) => {
               event.preventDefault();

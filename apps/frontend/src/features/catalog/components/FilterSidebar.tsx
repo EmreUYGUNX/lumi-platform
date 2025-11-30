@@ -70,7 +70,7 @@ const RatingButton = ({
     type="button"
     onClick={() => onSelect(active ? undefined : ratingValue)}
     className={cn(
-      "flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em]",
+      "flex min-h-[44px] items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em]",
       active
         ? "border-lumi-text bg-lumi-bg-secondary text-lumi-text"
         : "border-lumi-border text-lumi-text-secondary",
@@ -408,8 +408,12 @@ export function FilterSidebar({
   if (variant === "drawer") {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="left" className="w-[90vw] max-w-md overflow-y-auto">
-          <SheetHeader>
+        <SheetContent
+          side="bottom"
+          className="border-lumi-border/70 h-[82vh] max-h-[720px] overflow-y-auto rounded-t-3xl border bg-white/95 px-6 pb-8 pt-4 shadow-2xl backdrop-blur-md sm:max-w-xl sm:rounded-3xl"
+        >
+          <SheetHeader className="flex flex-col items-center">
+            <div className="bg-lumi-border/60 mb-2 h-1 w-12 rounded-full" aria-hidden />
             <SheetTitle className="text-[12px] uppercase tracking-[0.28em]">Filters</SheetTitle>
           </SheetHeader>
           <div className="mt-6">

@@ -24,5 +24,29 @@ export default defineConfig({
       name: "mobile-chrome",
       use: { ...devices["Pixel 5"] },
     },
+    {
+      name: "iphone-se",
+      use: { ...devices["iPhone SE"] },
+    },
+    {
+      name: "iphone-13",
+      use: { ...devices["iPhone 13"] },
+    },
+    {
+      name: "iphone-14-pro-max",
+      use: { ...devices["iPhone 14 Pro Max"] },
+    },
+    {
+      name: "ipad-mini",
+      use: { ...devices["iPad Mini"] },
+    },
+    {
+      name: "ipad-air",
+      use: { ...devices["iPad Air"] },
+    },
+    {
+      name: "ipad-pro-12-9",
+      use: { ...devices["iPad Pro 12.9"] },
+    },
   ],
 });

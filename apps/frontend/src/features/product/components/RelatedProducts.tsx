@@ -1,9 +1,12 @@
 "use client";
 
+import { useRef } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/features/catalog/components/ProductCard";
 import { useProducts } from "@/features/products/hooks/useProducts";
 import type { ProductSummary } from "@/features/products/types/product.types";
+import { useSwipeScroll } from "@/hooks/useSwipeScroll";
 
 interface RelatedProductsProps {
   product?: ProductSummary;
@@ -11,6 +14,8 @@ interface RelatedProductsProps {
 
 export function RelatedProducts({ product }: RelatedProductsProps): JSX.Element | null {
   const primaryCategory = product?.categories[0]?.slug;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useSwipeScroll(scrollRef);
 
   const relatedQuery = useProducts(
     {
@@ -46,7 +51,10 @@ export function RelatedProducts({ product }: RelatedProductsProps): JSX.Element 
       <h3 className="text-lumi-text text-xl font-semibold uppercase tracking-[0.2em]">
         You may also like
       </h3>
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div
+        ref={scrollRef}
+        className="flex touch-pan-y snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {items.map((item) => (
           <div key={item.id} className="min-w-[240px] snap-start">
             <ProductCard product={item} />

@@ -56,6 +56,7 @@ module.exports = {
   siteUrl,
   generateRobotsTxt: false,
   sitemapSize: 7000,
+  sourceDir: ".next-build",
   exclude: ["/admin/*", "/dashboard/*", "/api/*"],
   transform: async (config, path) => {
     const priority = (() => {

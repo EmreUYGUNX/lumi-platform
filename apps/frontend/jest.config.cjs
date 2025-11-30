@@ -6,7 +6,7 @@ const coverageExcludes = [
   "/src/features/media/",
   "/src/components/ui/image/",
   "/src/lib/cloudinary\\.ts$",
-  "/src/lib/image-loader\\.ts$"
+  "/src/lib/image-loader\\.ts$",
 ];
 
 module.exports = createProjectJestConfig({
@@ -17,6 +17,8 @@ module.exports = createProjectJestConfig({
   modulePathIgnorePatterns: [
     "<rootDir>/apps/frontend/.next",
     "<rootDir>/apps/frontend/.next/standalone",
+    "<rootDir>/apps/frontend/.next-build",
+    "<rootDir>/apps/frontend/.next-build/standalone",
   ],
   moduleNameMapper: {
     "^@/(.*)$": path.join(__dirname, "src", "$1"),
@@ -34,7 +36,7 @@ module.exports = createProjectJestConfig({
     "!src/features/media/**/*",
     "!src/components/ui/image/**/*",
     "!src/lib/cloudinary.ts",
-    "!src/lib/image-loader.ts"
+    "!src/lib/image-loader.ts",
   ],
-  coveragePathIgnorePatterns: coverageExcludes
+  coveragePathIgnorePatterns: coverageExcludes,
 });

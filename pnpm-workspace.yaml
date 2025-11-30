@@ -3,6 +3,7 @@ packages:
   - "apps/**"
   - "!apps/**/.lumi-next/**"
   - "!apps/**/.next/**"
+  - "!apps/**/.next-build/**"
   - "packages/*"
   - "packages/**"
   - "tools/*"
