@@ -42,7 +42,7 @@ export function FilterBar({
               type="button"
               onClick={() => onCategoryChange(item.slug, item.label)}
               className={cn(
-                "rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
+                "min-h-[44px] rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
                 activeCategory === item.slug
                   ? "bg-lumi-text text-white"
                   : "border-lumi-border/70 text-lumi-text-secondary border",
