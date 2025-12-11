@@ -59,8 +59,8 @@ export function WishlistItem({
         ? "text-lumi-warning"
         : "text-lumi-text-secondary";
   const router = useRouter();
-  const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
-  const prefetchProduct = () => router.prefetch(`/products/${product.slug}` as Route);
+  const href = `/products/${product.slug}` as Route;
+  const prefetchProduct = () => router.prefetch(href);
 
   const handleAdd = () => {
     if (disabled || !onAddToCart) return;

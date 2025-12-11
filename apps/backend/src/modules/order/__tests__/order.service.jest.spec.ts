@@ -237,6 +237,7 @@ const createProductFixture = () => ({
   currency: "TRY",
   inventoryPolicy: InventoryPolicy.TRACK,
   searchKeywords: [],
+  tags: [],
   attributes: null,
   deletedAt: null,
   createdAt: FIXTURE_TIMESTAMP,

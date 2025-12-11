@@ -557,6 +557,11 @@ const toRepositoryFilters = (filter: ProductFilter): ProductSearchFilters => {
     filters.collectionIds = filter.collectionIds;
   }
 
+  const { tags } = filter as unknown as { tags?: string[] };
+  if (tags?.length) {
+    filters.tags = tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+  }
+
   if (filter.priceRange?.min) {
     filters.minPrice = new Prisma.Decimal(filter.priceRange.min);
   }

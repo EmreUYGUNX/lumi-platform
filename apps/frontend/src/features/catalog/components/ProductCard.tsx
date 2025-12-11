@@ -87,11 +87,10 @@ export function ProductCard({
     });
   };
 
-  const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
-  const hrefString = `/products/${product.slug}` as Route;
+  const href = `/products/${product.slug}` as Route;
 
   const prefetchProduct = () => {
-    router.prefetch(hrefString);
+    router.prefetch(href);
   };
 
   return (
@@ -108,7 +107,7 @@ export function ProductCard({
         onMouseEnter={prefetchProduct}
         onFocus={prefetchProduct}
       >
-        <div className="bg-lumi-text relative aspect-[3/4] overflow-hidden rounded-xl">
+        <div className="relative aspect-[3/4] min-h-[240px] w-full overflow-hidden rounded-xl bg-neutral-100">
           <Image
             loader={cloudinaryImageLoader}
             src={src}
@@ -117,7 +116,7 @@ export function ProductCard({
             sizes={sizes}
             placeholder="blur"
             blurDataURL={blur}
-            className="object-cover mix-blend-multiply transition duration-700 group-hover:scale-105"
+            className="object-cover transition duration-700 group-hover:scale-105"
             priority={priority}
             loading={priority ? "eager" : "lazy"}
           />

@@ -15,7 +15,7 @@ export default function PublicLayout({ children }: PublicLayoutProps): JSX.Eleme
     <MarketingWrapper>
       <div className="bg-lumi-bg flex min-h-screen flex-col">
         <PublicHeader />
-        <main className="flex-1">
+        <main className="flex-1 pt-16">
           <Suspense fallback={<div className="min-h-[160px]" />}>
             <PageTransition>{children}</PageTransition>
           </Suspense>

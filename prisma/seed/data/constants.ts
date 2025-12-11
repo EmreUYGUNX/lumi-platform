@@ -58,6 +58,7 @@ export interface ProductSeed {
   compareAtPrice?: string | null;
   currency?: string;
   searchKeywords?: string[];
+  tags?: string[];
   attributes?: Record<string, unknown>;
   categories: string[];
   variants: ProductVariantSeed[];

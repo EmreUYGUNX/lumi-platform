@@ -13,6 +13,8 @@ import { createCartRouter } from "@/modules/cart/cart.router.js";
 import type { CartRouterOptions } from "@/modules/cart/cart.router.js";
 import { createCatalogRouter } from "@/modules/catalog/catalog.router.js";
 import type { CatalogRouterOptions } from "@/modules/catalog/catalog.router.js";
+import { createCustomizationRouter } from "@/modules/customization/customization.router.js";
+import type { CustomizationRouterOptions } from "@/modules/customization/customization.router.js";
 import { createMediaRouter } from "@/modules/media/media.router.js";
 import { createOrderRouter } from "@/modules/order/order.router.js";
 import type { OrderRouterOptions } from "@/modules/order/order.router.js";
@@ -34,6 +36,7 @@ interface ApiRouterOptions {
    */
   registerRoute?: RouteRegistrar;
   catalogOptions?: Pick<CatalogRouterOptions, "service">;
+  customizationOptions?: Pick<CustomizationRouterOptions, "service">;
   authOptions?: AuthRouterOptions;
   cartOptions?: Pick<CartRouterOptions, "service">;
   orderOptions?: Pick<OrderRouterOptions, "service">;
@@ -170,6 +173,14 @@ export const createV1Router = (
     createCatalogRouter(config, {
       registerRoute: registerV1Route,
       ...options.catalogOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createCustomizationRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.customizationOptions,
     }),
   );
 

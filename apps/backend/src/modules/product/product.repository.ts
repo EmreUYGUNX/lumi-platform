@@ -23,6 +23,7 @@ export interface ProductSearchFilters {
   categoryIds?: string[];
   primaryCategoryId?: string;
   collectionIds?: string[];
+  tags?: string[];
   minPrice?: Prisma.Decimal | number;
   maxPrice?: Prisma.Decimal | number;
   includeDeleted?: boolean;
@@ -325,6 +326,10 @@ export const buildProductSearchWhere = (
   const collectionCondition = buildCollectionCondition(filters.collectionIds);
   if (collectionCondition) {
     where.collections = collectionCondition;
+  }
+
+  if (filters.tags?.length) {
+    where.tags = { hasSome: filters.tags };
   }
 
   const priceFilter = buildPriceFilter(filters);

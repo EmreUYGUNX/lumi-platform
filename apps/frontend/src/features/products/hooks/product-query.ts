@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { paginationMetaSchema } from "@lumi/shared/dto";
+import { isoDateTimeSchema, paginationMetaSchema } from "@lumi/shared/dto";
 
 import type {
   ProductAttributeFilters,
@@ -20,8 +20,10 @@ export const paginatedMetaSchema = z
   .object({
     pagination: paginationMetaSchema,
     cursor: cursorMetaSchema,
+    timestamp: isoDateTimeSchema.optional(),
+    requestId: z.string().optional(),
   })
-  .strict();
+  .strip();
 
 export const FALLBACK_PAGINATION = {
   page: 1,

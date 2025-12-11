@@ -100,6 +100,8 @@ const CLOUDINARY_CLOUD_NAME =
   process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? process.env.CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_REMOTE_PATH = CLOUDINARY_CLOUD_NAME ? `/${CLOUDINARY_CLOUD_NAME}/**` : "/**";
 
+const distDir = process.env.NODE_ENV === "development" ? ".next" : ".next-build";
+
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -111,7 +113,7 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/**/*": ["./node_modules/@swc/helpers/esm/**/*"],
   },
-  distDir: ".next-build",
+  distDir,
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ["@lumi/ui", "@lumi/shared"],

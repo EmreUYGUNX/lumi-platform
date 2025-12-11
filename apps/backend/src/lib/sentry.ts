@@ -1,6 +1,6 @@
-import type { Scope } from "@sentry/core";
 import * as Sentry from "@sentry/node";
 import { httpIntegration, linkedErrorsIntegration } from "@sentry/node";
+import type { Scope } from "@sentry/node";
 import type { Request, RequestHandler, Response } from "express";
 
 import type { ApplicationConfig } from "@lumi/types";

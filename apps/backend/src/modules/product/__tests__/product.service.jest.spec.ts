@@ -71,6 +71,7 @@ const createProductEntity = (): ProductWithRelations => {
     currency: "TRY",
     inventoryPolicy: "TRACK" as const,
     searchKeywords: ["lamp"],
+    tags: [],
     attributes: { colour: "black" },
     deletedAt: null,
     createdAt: timestamp,

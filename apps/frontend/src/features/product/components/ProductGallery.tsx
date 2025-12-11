@@ -15,6 +15,7 @@ import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { cn } from "@/lib/utils";
 import type { ProductSummary } from "@/features/products/types/product.types";
 import { useSwipeScroll } from "@/hooks/useSwipeScroll";
+import { getFallbackMedia } from "@/features/products/utils/product-helpers";
 
 import { ImageZoom } from "./ImageZoom";
 
@@ -26,8 +27,10 @@ interface GalleryMedia {
   isPrimary?: boolean;
 }
 
+// Guaranteed demo asset so we don't depend on a project-specific Cloudinary upload.
 const placeholder = buildCloudinaryUrl({
-  publicId: "lumi/placeholders/product-fallback",
+  publicId: "sample",
+  baseUrl: "https://res.cloudinary.com/demo/image/upload",
   transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_1080,h_1350"],
 });
 
@@ -36,11 +39,12 @@ const sizes = buildSizesAttribute("detail");
 
 const deriveMedia = (product: ProductSummary | undefined): GalleryMedia[] => {
   if (!product?.media?.length) {
+    const fallback = getFallbackMedia(product);
     return [
       {
         id: "placeholder",
-        url: placeholder,
-        alt: product?.title ?? "Product media",
+        url: fallback.src,
+        alt: fallback.alt,
         type: "image",
         isPrimary: true,
       },

@@ -89,6 +89,7 @@ services:
 
   frontend:
     <<: *node-base
+    restart: "no"
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
@@ -103,7 +104,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      NEXT_PUBLIC_API_URL: http://backend:4000/api/v1
+      # Use host loopback so the browser can reach the API via the exposed port.
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
       FRONTEND_INSPECT_PORT: ${FRONTEND_INSPECT_PORT:-9230}
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: 100

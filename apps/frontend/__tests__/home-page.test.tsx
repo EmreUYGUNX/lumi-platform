@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, it, vi } from "vitest";
 
-import HomePage from "@/app/page";
+import HomePage from "@/app/(public)/page";
 
 vi.mock("@/features/homepage/hooks/useJustDroppedProducts", () => ({
   useJustDroppedProducts: () => ({

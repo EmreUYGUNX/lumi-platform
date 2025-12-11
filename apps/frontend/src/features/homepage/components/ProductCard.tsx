@@ -42,9 +42,9 @@ const resolveMediaUrl = (product: ProductSummary): { src: string; alt: string } 
 export function ProductCard({ product, priority = false }: ProductCardProps): JSX.Element {
   const { src, alt } = resolveMediaUrl(product);
   const price = formatMoney(product.price);
-  const href = { pathname: "/products/[slug]", query: { slug: product.slug } } as const;
+  const href = `/products/${product.slug}` as Route;
   const router = useRouter();
-  const prefetchProduct = () => router.prefetch(`/products/${product.slug}` as Route);
+  const prefetchProduct = () => router.prefetch(href);
 
   return (
     <Link
@@ -55,7 +55,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps): JS
       onMouseEnter={prefetchProduct}
       onFocus={prefetchProduct}
     >
-      <div className="bg-lumi-background-secondary border-lumi-border/60 relative aspect-square overflow-hidden rounded-xl border">
+      <div className="border-lumi-border/60 relative aspect-square min-h-[200px] w-full overflow-hidden rounded-xl border bg-neutral-100">
         <Image
           loader={cloudinaryImageLoader}
           src={src}
@@ -64,7 +64,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps): JS
           sizes={sizes}
           placeholder="blur"
           blurDataURL={blur}
-          className="ease-emphasis object-cover mix-blend-multiply transition duration-500 group-hover:scale-105"
+          className="ease-emphasis object-cover transition duration-500 group-hover:scale-105"
           priority={priority}
           loading={priority ? "eager" : "lazy"}
         />

@@ -82,6 +82,34 @@ export function getBasePermissions(): PermissionSeed[] {
   return BASE_PERMISSIONS;
 }
 
+const CLOUDINARY_CLOUD_NAME =
+  process.env.CLOUDINARY_CLOUD_NAME ?? process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "dqmutwjcg";
+
+const buildCloudinaryUrl = (publicId: string): string =>
+  `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${publicId}`;
+
+const SEED_IMAGE_POOL = [
+  "lumi/products/jeans-428614_1920_uflws5",
+  "lumi/products/jeans-3051102_1920_hsp61l",
+  "lumi/products/kid-7471803_1920_snjfnd",
+  "lumi/products/neon-8726714_1920_fcykgq",
+  "lumi/products/guy-598180_1920_qfemem",
+  "lumi/products/tshirt-8726716_1920_oawa3r",
+  "lumi/products/stand-5126363_1920_enrcp9",
+  "lumi/products/male-5321547_1920_zy5nsm",
+  "lumi/products/young-girl-7409676_1920_ostddl",
+  "lumi/products/people-2592339_1920_wxtia8",
+  "lumi/products/ai-generated-9565195_1920_dcn8pe",
+  "lumi/products/t-shirt-3995093_1920_dijocp",
+];
+
+let seedImageCursor = 0;
+const nextSeedImage = (): { publicId: string; url: string } => {
+  const publicId = SEED_IMAGE_POOL[seedImageCursor % SEED_IMAGE_POOL.length];
+  seedImageCursor += 1;
+  return { publicId, url: buildCloudinaryUrl(publicId) };
+};
+
 const slugify = (value: string): string =>
   value
     .trim()
@@ -160,218 +188,235 @@ export function buildCategorySeeds(profile: SeedProfileConfig): CategorySeed[] {
 }
 
 const createBaseProductSeeds = (): ProductSeed[] => [
-  {
-    title: "Aurora X1 Smartphone",
-    slug: "aurora-x1-smartphone",
-    sku: "AURORA-X1",
-    summary: "Flagship smartphone with exceptional camera and battery life.",
-    description:
-      "The Aurora X1 delivers a stunning AMOLED display, triple-lens AI camera system and all-day battery in a premium aluminum frame.",
-    status: "ACTIVE" satisfies ProductStatus,
-    price: "12999.00",
-    compareAtPrice: "13999.00",
-    currency: "TRY",
-    searchKeywords: ["smartphone", "android", "camera"],
-    attributes: { warrantyYears: 2, chipset: "LumiCore X", waterproof: true },
-    categories: ["smartphones"],
-    variants: [
-      {
-        sku: "AURORA-X1-128",
-        title: "Aurora X1 128 GB",
-        price: "12999.00",
-        compareAtPrice: "13999.00",
-        stock: 25,
-        isPrimary: true,
-        attributes: { storage: "128 GB", color: "Midnight Black" },
-      },
-      {
-        sku: "AURORA-X1-256",
-        title: "Aurora X1 256 GB",
-        price: "14299.00",
-        compareAtPrice: "15299.00",
-        stock: 18,
-        attributes: { storage: "256 GB", color: "Polar Silver" },
-      },
-    ],
-    media: [
-      {
-        assetId: "aurora-x1-hero",
-        url: "https://images.lumi-commerce.com/products/aurora-x1/hero.jpg",
-        type: "IMAGE" satisfies MediaType,
-        provider: "CLOUDINARY" satisfies MediaProvider,
-        mimeType: "image/jpeg",
-        sizeBytes: 785_432,
-        width: 1600,
-        height: 2000,
-        alt: "Aurora X1 smartphone front and back view",
-        caption: "Aurora X1 flagship smartphone",
-        isPrimary: true,
-        sortOrder: 1,
-        variantSkus: ["AURORA-X1-128", "AURORA-X1-256"],
-      },
-      {
-        assetId: "aurora-x1-camera",
-        url: "https://images.lumi-commerce.com/products/aurora-x1/camera.jpg",
-        type: "IMAGE" satisfies MediaType,
-        provider: "CLOUDINARY" satisfies MediaProvider,
-        mimeType: "image/jpeg",
-        sizeBytes: 502_331,
-        width: 1600,
-        height: 2000,
-        alt: "Aurora X1 triple camera close-up",
-        caption: "Ultra wide triple camera system",
-        sortOrder: 2,
-        variantSkus: ["AURORA-X1-256"],
-      },
-    ],
-  },
-  {
-    title: "Nimbus Pro Laptop",
-    slug: "nimbus-pro-laptop",
-    sku: "NIMBUS-PRO",
-    summary: 'Professional-grade laptop with 16" 4K display and 12-core CPU.',
-    description:
-      'Designed for creators and developers, the Nimbus Pro pairs a 12-core processor with a dedicated GPU and 16" 4K display for uncompromising productivity.',
-    status: "ACTIVE" satisfies ProductStatus,
-    price: "36999.00",
-    compareAtPrice: "38999.00",
-    currency: "TRY",
-    searchKeywords: ["laptop", "4k", "creator"],
-    attributes: { warrantyYears: 3, weightKg: 1.4 },
-    categories: ["laptops"],
-    variants: [
-      {
-        sku: "NIMBUS-PRO-I7",
-        title: "Nimbus Pro Laptop (i7, 16 GB)",
-        price: "36999.00",
-        stock: 12,
-        isPrimary: true,
-        attributes: { cpu: "LumiCore i7", memory: "16 GB", storage: "512 GB SSD" },
-      },
-      {
-        sku: "NIMBUS-PRO-I9",
-        title: "Nimbus Pro Laptop (i9, 32 GB)",
-        price: "42999.00",
-        stock: 8,
-        attributes: { cpu: "LumiCore i9", memory: "32 GB", storage: "1 TB SSD" },
-      },
-    ],
-    media: [
-      {
-        assetId: "nimbus-pro-hero",
-        url: "https://images.lumi-commerce.com/products/nimbus-pro/hero.jpg",
-        type: "IMAGE" satisfies MediaType,
-        provider: "CLOUDINARY" satisfies MediaProvider,
-        mimeType: "image/jpeg",
-        sizeBytes: 893_442,
-        width: 1800,
-        height: 1200,
-        alt: "Nimbus Pro laptop with 16-inch 4K display",
-        caption: "Nimbus Pro workstation laptop",
-        isPrimary: true,
-        sortOrder: 1,
-        variantSkus: ["NIMBUS-PRO-I7", "NIMBUS-PRO-I9"],
-      },
-    ],
-  },
-  {
-    title: "EcoBlend Pro Blender",
-    slug: "ecoblend-pro-blender",
-    sku: "ECOBLEND-PRO",
-    summary: "High-performance blender with smart presets and silent motor.",
-    description:
-      "EcoBlend Pro combines a 1500W motor, sound-dampening shell and smart presets for smoothies, soups and nut milks.",
-    status: "ACTIVE" satisfies ProductStatus,
-    price: "3499.00",
-    compareAtPrice: "3999.00",
-    currency: "TRY",
-    searchKeywords: ["kitchen", "blender", "appliance"],
-    attributes: { warrantyYears: 2, capacityLiters: 1.8 },
-    categories: ["kitchen"],
-    variants: [
-      {
-        sku: "ECOBLEND-PRO-STD",
-        title: "EcoBlend Pro (Standard)",
-        price: "3499.00",
-        stock: 40,
-        isPrimary: true,
-        attributes: { color: "Graphite Grey" },
-      },
-      {
-        sku: "ECOBLEND-PRO-PREM",
-        title: "EcoBlend Pro (Premium Accessories)",
-        price: "4199.00",
-        stock: 22,
-        attributes: { color: "Arctic White", accessories: ["Travel cup", "Grinding blade"] },
-      },
-    ],
-    media: [
-      {
-        assetId: "ecoblend-pro-hero",
-        url: "https://images.lumi-commerce.com/products/ecoblend-pro/hero.jpg",
-        type: "IMAGE" satisfies MediaType,
-        provider: "CLOUDINARY" satisfies MediaProvider,
-        mimeType: "image/jpeg",
-        sizeBytes: 623_441,
-        width: 1400,
-        height: 1400,
-        alt: "EcoBlend Pro blender with smart control panel",
-        caption: "EcoBlend Pro countertop blender",
-        isPrimary: true,
-        sortOrder: 1,
-        variantSkus: ["ECOBLEND-PRO-STD", "ECOBLEND-PRO-PREM"],
-      },
-    ],
-  },
-  {
-    title: "LumiGlow Floor Lamp",
-    slug: "lumiglow-floor-lamp",
-    sku: "LUMIGLOW-FLOOR",
-    summary: "Ambient LED floor lamp with voice assistant integration.",
-    description:
-      "Set the perfect mood with 16 million colors, scene presets and smart assistant control using the LumiGlow floor lamp.",
-    status: "ACTIVE" satisfies ProductStatus,
-    price: "2199.00",
-    compareAtPrice: "2499.00",
-    currency: "TRY",
-    searchKeywords: ["lighting", "smart home", "decor"],
-    attributes: { warrantyYears: 2, heightCm: 130 },
-    categories: ["decor"],
-    variants: [
-      {
-        sku: "LUMIGLOW-FLOOR-BLK",
-        title: "LumiGlow Floor Lamp (Black)",
-        price: "2199.00",
-        stock: 35,
-        isPrimary: true,
-        attributes: { color: "Black" },
-      },
-      {
-        sku: "LUMIGLOW-FLOOR-GLD",
-        title: "LumiGlow Floor Lamp (Champagne Gold)",
-        price: "2399.00",
-        stock: 15,
-        attributes: { color: "Champagne Gold" },
-      },
-    ],
-    media: [
-      {
-        assetId: "lumiglow-floor-hero",
-        url: "https://images.lumi-commerce.com/products/lumiglow-floor/hero.jpg",
-        type: "IMAGE" satisfies MediaType,
-        provider: "CLOUDINARY" satisfies MediaProvider,
-        mimeType: "image/jpeg",
-        sizeBytes: 512_304,
-        width: 1600,
-        height: 2000,
-        alt: "LumiGlow floor lamp illuminating a living room corner",
-        caption: "Modern LED floor lamp with smart control",
-        isPrimary: true,
-        sortOrder: 1,
-        variantSkus: ["LUMIGLOW-FLOOR-BLK", "LUMIGLOW-FLOOR-GLD"],
-      },
-    ],
-  },
+  (() => {
+    const primary = nextSeedImage();
+    const secondary = nextSeedImage();
+    return {
+      title: "Aurora X1 Smartphone",
+      slug: "aurora-x1-smartphone",
+      sku: "AURORA-X1",
+      summary: "Flagship smartphone with exceptional camera and battery life.",
+      description:
+        "The Aurora X1 delivers a stunning AMOLED display, triple-lens AI camera system and all-day battery in a premium aluminum frame.",
+      status: "ACTIVE" satisfies ProductStatus,
+      price: "12999.00",
+      compareAtPrice: "13999.00",
+      currency: "TRY",
+      searchKeywords: ["smartphone", "android", "camera"],
+      tags: ["just-dropped"],
+      attributes: { warrantyYears: 2, chipset: "LumiCore X", waterproof: true },
+      categories: ["smartphones"],
+      variants: [
+        {
+          sku: "AURORA-X1-128",
+          title: "Aurora X1 128 GB",
+          price: "12999.00",
+          compareAtPrice: "13999.00",
+          stock: 25,
+          isPrimary: true,
+          attributes: { storage: "128 GB", color: "Midnight Black" },
+        },
+        {
+          sku: "AURORA-X1-256",
+          title: "Aurora X1 256 GB",
+          price: "14299.00",
+          compareAtPrice: "15299.00",
+          stock: 18,
+          attributes: { storage: "256 GB", color: "Polar Silver" },
+        },
+      ],
+      media: [
+        {
+          assetId: primary.publicId,
+          url: primary.url,
+          type: "IMAGE" satisfies MediaType,
+          provider: "CLOUDINARY" satisfies MediaProvider,
+          mimeType: "image/jpeg",
+          sizeBytes: 785_432,
+          width: 1600,
+          height: 2000,
+          alt: "Aurora X1 showcase",
+          caption: "Aurora X1 flagship smartphone",
+          isPrimary: true,
+          sortOrder: 1,
+          variantSkus: ["AURORA-X1-128", "AURORA-X1-256"],
+        },
+        {
+          assetId: secondary.publicId,
+          url: secondary.url,
+          type: "IMAGE" satisfies MediaType,
+          provider: "CLOUDINARY" satisfies MediaProvider,
+          mimeType: "image/jpeg",
+          sizeBytes: 502_331,
+          width: 1600,
+          height: 2000,
+          alt: "Aurora X1 lifestyle",
+          caption: "Ultra wide triple camera system",
+          sortOrder: 2,
+          variantSkus: ["AURORA-X1-256"],
+        },
+      ],
+    };
+  })(),
+  (() => {
+    const primary = nextSeedImage();
+    return {
+      title: "Nimbus Pro Laptop",
+      slug: "nimbus-pro-laptop",
+      sku: "NIMBUS-PRO",
+      summary: 'Professional-grade laptop with 16" 4K display and 12-core CPU.',
+      description:
+        'Designed for creators and developers, the Nimbus Pro pairs a 12-core processor with a dedicated GPU and 16" 4K display for uncompromising productivity.',
+      status: "ACTIVE" satisfies ProductStatus,
+      price: "36999.00",
+      compareAtPrice: "38999.00",
+      currency: "TRY",
+      searchKeywords: ["laptop", "4k", "creator"],
+      tags: ["just-dropped"],
+      attributes: { warrantyYears: 3, weightKg: 1.4 },
+      categories: ["laptops"],
+      variants: [
+        {
+          sku: "NIMBUS-PRO-I7",
+          title: "Nimbus Pro Laptop (i7, 16 GB)",
+          price: "36999.00",
+          stock: 12,
+          isPrimary: true,
+          attributes: { cpu: "LumiCore i7", memory: "16 GB", storage: "512 GB SSD" },
+        },
+        {
+          sku: "NIMBUS-PRO-I9",
+          title: "Nimbus Pro Laptop (i9, 32 GB)",
+          price: "42999.00",
+          stock: 8,
+          attributes: { cpu: "LumiCore i9", memory: "32 GB", storage: "1 TB SSD" },
+        },
+      ],
+      media: [
+        {
+          assetId: primary.publicId,
+          url: primary.url,
+          type: "IMAGE" satisfies MediaType,
+          provider: "CLOUDINARY" satisfies MediaProvider,
+          mimeType: "image/jpeg",
+          sizeBytes: 893_442,
+          width: 1800,
+          height: 1200,
+          alt: "Nimbus Pro laptop hero",
+          caption: "Nimbus Pro workstation laptop",
+          isPrimary: true,
+          sortOrder: 1,
+          variantSkus: ["NIMBUS-PRO-I7", "NIMBUS-PRO-I9"],
+        },
+      ],
+    };
+  })(),
+  (() => {
+    const primary = nextSeedImage();
+    return {
+      title: "EcoBlend Pro Blender",
+      slug: "ecoblend-pro-blender",
+      sku: "ECOBLEND-PRO",
+      summary: "High-performance blender with smart presets and silent motor.",
+      description:
+        "EcoBlend Pro combines a 1500W motor, sound-dampening shell and smart presets for smoothies, soups and nut milks.",
+      status: "ACTIVE" satisfies ProductStatus,
+      price: "3499.00",
+      compareAtPrice: "3999.00",
+      currency: "TRY",
+      searchKeywords: ["kitchen", "blender", "appliance"],
+      tags: ["just-dropped"],
+      attributes: { warrantyYears: 2, capacityLiters: 1.8 },
+      categories: ["kitchen"],
+      variants: [
+        {
+          sku: "ECOBLEND-PRO-STD",
+          title: "EcoBlend Pro (Standard)",
+          price: "3499.00",
+          stock: 40,
+          isPrimary: true,
+          attributes: { color: "Graphite Grey" },
+        },
+        {
+          sku: "ECOBLEND-PRO-PREM",
+          title: "EcoBlend Pro (Premium Accessories)",
+          price: "4199.00",
+          stock: 22,
+          attributes: { color: "Arctic White", accessories: ["Travel cup", "Grinding blade"] },
+        },
+      ],
+      media: [
+        {
+          assetId: primary.publicId,
+          url: primary.url,
+          type: "IMAGE" satisfies MediaType,
+          provider: "CLOUDINARY" satisfies MediaProvider,
+          mimeType: "image/jpeg",
+          sizeBytes: 623_441,
+          width: 1400,
+          height: 1400,
+          alt: "EcoBlend Pro hero",
+          caption: "EcoBlend Pro countertop blender",
+          isPrimary: true,
+          sortOrder: 1,
+          variantSkus: ["ECOBLEND-PRO-STD", "ECOBLEND-PRO-PREM"],
+        },
+      ],
+    };
+  })(),
+  (() => {
+    const primary = nextSeedImage();
+    return {
+      title: "LumiGlow Floor Lamp",
+      slug: "lumiglow-floor-lamp",
+      sku: "LUMIGLOW-FLOOR",
+      summary: "Ambient LED floor lamp with voice assistant integration.",
+      description:
+        "Set the perfect mood with 16 million colors, scene presets and smart assistant control using the LumiGlow floor lamp.",
+      status: "ACTIVE" satisfies ProductStatus,
+      price: "2199.00",
+      compareAtPrice: "2499.00",
+      currency: "TRY",
+      searchKeywords: ["lighting", "smart home", "decor"],
+      tags: ["just-dropped"],
+      attributes: { warrantyYears: 2, heightCm: 130 },
+      categories: ["decor"],
+      variants: [
+        {
+          sku: "LUMIGLOW-FLOOR-BLK",
+          title: "LumiGlow Floor Lamp (Black)",
+          price: "2199.00",
+          stock: 35,
+          isPrimary: true,
+          attributes: { color: "Black" },
+        },
+        {
+          sku: "LUMIGLOW-FLOOR-GLD",
+          title: "LumiGlow Floor Lamp (Champagne Gold)",
+          price: "2399.00",
+          stock: 15,
+          attributes: { color: "Champagne Gold" },
+        },
+      ],
+      media: [
+        {
+          assetId: primary.publicId,
+          url: primary.url,
+          type: "IMAGE" satisfies MediaType,
+          provider: "CLOUDINARY" satisfies MediaProvider,
+          mimeType: "image/jpeg",
+          sizeBytes: 512_304,
+          width: 1600,
+          height: 2000,
+          alt: "LumiGlow floor lamp hero",
+          caption: "Modern LED floor lamp with smart control",
+          isPrimary: true,
+          sortOrder: 1,
+          variantSkus: ["LUMIGLOW-FLOOR-BLK", "LUMIGLOW-FLOOR-GLD"],
+        },
+      ],
+    };
+  })(),
 ];
 
 const buildGeneratedProduct = (
@@ -410,10 +455,11 @@ const buildGeneratedProduct = (
     },
   );
 
+  const heroImage = nextSeedImage();
   const media: ProductMediaSeed[] = [
     {
-      assetId: `${productSlug}-hero`,
-      url: `https://images.lumi-commerce.com/generated/${productSlug}/hero.jpg`,
+      assetId: heroImage.publicId,
+      url: heroImage.url,
       type: "IMAGE" satisfies MediaType,
       provider: "CLOUDINARY" satisfies MediaProvider,
       mimeType: "image/jpeg",
@@ -441,6 +487,7 @@ const buildGeneratedProduct = (
       faker.commerce.productMaterial().toLowerCase(),
       faker.commerce.productAdjective().toLowerCase(),
     ],
+    tags: ["just-dropped"],
     attributes: { brand: faker.company.name() },
     categories: [category],
     variants,

@@ -20,6 +20,7 @@ import {
   buildOrganizationSchema,
   buildWebSiteSchema,
 } from "@/lib/seo/schema";
+import { serializeJsonForScript } from "@/lib/serialize-json";
 
 const homeTitle = "Lumi - Premium E-commerce Platform";
 const homeDescription =
@@ -86,7 +87,7 @@ export default function PublicHomePage(): JSX.Element {
       ))}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonForScript(structuredData) }}
       />
     </>
   );

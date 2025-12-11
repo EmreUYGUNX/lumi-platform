@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { serializeJsonForScript } from "@/lib/serialize-json";
+
 interface MarketingWrapperProps {
   children: ReactNode;
   campaign?: string;
@@ -18,7 +20,7 @@ export function MarketingWrapper({
     <div data-marketing-channel={marketingConfig.channel}>
       <script
         dangerouslySetInnerHTML={{
-          __html: `window.dataLayer = window.dataLayer || []; window.dataLayer.push(${JSON.stringify(
+          __html: `window.dataLayer = window.dataLayer || []; window.dataLayer.push(${serializeJsonForScript(
             marketingConfig,
           )});`,
         }}
