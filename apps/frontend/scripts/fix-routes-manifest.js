@@ -1,10 +1,12 @@
 /* eslint-disable no-console */
 // Ensures routes-manifest.json contains the fields Next.js expects for next start.
 
-import fs from "node:fs";
-import path from "node:path";
+/* eslint-disable @typescript-eslint/no-require-imports */
 
-const manifestPath = path.join(process.cwd(), ".next-build", "routes-manifest.json");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const manifestPath = path.join(__dirname, "..", ".next-build", "routes-manifest.json");
 
 try {
   const raw = fs.readFileSync(manifestPath, "utf8");
