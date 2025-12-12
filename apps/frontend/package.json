@@ -7,7 +7,7 @@
     "dev": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next dev",
     "build": "rimraf .next-build && node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next build",
     "start": "node -r ./scripts/polyfill-self.cjs ../../node_modules/.bin/next start",
-    "lint": "NODE_ENV=development next lint",
+    "lint": "NODE_ENV=development eslint --cache --cache-location .eslintcache \"src/**/*.{ts,tsx}\" \"middleware.ts\"",
     "typecheck": "tsc --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" --check",
     "test": "vitest run",

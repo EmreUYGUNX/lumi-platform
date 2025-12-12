@@ -60,9 +60,8 @@ export const resolveProductMedia = (
   product: ProductSummary,
 ): { src: string; alt: string; provider?: string } => {
   const primary = product.media.find((item) => item.isPrimary)?.media ?? product.media[0]?.media;
-  const isCloudinary = primary?.url?.includes("res.cloudinary.com");
 
-  if (primary?.url && isCloudinary) {
+  if (primary?.url) {
     return { src: primary.url, alt: primary.alt ?? product.title, provider: primary.provider };
   }
 
