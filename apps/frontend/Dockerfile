@@ -48,6 +48,10 @@ COPY . .
 RUN NODE_ENV=development pnpm install --filter @lumi/frontend... --frozen-lockfile
 RUN NODE_ENV=production pnpm --filter @lumi/frontend... build
 RUN pnpm prune --prod
+RUN find node_modules -type f -path "*/bin/esbuild" -delete \
+  && if [ -d "apps/frontend/.next-build/standalone/node_modules" ]; then \
+    find apps/frontend/.next-build/standalone/node_modules -type f -path "*/bin/esbuild" -delete; \
+  fi
 
 FROM base AS production
 
@@ -59,6 +63,8 @@ LABEL org.opencontainers.image.title="Lumi Frontend Application" \
   org.opencontainers.image.revision="${VCS_REF}" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.security.scan-status="required"
+
+RUN apk upgrade --no-cache
 
 ENV NODE_ENV=production \
   PORT=3000 \

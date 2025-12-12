@@ -85,6 +85,15 @@ const buildBaseUrl = ({ resourceType, deliveryType, baseUrl }: CloudinaryUrlOpti
 };
 
 const mapTransformations = (options: CloudinaryUrlOptions): string => {
+  // If custom transformations are provided, trust them and only append width/height if given.
+  if (options.transformations?.length) {
+    const widthHeight: string[] = [];
+    if (options.width) widthHeight.push(`w_${Math.round(options.width)}`);
+    if (options.height) widthHeight.push(`h_${Math.round(options.height)}`);
+    return [...options.transformations, ...widthHeight].filter(Boolean).join(",");
+  }
+
+  // Default, non-conflicting transformation set
   const entries = new Map<string, string>();
 
   entries.set("format", DEFAULT_TRANSFORMATIONS.format);
@@ -116,10 +125,6 @@ const mapTransformations = (options: CloudinaryUrlOptions): string => {
     entries.set("format", `f_${options.format}`);
   }
 
-  options.transformations?.forEach((value, index) => {
-    entries.set(`custom_${index}`, value);
-  });
-
   return [...entries.values()].filter(Boolean).join(",");
 };
 
@@ -130,7 +135,22 @@ export const buildCloudinaryUrl = (options: CloudinaryUrlOptions): string => {
   }
 
   if (isRemoteSource(source)) {
-    return source;
+    try {
+      const url = new URL(source);
+
+      if (options.width) {
+        url.searchParams.set("w", `${Math.round(options.width)}`);
+      }
+
+      if (options.quality) {
+        url.searchParams.set("q", `${options.quality}`);
+      }
+
+      return url.toString();
+    } catch {
+      // If URL parsing fails, fall back to the original source.
+      return source;
+    }
   }
 
   const trimmedSource = source.replaceAll(/^\/+/gu, "").replaceAll(/\/+$/gu, "");

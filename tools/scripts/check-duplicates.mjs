@@ -55,6 +55,10 @@ const allowedPatterns = [
   /^encodeurl$/,
   /^esbuild$/,
   /^escape-string-regexp$/,
+  // Webpack still pins eslint-scope v5, while ESLint v8 pulls v7.
+  // Treat these as acceptable duplicates until upstream aligns.
+  /^eslint-scope$/,
+  /^estraverse$/,
   /^estree-walker$/,
   /^execa$/,
   /^fast-glob$/,

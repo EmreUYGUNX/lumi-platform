@@ -95,6 +95,7 @@ interface CartProductVariant {
     inventoryPolicy: InventoryPolicy;
     attributes: Prisma.JsonValue | null;
     searchKeywords: string[];
+    tags: string[];
     createdAt: Date;
     updatedAt: Date;
     deletedAt: Date | null;

@@ -292,6 +292,7 @@ const createVariant = (overrides: Partial<CartVariantEntity> = {}): CartVariantE
     inventoryPolicy: InventoryPolicy.TRACK,
     attributes: null,
     searchKeywords: [],
+    tags: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     deletedAt: null,

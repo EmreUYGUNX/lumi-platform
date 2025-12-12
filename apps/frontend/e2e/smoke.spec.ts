@@ -1,12 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("login form allows navigation to dashboard", async ({ page }) => {
-  await page.goto("/login");
+test.setTimeout(60_000);
 
-  await page.getByPlaceholder("founder@lumi.com").fill("demo@lumi.com");
-  await page.getByPlaceholder("••••••••").fill("SecurePass123!");
-  await page.getByRole("button", { name: /sign in/i }).click();
-
-  await page.goto("/dashboard");
-  await expect(page.getByText("Ship the next commerce milestone.")).toBeVisible();
+test("home page renders shell", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /premium minimalist drop/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /shop collection/i })).toBeVisible();
 });

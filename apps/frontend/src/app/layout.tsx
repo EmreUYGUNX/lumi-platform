@@ -48,7 +48,6 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Lumi Commerce",
   },
-  themeColor: "#3B82F6",
   metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
 };
 

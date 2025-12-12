@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { CartItemWithProduct } from "../types/cart.types";
 
 const fallbackImage = buildCloudinaryUrl({
-  publicId: "lumi/products/board-001",
+  publicId: "lumi/products/jeans-428614_1920_uflws5",
   transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_480,h_640"],
 });
 const blur = buildBlurPlaceholder("#0a0a0a");
@@ -84,9 +84,8 @@ export function CartItem({
   const variantLabel = resolveVariantLabel(item);
   const media = resolveItemMedia(item);
   const router = useRouter();
-  const productHref = { pathname: "/products/[slug]", query: { slug: item.product.slug } } as const;
-  const productHrefString = `/products/${item.product.slug}` as Route;
-  const prefetchProduct = () => router.prefetch(productHrefString);
+  const productHref = `/products/${item.product.slug}` as Route;
+  const prefetchProduct = () => router.prefetch(productHref);
   const lowStock =
     item.availableStock <= 0
       ? "Out of stock"
@@ -116,7 +115,7 @@ export function CartItem({
           sizes="120px"
           placeholder="blur"
           blurDataURL={blur}
-          className="object-cover mix-blend-multiply transition duration-500 hover:scale-105"
+          className="object-cover transition duration-500 hover:scale-105"
           priority={false}
           loading="lazy"
         />

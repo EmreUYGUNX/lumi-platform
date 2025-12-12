@@ -1,5 +1,6 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 import { Router } from "express";
+import type { RequestHandler } from "express";
 
 import { createRequireAuthMiddleware } from "@/middleware/auth/requireAuth.js";
 import { createRequireRoleMiddleware } from "@/middleware/auth/requireRole.js";
@@ -10,6 +11,23 @@ import { CatalogService } from "./catalog.service.js";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
+const CATALOG_BASE = "/catalog";
+const withCatalogPrefix = (path: string) => `${CATALOG_BASE}${path}`;
+
+const PRODUCTS_ROUTE = "/products";
+const POPULAR_PRODUCTS_ROUTE = `${PRODUCTS_ROUTE}/popular`;
+const PRODUCT_ROUTE = `${PRODUCTS_ROUTE}/:slug`;
+const PRODUCT_REVIEWS_ROUTE = `${PRODUCT_ROUTE}/reviews`;
+const PRODUCT_VARIANTS_ROUTE = `${PRODUCTS_ROUTE}/:id/variants`;
+const CATEGORIES_ROUTE = "/categories";
+const CATEGORY_ROUTE = `${CATEGORIES_ROUTE}/:slug`;
+const ADMIN_PRODUCTS_ROUTE = "/admin/products";
+const ADMIN_PRODUCT_ROUTE = `${ADMIN_PRODUCTS_ROUTE}/:id`;
+const ADMIN_PRODUCT_VARIANT_ROUTE = `${ADMIN_PRODUCT_ROUTE}/variants/:variantId`;
+const ADMIN_PRODUCT_VARIANTS_ROUTE = `${ADMIN_PRODUCT_ROUTE}/variants`;
+const ADMIN_CATEGORIES_ROUTE = "/admin/categories";
+const ADMIN_CATEGORY_ROUTE = `${ADMIN_CATEGORIES_ROUTE}/:id`;
+
 export interface CatalogRouterOptions {
   registerRoute?: RouteRegistrar;
   service?: CatalogService;
@@ -17,6 +35,57 @@ export interface CatalogRouterOptions {
 
 const registerRoute = (registrar: RouteRegistrar | undefined, method: string, path: string) => {
   registrar?.(method, path);
+};
+
+const registerGet = (
+  router: Router,
+  registrar: RouteRegistrar | undefined,
+  paths: string[],
+  handler: RequestHandler,
+) => {
+  paths.forEach((path) => {
+    router.get(path, handler);
+    registerRoute(registrar, "GET", path);
+  });
+};
+
+const registerPost = (
+  router: Router,
+  registrar: RouteRegistrar | undefined,
+  paths: string[],
+  middlewares: RequestHandler[],
+  handler: RequestHandler,
+) => {
+  paths.forEach((path) => {
+    router.post(path, ...middlewares, handler);
+    registerRoute(registrar, "POST", path);
+  });
+};
+
+const registerPut = (
+  router: Router,
+  registrar: RouteRegistrar | undefined,
+  paths: string[],
+  middlewares: RequestHandler[],
+  handler: RequestHandler,
+) => {
+  paths.forEach((path) => {
+    router.put(path, ...middlewares, handler);
+    registerRoute(registrar, "PUT", path);
+  });
+};
+
+const registerDelete = (
+  router: Router,
+  registrar: RouteRegistrar | undefined,
+  paths: string[],
+  middlewares: RequestHandler[],
+  handler: RequestHandler,
+) => {
+  paths.forEach((path) => {
+    router.delete(path, ...middlewares, handler);
+    registerRoute(registrar, "DELETE", path);
+  });
 };
 
 export const createCatalogRouter = (
@@ -31,66 +100,110 @@ export const createCatalogRouter = (
   const requireAdmin = createRequireRoleMiddleware(["admin"]);
 
   // Public product routes
-  router.get("/products", controller.listProducts);
-  registerRoute(options.registerRoute, "GET", "/products");
+  const productRoutes = [PRODUCTS_ROUTE, withCatalogPrefix(PRODUCTS_ROUTE)];
+  registerGet(router, options.registerRoute, productRoutes, controller.listProducts);
 
-  router.get("/products/popular", controller.listPopularProducts);
-  registerRoute(options.registerRoute, "GET", "/products/popular");
+  const popularRoutes = [POPULAR_PRODUCTS_ROUTE, withCatalogPrefix(POPULAR_PRODUCTS_ROUTE)];
+  registerGet(router, options.registerRoute, popularRoutes, controller.listPopularProducts);
 
-  router.get("/products/:slug", controller.getProduct);
-  registerRoute(options.registerRoute, "GET", "/products/:slug");
+  const productDetailRoutes = [PRODUCT_ROUTE, withCatalogPrefix(PRODUCT_ROUTE)];
+  registerGet(router, options.registerRoute, productDetailRoutes, controller.getProduct);
 
-  router.get("/products/:slug/reviews", controller.listProductReviews);
-  registerRoute(options.registerRoute, "GET", "/products/:slug/reviews");
+  const reviewRoutes = [PRODUCT_REVIEWS_ROUTE, withCatalogPrefix(PRODUCT_REVIEWS_ROUTE)];
+  registerGet(router, options.registerRoute, reviewRoutes, controller.listProductReviews);
 
-  router.get("/products/:id/variants", controller.listVariants);
-  registerRoute(options.registerRoute, "GET", "/products/:id/variants");
+  const variantRoutes = [PRODUCT_VARIANTS_ROUTE, withCatalogPrefix(PRODUCT_VARIANTS_ROUTE)];
+  registerGet(router, options.registerRoute, variantRoutes, controller.listVariants);
 
   // Public category routes
-  router.get("/categories", controller.listCategories);
-  registerRoute(options.registerRoute, "GET", "/categories");
+  const categoryRoutes = [CATEGORIES_ROUTE, withCatalogPrefix(CATEGORIES_ROUTE)];
+  registerGet(router, options.registerRoute, categoryRoutes, controller.listCategories);
 
-  router.get("/categories/:slug", controller.getCategory);
-  registerRoute(options.registerRoute, "GET", "/categories/:slug");
+  const categoryDetailRoutes = [CATEGORY_ROUTE, withCatalogPrefix(CATEGORY_ROUTE)];
+  registerGet(router, options.registerRoute, categoryDetailRoutes, controller.getCategory);
 
   // Admin product routes
-  router.post("/admin/products", requireAuth, requireAdmin, controller.createProduct);
-  registerRoute(options.registerRoute, "POST", "/admin/products");
+  const adminProductRoutes = [ADMIN_PRODUCTS_ROUTE, withCatalogPrefix(ADMIN_PRODUCTS_ROUTE)];
+  registerPost(
+    router,
+    options.registerRoute,
+    adminProductRoutes,
+    [requireAuth, requireAdmin],
+    controller.createProduct,
+  );
 
-  router.put("/admin/products/:id", requireAuth, requireAdmin, controller.updateProduct);
-  registerRoute(options.registerRoute, "PUT", "/admin/products/:id");
+  const adminProductDetailRoutes = [ADMIN_PRODUCT_ROUTE, withCatalogPrefix(ADMIN_PRODUCT_ROUTE)];
+  registerPut(
+    router,
+    options.registerRoute,
+    adminProductDetailRoutes,
+    [requireAuth, requireAdmin],
+    controller.updateProduct,
+  );
+  registerDelete(
+    router,
+    options.registerRoute,
+    adminProductDetailRoutes,
+    [requireAuth, requireAdmin],
+    controller.deleteProduct,
+  );
 
-  router.delete("/admin/products/:id", requireAuth, requireAdmin, controller.deleteProduct);
-  registerRoute(options.registerRoute, "DELETE", "/admin/products/:id");
+  const adminProductVariantsRoutes = [
+    ADMIN_PRODUCT_VARIANTS_ROUTE,
+    withCatalogPrefix(ADMIN_PRODUCT_VARIANTS_ROUTE),
+  ];
+  registerPost(
+    router,
+    options.registerRoute,
+    adminProductVariantsRoutes,
+    [requireAuth, requireAdmin],
+    controller.addVariant,
+  );
 
-  router.post("/admin/products/:id/variants", requireAuth, requireAdmin, controller.addVariant);
-  registerRoute(options.registerRoute, "POST", "/admin/products/:id/variants");
-
-  router.put(
-    "/admin/products/:id/variants/:variantId",
-    requireAuth,
-    requireAdmin,
+  const adminProductVariantRoutes = [
+    ADMIN_PRODUCT_VARIANT_ROUTE,
+    withCatalogPrefix(ADMIN_PRODUCT_VARIANT_ROUTE),
+  ];
+  registerPut(
+    router,
+    options.registerRoute,
+    adminProductVariantRoutes,
+    [requireAuth, requireAdmin],
     controller.updateVariant,
   );
-  registerRoute(options.registerRoute, "PUT", "/admin/products/:id/variants/:variantId");
-
-  router.delete(
-    "/admin/products/:id/variants/:variantId",
-    requireAuth,
-    requireAdmin,
+  registerDelete(
+    router,
+    options.registerRoute,
+    adminProductVariantRoutes,
+    [requireAuth, requireAdmin],
     controller.deleteVariant,
   );
-  registerRoute(options.registerRoute, "DELETE", "/admin/products/:id/variants/:variantId");
 
   // Admin category routes
-  router.post("/admin/categories", requireAuth, requireAdmin, controller.createCategory);
-  registerRoute(options.registerRoute, "POST", "/admin/categories");
+  const adminCategoryRoutes = [ADMIN_CATEGORIES_ROUTE, withCatalogPrefix(ADMIN_CATEGORIES_ROUTE)];
+  registerPost(
+    router,
+    options.registerRoute,
+    adminCategoryRoutes,
+    [requireAuth, requireAdmin],
+    controller.createCategory,
+  );
 
-  router.put("/admin/categories/:id", requireAuth, requireAdmin, controller.updateCategory);
-  registerRoute(options.registerRoute, "PUT", "/admin/categories/:id");
-
-  router.delete("/admin/categories/:id", requireAuth, requireAdmin, controller.deleteCategory);
-  registerRoute(options.registerRoute, "DELETE", "/admin/categories/:id");
+  const adminCategoryDetailRoutes = [ADMIN_CATEGORY_ROUTE, withCatalogPrefix(ADMIN_CATEGORY_ROUTE)];
+  registerPut(
+    router,
+    options.registerRoute,
+    adminCategoryDetailRoutes,
+    [requireAuth, requireAdmin],
+    controller.updateCategory,
+  );
+  registerDelete(
+    router,
+    options.registerRoute,
+    adminCategoryDetailRoutes,
+    [requireAuth, requireAdmin],
+    controller.deleteCategory,
+  );
 
   return router;
 };

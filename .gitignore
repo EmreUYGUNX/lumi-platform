@@ -18,6 +18,7 @@ packages/**/dist/
 coverage/
 reports/performance/*.json
 reports/performance/*.html
+lighthouse-report*.json
 
 # Logs
 logs/
@@ -61,6 +62,7 @@ storybook-static/
 *.tmp
 *.swp
 *.Zone.Identifier
+apps/**/test-results/
 apps/backend/logs-*/
 .trivy/
 apps/**/.next-build/

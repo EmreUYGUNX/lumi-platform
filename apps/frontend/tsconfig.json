@@ -23,7 +23,7 @@
     "isolatedModules": true,
     "incremental": true,
     "strict": true,
-    "tsBuildInfoFile": ".next-build/tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": "tsconfig.tsbuildinfo",
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "plugins": [
       {

@@ -68,13 +68,13 @@
     "commitlint": "commitlint"
   },
   "dependencies": {
+    "@faker-js/faker": "^9.1.0",
     "@prisma/client": "^6.17.1",
     "@types/bcryptjs": "^2.4.6"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",
     "@commitlint/config-conventional": "^19.2.2",
-    "@faker-js/faker": "^9.1.0",
     "@jest/globals": "^29.7.0",
     "@next/eslint-plugin-next": "^14.2.3",
     "@secretlint/secretlint-rule-preset-recommend": "^8.3.0",

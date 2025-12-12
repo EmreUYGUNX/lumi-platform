@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import type { Route } from "next";
 import { Menu, X } from "lucide-react";
+import type { Route } from "next";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,11 +29,11 @@ export function PublicHeader(): JSX.Element {
   const toggleMenu = () => setMobileMenuOpen((open) => !open);
 
   return (
-    <header className="supports-backdrop-blur:bg-lumi-bg/70 border-lumi-border/60 bg-lumi-bg/80 sticky top-0 z-40 border-b backdrop-blur-xl">
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between">
         <Link
           href={homeRoute}
-          className="gradient-text text-lg font-semibold tracking-tight"
+          className="text-lg font-semibold tracking-tight text-white"
           aria-label="Lumi Home"
         >
           Lumi Commerce
@@ -44,8 +44,8 @@ export function PublicHeader(): JSX.Element {
               key={item.href}
               href={item.href}
               className={cn(
-                "hover:text-lumi-primary text-sm font-semibold transition-colors",
-                pathname === item.href ? "text-lumi-primary" : "text-lumi-text-secondary",
+                "text-sm font-semibold transition-colors hover:text-white",
+                pathname === item.href ? "text-white" : "text-white/70",
               )}
             >
               {item.label}
@@ -54,7 +54,11 @@ export function PublicHeader(): JSX.Element {
         </nav>
         <div className="hidden items-center gap-3 md:flex">
           <MiniCart />
-          <Button asChild variant="ghost" className="text-sm font-semibold">
+          <Button
+            asChild
+            variant="ghost"
+            className="text-sm font-semibold text-white hover:bg-white/10 hover:text-white"
+          >
             <Link href="/register">Create account</Link>
           </Button>
           <Button asChild className="bg-lumi-primary hover:bg-lumi-primary-dark">

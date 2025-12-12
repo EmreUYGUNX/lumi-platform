@@ -6,6 +6,7 @@ import { ProductDetailPage } from "@/features/product/components/ProductDetailPa
 import type { ProductDetail } from "@/features/product/types/product-detail.types";
 import { productDetailSchema } from "@/features/product/types/product-detail.types";
 import { apiClient } from "@/lib/api-client";
+import { serializeJsonForScript } from "@/lib/serialize-json";
 import { buildAbsoluteUrl, generateMetadata as buildMetadata } from "@/lib/seo/metadata";
 import { buildBreadcrumbSchema, buildProductSchema } from "@/lib/seo/schema";
 
@@ -80,12 +81,12 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonForScript(jsonLd) }}
       />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonForScript(breadcrumbLd) }}
       />
       <ProductDetailPage slug={slug} initialData={detail} />
     </>

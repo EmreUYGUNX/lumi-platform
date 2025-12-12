@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
+import { sessionStore } from "@/store/session";
 
 import type { CartSummaryView } from "../types/cart.types";
 import { cartSummaryViewSchema } from "../types/cart.types";
@@ -16,6 +17,9 @@ interface UseCartOptions {
 }
 
 export const useCart = (options: UseCartOptions = {}) => {
+  const isAuthenticated = sessionStore((state) => state.isAuthenticated);
+  const accessToken = sessionStore((state) => state.accessToken);
+
   const persistedView = useCartStore((state) => state.view);
   const sync = useCartStore((state) => state.sync);
   const items = useCartStore((state) => state.items);
@@ -33,6 +37,9 @@ export const useCart = (options: UseCartOptions = {}) => {
     [options.initialData, persistedView],
   );
 
+  const shouldQuery =
+    options.enabled ?? Boolean(options.authToken || isAuthenticated || accessToken);
+
   const query = useQuery<CartSummaryView>({
     queryKey: cartKeys.summary(),
     queryFn: async () => {
@@ -44,7 +51,7 @@ export const useCart = (options: UseCartOptions = {}) => {
     },
     initialData,
     placeholderData: (previous) => previous ?? initialData,
-    enabled: options.enabled ?? true,
+    enabled: shouldQuery,
     staleTime: 0,
     gcTime: 90_000,
   });

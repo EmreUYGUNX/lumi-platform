@@ -77,6 +77,7 @@ export const productFilterSchema = z
     categoryIds: z.array(cuidSchema).max(10).optional(),
     collectionIds: z.array(cuidSchema).max(10).optional(),
     primaryCategoryId: cuidSchema.optional(),
+    tags: z.array(localeStringSchema.max(120)).max(20).optional(),
     attributes: productAttributeFilterSchema.optional(),
     priceRange: priceRangeFilterSchema.optional(),
     includeDeleted: z.boolean().optional(),
