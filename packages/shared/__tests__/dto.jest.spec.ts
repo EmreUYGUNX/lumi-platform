@@ -177,6 +177,7 @@ const createProductFixture = (): ProductWithRelations => {
     compareAtPrice: createDecimal("299.90"),
     currency: "TRY",
     inventoryPolicy: InventoryPolicy.TRACK,
+    tags: [],
     searchKeywords: ["lamp", "desk"],
     attributes: {
       material: "aluminium",
