@@ -152,6 +152,7 @@ model User {
   preferences             UserPreference?
   uploadedMediaAssets     MediaAsset[]             @relation("UploadedMediaAssets")
   customerDesigns         CustomerDesign[]
+  designSessions          DesignSession[]
 }
 
 model UserSession {
@@ -312,6 +313,7 @@ model Product {
   orderItemCustomizations OrderItemCustomization[]
   mediaAssets             MediaAsset[]             @relation("ProductMediaAssets")
   customization           ProductCustomization?
+  designSessions          DesignSession[]
 
   @@index([status])
   @@index([status, createdAt])
@@ -382,6 +384,42 @@ model CustomerDesign {
   @@index([purgeAt])
   @@index([tags], type: Gin)
   @@map("customer_designs")
+}
+
+// Persisted editor state for in-progress product personalization.
+model DesignSession {
+  id         String   @id @default(cuid())
+  userId     String?
+  productId  String
+  designArea String
+
+  sessionData  Json
+  previewUrl   String?
+  thumbnailUrl String?
+
+  shareToken String?  @unique
+  isPublic   Boolean  @default(false)
+  viewCount  Int      @default(0)
+
+  lastEditedAt DateTime @default(now())
+  expiresAt    DateTime
+
+  deletedAt DateTime?
+  purgeAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([shareToken])
+  @@index([expiresAt])
+  @@index([lastEditedAt])
+  @@index([deletedAt])
+  @@index([purgeAt])
+  @@map("design_sessions")
 }
 
 model ProductVariant {

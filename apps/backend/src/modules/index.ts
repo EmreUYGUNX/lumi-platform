@@ -15,6 +15,8 @@ export * from "./media/media.service.js";
 export * from "./design/design.repository.js";
 export * from "./design/design.service.js";
 export * from "./preview/preview.service.js";
+export * from "./session/session.repository.js";
+export * from "./session/session.service.js";
 export * from "./address/address.repository.js";
 export * from "./auth/token.service.js";
 export * from "./auth/token.types.js";
