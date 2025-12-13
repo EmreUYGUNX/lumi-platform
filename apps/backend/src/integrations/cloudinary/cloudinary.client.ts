@@ -29,6 +29,8 @@ export interface CloudinaryUploadOptions {
   overwrite?: boolean;
   invalidate?: boolean;
   mimeType?: string;
+  colors?: boolean;
+  imageMetadata?: boolean;
 }
 
 export interface CloudinaryDeleteOptions {
@@ -108,6 +110,8 @@ export class CloudinaryClient {
       unique_filename: options.uniqueFilename ?? true,
       overwrite: options.overwrite ?? false,
       invalidate: options.invalidate ?? false,
+      colors: options.colors ?? undefined,
+      image_metadata: options.imageMetadata ?? undefined,
     };
 
     try {

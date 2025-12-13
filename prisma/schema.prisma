@@ -145,6 +145,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   preferences             UserPreference?
   uploadedMediaAssets     MediaAsset[] @relation("UploadedMediaAssets")
+  customerDesigns         CustomerDesign[]
 }
 
 model UserSession {
@@ -341,6 +342,39 @@ model ProductCustomization {
   updatedAt DateTime @updatedAt
 
   @@map("product_customizations")
+}
+
+// Customer-uploaded designs used for product personalization.
+model CustomerDesign {
+  id           String   @id @default(cuid())
+  userId       String
+  publicId     String   @unique
+  url          String
+  secureUrl    String
+  thumbnailUrl String
+  format       String
+  width        Int?
+  height       Int?
+  bytes        Int
+  tags         String[] @default([])
+  metadata     Json?
+  isPublic     Boolean  @default(false)
+  usageCount   Int      @default(0)
+  viewCount    Int      @default(0)
+  deletedAt    DateTime?
+  purgeAt      DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPublic])
+  @@index([usageCount])
+  @@index([deletedAt])
+  @@index([purgeAt])
+  @@index([tags], type: Gin)
+  @@map("customer_designs")
 }
 
 model ProductVariant {
