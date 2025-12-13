@@ -97,6 +97,8 @@ overrides:
 
 packageExtensionsChecksum: 5935ceb42abacc1062bc21dd4e2dd090
 
+pnpmfileChecksum: cqyknfjqe37zvhvwiijsvlkzme
+
 importers:
   .:
     dependencies:
@@ -588,6 +590,9 @@ importers:
       "@tanstack/react-query-devtools":
         specifier: ^5.90.2
         version: 5.90.2(@tanstack/react-query@5.90.9(react@18.3.1))(react@18.3.1)
+      "@types/fabric":
+        specifier: ^5.3.10
+        version: 5.3.10
       autoprefixer:
         specifier: ^10.4.22
         version: 10.4.22(postcss@8.5.6)
@@ -600,6 +605,9 @@ importers:
       critters:
         specifier: ^0.0.25
         version: 0.0.25
+      fabric:
+        specifier: ^6.9.0
+        version: 6.9.0
       framer-motion:
         specifier: ^12.23.24
         version: 12.23.24(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6384,6 +6392,12 @@ packages:
         integrity: sha512-wGA0NX93b19/dZC1J18tKWVIYWyyF2ZjT9vin/NRu0qzzvfVzWjs04iq2rQ3H65vCTQYlRqs3YHfY7zjdV+9Kw==,
       }
 
+  "@types/fabric@5.3.10":
+    resolution:
+      {
+        integrity: sha512-fsJIuVkU+B2AnmQh+Ml2X0ax3NmRIqLvEXmZ+squX60HaF89TvdIP6tI6Uk5srXaauswTwPOOfWE7k2QboUZCg==,
+      }
+
   "@types/geojson@7946.0.16":
     resolution:
       {
@@ -10223,6 +10237,13 @@ packages:
       }
     engines: { node: ">= 10.17.0" }
     hasBin: true
+
+  fabric@6.9.0:
+    resolution:
+      {
+        integrity: sha512-ILIbG4Us/41Z4rU8/gveN4Hb7NvgBorqV9xj+9Dl7YsXiyUPXdxV8+q5OvaNghmYzQoK1Am3m0wTvmovOxrJAg==,
+      }
+    engines: { node: ">=16.20.0" }
 
   fast-check@3.23.2:
     resolution:
@@ -21567,6 +21588,8 @@ snapshots:
       "@types/express-serve-static-core": 5.1.0
       "@types/serve-static": 1.15.9
 
+  "@types/fabric@5.3.10": {}
+
   "@types/geojson@7946.0.16": {}
 
   "@types/glob@7.2.0":
@@ -24225,6 +24248,15 @@ snapshots:
       "@types/yauzl": 2.10.3
     transitivePeerDependencies:
       - supports-color
+
+  fabric@6.9.0:
+    optionalDependencies:
+      jsdom: 20.0.3
+    transitivePeerDependencies:
+      - bufferutil
+      - canvas
+      - supports-color
+      - utf-8-validate
 
   fast-check@3.23.2:
     dependencies:
