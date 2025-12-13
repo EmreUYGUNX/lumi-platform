@@ -18,6 +18,11 @@ export interface InitializeCanvasOptions {
 }
 
 const DEFAULT_GRID_SIZE = 10;
+const DEFAULT_GRID_COLOR = "rgba(255, 255, 255, 0.14)";
+
+interface CanvasInternals {
+  lumiSnapToGridHandler?: (event: { target?: fabric.Object }) => void;
+}
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
@@ -153,7 +158,13 @@ const installShiftMultiSelect = (canvas: fabric.Canvas): void => {
 };
 
 const installSnapToGrid = (canvas: fabric.Canvas, gridSize: number): void => {
-  canvas.on("object:moving", (event) => {
+  const raw = canvas as unknown as CanvasInternals;
+
+  if (raw.lumiSnapToGridHandler) {
+    canvas.off("object:moving", raw.lumiSnapToGridHandler);
+  }
+
+  const handler = (event: { target?: fabric.Object }) => {
     const object = event.target;
     if (!object) return;
 
@@ -164,7 +175,10 @@ const installSnapToGrid = (canvas: fabric.Canvas, gridSize: number): void => {
       left: Math.round(left / gridSize) * gridSize,
       top: Math.round(top / gridSize) * gridSize,
     });
-  });
+  };
+
+  raw.lumiSnapToGridHandler = handler;
+  canvas.on("object:moving", handler);
 };
 
 export const initializeCanvas = (
@@ -193,6 +207,61 @@ export const initializeCanvas = (
   }
 
   return canvas;
+};
+
+export const setSnapToGridEnabled = (
+  canvas: fabric.Canvas,
+  enabled: boolean,
+  gridSize = DEFAULT_GRID_SIZE,
+): void => {
+  const raw = canvas as unknown as CanvasInternals;
+
+  if (raw.lumiSnapToGridHandler) {
+    canvas.off("object:moving", raw.lumiSnapToGridHandler);
+    raw.lumiSnapToGridHandler = undefined;
+  }
+
+  if (!enabled) return;
+  installSnapToGrid(canvas, gridSize);
+};
+
+export const setGridOverlayEnabled = (
+  canvas: fabric.Canvas,
+  enabled: boolean,
+  gridSize = DEFAULT_GRID_SIZE,
+  color = DEFAULT_GRID_COLOR,
+): void => {
+  const overlayCanvas = document.createElement("canvas");
+
+  if (!enabled) {
+    canvas.set({ overlayColor: undefined });
+    canvas.requestRenderAll();
+    return;
+  }
+
+  overlayCanvas.width = gridSize;
+  overlayCanvas.height = gridSize;
+
+  const ctx = overlayCanvas.getContext("2d");
+  if (!ctx) {
+    canvas.set({ overlayColor: undefined });
+    canvas.requestRenderAll();
+    return;
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(gridSize, 0);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(0, gridSize);
+  ctx.stroke();
+
+  const pattern = new fabric.Pattern({ source: overlayCanvas, repeat: "repeat" });
+  const overlayConfig = canvas as unknown as { overlayVpt?: boolean };
+  overlayConfig.overlayVpt = true;
+  canvas.set({ overlayColor: pattern as unknown as string });
+  canvas.requestRenderAll();
 };
 
 export const disposeCanvas = (canvas: fabric.Canvas, containerId?: string): void => {

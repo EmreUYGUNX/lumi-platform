@@ -22,6 +22,7 @@ interface DesignCanvasProps {
   initialLayers?: Layer[];
   onLayerChange: (layers: Layer[]) => void;
   onSelectionChange: (layer?: Layer) => void;
+  onCanvasReady?: (canvas?: fabric.Canvas) => void;
   readOnly?: boolean;
   className?: string;
 }
@@ -34,6 +35,7 @@ export function DesignCanvas({
   initialLayers,
   onLayerChange,
   onSelectionChange,
+  onCanvasReady,
   readOnly = false,
   className,
 }: DesignCanvasProps): JSX.Element {
@@ -57,6 +59,7 @@ export function DesignCanvas({
     (created as unknown as { lumiDesignWidth?: number }).lumiDesignWidth = designArea.width;
     (created as unknown as { lumiDesignHeight?: number }).lumiDesignHeight = designArea.height;
     setCanvas(created);
+    onCanvasReady?.(created);
 
     const observer = new ResizeObserver(() => {
       if (!containerRef.current) return;
@@ -70,6 +73,7 @@ export function DesignCanvas({
       observer.disconnect();
       disposeCanvas(created, containerId);
       setCanvas(undefined);
+      onCanvasReady?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Canvas lifecycle is intentionally tied to first mount.
   }, []);
