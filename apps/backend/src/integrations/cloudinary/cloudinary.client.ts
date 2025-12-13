@@ -53,6 +53,13 @@ export interface GenerateImageUrlOptions {
   version?: number | string;
 }
 
+export interface PrivateDownloadUrlOptions {
+  expiresAt?: Date;
+  attachment?: boolean;
+  resourceType?: UploadApiOptions["resource_type"];
+  type?: UploadApiOptions["type"];
+}
+
 export interface GenerateUploadSignatureOptions {
   folder?: string;
   tags?: string[];
@@ -162,6 +169,26 @@ export class CloudinaryClient {
       type: options.type ?? "upload",
       transformation,
       version: options.version,
+    });
+  }
+
+  generatePrivateDownloadUrl(
+    publicId: string,
+    format: string,
+    options: PrivateDownloadUrlOptions = {},
+  ): string {
+    this.ensureConfiguration();
+
+    const expiresAt =
+      options.expiresAt instanceof Date
+        ? Math.round(options.expiresAt.getTime() / 1000)
+        : undefined;
+
+    return cloudinary.utils.private_download_url(publicId, format, {
+      expires_at: expiresAt,
+      attachment: options.attachment ?? true,
+      type: options.type ?? "upload",
+      resource_type: options.resourceType ?? "image",
     });
   }
 

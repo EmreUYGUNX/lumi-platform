@@ -10,6 +10,8 @@ import type { AccountSecurityService } from "@/modules/auth/account-security.ser
 import { PERMISSIONS } from "@/modules/auth/permissions.js";
 import { createSecurityEventService } from "@/modules/auth/security-event.service.js";
 import type { SecurityEventService } from "@/modules/auth/security-event.service.js";
+import { ProductionController } from "@/modules/production/production.controller.js";
+import { ProductionService } from "@/modules/production/production.service.js";
 import type { ApplicationConfig } from "@lumi/types";
 
 import { asyncHandler } from "../lib/asyncHandler.js";
@@ -20,6 +22,7 @@ import { createAuthorizeResourceMiddleware } from "../middleware/auth/authorizeR
 import { createRequireAuthMiddleware } from "../middleware/auth/requireAuth.js";
 import { createRequirePermissionMiddleware } from "../middleware/auth/requirePermission.js";
 import { createRequireRoleMiddleware } from "../middleware/auth/requireRole.js";
+import { buildRequestPath } from "./registry.js";
 
 type RouteRegistrar = (method: string, path: string) => void;
 
@@ -147,7 +150,7 @@ const registerAdminRoute = (
   method: string,
   path: string,
 ) => {
-  registerRoute?.(method, path);
+  registerRoute?.(method, buildRequestPath("/admin", path));
 };
 
 const UnlockAccountRequestSchema = z.object({
@@ -196,6 +199,9 @@ export const createAdminRouter = (
 
   const requireAuth = createRequireAuthMiddleware();
   const requireAdminRole = createRequireRoleMiddleware(["admin"], { securityEvents });
+  const requireAdminOrStaffRole = createRequireRoleMiddleware(["admin", "staff"], {
+    securityEvents,
+  });
   const requireAuditPermission = createRequirePermissionMiddleware([PERMISSIONS.REPORTS.READ], {
     securityEvents,
   });
@@ -237,6 +243,19 @@ export const createAdminRouter = (
   };
 
   router.use(requireAuth);
+
+  const productionService = new ProductionService();
+  const productionController = new ProductionController({ service: productionService });
+
+  router.post("/production/generate", requireAdminRole, productionController.generate);
+  registerAdminRoute(registerRoute, "POST", "/production/generate");
+
+  router.get("/production/download/:id", requireAdminOrStaffRole, productionController.download);
+  registerAdminRoute(registerRoute, "GET", "/production/download/:id");
+
+  router.get("/production/order/:orderId", requireAdminRole, productionController.listOrder);
+  registerAdminRoute(registerRoute, "GET", "/production/order/:orderId");
+
   router.use(requireAdminRole);
 
   router.use(async (req, _res, next) => {

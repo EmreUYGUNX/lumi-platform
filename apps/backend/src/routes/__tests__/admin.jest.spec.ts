@@ -169,11 +169,14 @@ describe("admin router placeholders", () => {
       ...buildAdminRouterOptions(),
     });
 
-    expect(registerRoute).toHaveBeenCalledWith("GET", "/users");
-    expect(registerRoute).toHaveBeenCalledWith("POST", "/users");
-    expect(registerRoute).toHaveBeenCalledWith("POST", "/users/:userId/unlock");
-    expect(registerRoute).toHaveBeenCalledWith("GET", "/audit-log");
-    expect(registerRoute).toHaveBeenCalledWith("GET", "/reports/sales");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/production/generate");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/production/download/:id");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/production/order/:orderId");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/users");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/users");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/users/:userId/unlock");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/audit-log");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/reports/sales");
   });
 
   it("returns 403 when a non-admin user accesses admin routes", async () => {
