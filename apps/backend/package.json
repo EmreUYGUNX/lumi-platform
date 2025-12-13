@@ -58,6 +58,7 @@
     "rate-limiter-flexible": "^3.0.5",
     "redis": "^5.8.3",
     "sanitize-html": "^2.17.0",
+    "sharp": "^0.34.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "validator": "13.15.22",
