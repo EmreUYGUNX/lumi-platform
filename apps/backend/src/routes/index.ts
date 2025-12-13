@@ -22,6 +22,8 @@ import { createOrderRouter } from "@/modules/order/order.router.js";
 import type { OrderRouterOptions } from "@/modules/order/order.router.js";
 import { createPreviewRouter } from "@/modules/preview/preview.router.js";
 import type { PreviewRouterOptions } from "@/modules/preview/preview.router.js";
+import { createSessionRouter } from "@/modules/session/session.router.js";
+import type { SessionRouterOptions } from "@/modules/session/session.router.js";
 import { createUserRouter } from "@/modules/user/user.router.js";
 import type { UserRouterOptions } from "@/modules/user/user.router.js";
 import type { ApplicationConfig } from "@lumi/types";
@@ -43,6 +45,7 @@ interface ApiRouterOptions {
   customizationOptions?: Pick<CustomizationRouterOptions, "service">;
   designOptions?: Pick<DesignRouterOptions, "service" | "controller">;
   previewOptions?: Pick<PreviewRouterOptions, "service" | "controller">;
+  sessionOptions?: Pick<SessionRouterOptions, "service" | "controller">;
   authOptions?: AuthRouterOptions;
   cartOptions?: Pick<CartRouterOptions, "service">;
   orderOptions?: Pick<OrderRouterOptions, "service">;
@@ -226,6 +229,14 @@ export const createV1Router = (
     createPreviewRouter(config, {
       registerRoute: registerV1Route,
       ...options.previewOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createSessionRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.sessionOptions,
     }),
   );
 
