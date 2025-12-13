@@ -84,7 +84,6 @@
     "@vitest/coverage-istanbul": "^2.1.9",
     "@vitest/coverage-v8": "^2.1.9",
     "axe-core": "^4.10.0",
-    "happy-dom": "^20.0.11",
     "identity-obj-proxy": "^3.0.0",
     "msw": "^2.4.9",
     "next-sitemap": "^4.2.3",
