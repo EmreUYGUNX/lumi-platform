@@ -15,8 +15,24 @@ import type { CustomerDesignView } from "../../types/design.types";
 import { addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-const COMPRESSION_THRESHOLD_BYTES = 2 * 1024 * 1024;
-const MAX_DIMENSION_PX = 2048;
+
+type CompressionPreset = "default" | "mobile";
+
+const COMPRESSION_PRESETS: Record<
+  CompressionPreset,
+  { thresholdBytes: number; maxDimensionPx: number; jpegQuality: number }
+> = {
+  default: {
+    thresholdBytes: 2 * 1024 * 1024,
+    maxDimensionPx: 2048,
+    jpegQuality: 0.86,
+  },
+  mobile: {
+    thresholdBytes: 512 * 1024,
+    maxDimensionPx: 1536,
+    jpegQuality: 0.8,
+  },
+};
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/svg+xml"] as const;
 
@@ -30,8 +46,9 @@ const formatBytes = (bytes: number): string => {
 const isAllowedMime = (mimeType: string): mimeType is (typeof ALLOWED_MIME_TYPES)[number] =>
   (ALLOWED_MIME_TYPES as readonly string[]).includes(mimeType);
 
-const compressIfNeeded = async (file: File): Promise<File> => {
-  if (file.size <= COMPRESSION_THRESHOLD_BYTES) return file;
+const compressIfNeeded = async (file: File, preset: CompressionPreset): Promise<File> => {
+  const config = COMPRESSION_PRESETS[preset];
+  if (file.size <= config.thresholdBytes) return file;
   if (file.type === "image/svg+xml") return file;
 
   if (typeof createImageBitmap !== "function") {
@@ -40,7 +57,7 @@ const compressIfNeeded = async (file: File): Promise<File> => {
 
   const bitmap = await createImageBitmap(file);
   const maxDimension = Math.max(bitmap.width, bitmap.height);
-  const scale = maxDimension > 0 ? Math.min(1, MAX_DIMENSION_PX / maxDimension) : 1;
+  const scale = maxDimension > 0 ? Math.min(1, config.maxDimensionPx / maxDimension) : 1;
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
 
@@ -54,7 +71,7 @@ const compressIfNeeded = async (file: File): Promise<File> => {
   ctx.drawImage(bitmap, 0, 0, width, height);
 
   const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
-  const outputQuality = outputType === "image/jpeg" ? 0.86 : undefined;
+  const outputQuality = outputType === "image/jpeg" ? config.jpegQuality : undefined;
 
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, outputType, outputQuality);
@@ -73,10 +90,16 @@ const compressIfNeeded = async (file: File): Promise<File> => {
 interface ImageUploaderProps {
   canvas?: fabric.Canvas;
   onUploaded?: (design: CustomerDesignView) => void;
+  compressionPreset?: CompressionPreset;
   className?: string;
 }
 
-export function ImageUploader({ canvas, onUploaded, className }: ImageUploaderProps): JSX.Element {
+export function ImageUploader({
+  canvas,
+  onUploaded,
+  compressionPreset = "default",
+  className,
+}: ImageUploaderProps): JSX.Element {
   const [error, setError] = useState<string | undefined>();
   const [success, setSuccess] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | undefined>();
@@ -98,10 +121,11 @@ export function ImageUploader({ canvas, onUploaded, className }: ImageUploaderPr
 
       let fileToUpload = file;
 
-      if (file.size > COMPRESSION_THRESHOLD_BYTES && file.type !== "image/svg+xml") {
+      const preset = COMPRESSION_PRESETS[compressionPreset];
+      if (file.size > preset.thresholdBytes && file.type !== "image/svg+xml") {
         setIsCompressing(true);
         try {
-          fileToUpload = await compressIfNeeded(file);
+          fileToUpload = await compressIfNeeded(file, compressionPreset);
         } finally {
           setIsCompressing(false);
         }

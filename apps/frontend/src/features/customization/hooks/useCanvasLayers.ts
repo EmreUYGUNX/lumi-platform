@@ -125,6 +125,66 @@ const clampObjectSize = (object: fabric.Object, constraints: CanvasConstraints):
   object.setCoords();
 };
 
+const resolveDesignBounds = (canvas: fabric.Canvas): { width: number; height: number } => {
+  const raw = canvas as unknown as { lumiDesignWidth?: unknown; lumiDesignHeight?: unknown };
+  const width = typeof raw.lumiDesignWidth === "number" ? raw.lumiDesignWidth : canvas.getWidth();
+  const height =
+    typeof raw.lumiDesignHeight === "number" ? raw.lumiDesignHeight : canvas.getHeight();
+  return { width, height };
+};
+
+const applyRotationConstraints = (
+  canvas: fabric.Canvas,
+  object: fabric.Object,
+  constraints: CanvasConstraints,
+): void => {
+  const allowRotation = constraints.allowRotation ?? true;
+  if (!allowRotation) {
+    object.set({ angle: 0 });
+    object.setCoords();
+    return;
+  }
+
+  const raw = canvas as unknown as { lumiRotationSnapStep?: unknown };
+  const snapStep = typeof raw.lumiRotationSnapStep === "number" ? raw.lumiRotationSnapStep : 0;
+  if (snapStep <= 0 || typeof object.angle !== "number") return;
+
+  const snapped = Math.round(object.angle / snapStep) * snapStep;
+  object.set({ angle: snapped });
+  object.setCoords();
+};
+
+const handleMoving = (
+  canvas: fabric.Canvas,
+  bounds: { width: number; height: number },
+  event: { target?: fabric.Object },
+): void => {
+  if (!event.target) return;
+  clampObjectWithinBounds(canvas, event.target, bounds);
+};
+
+const handleScaling = (
+  canvas: fabric.Canvas,
+  bounds: { width: number; height: number },
+  constraints: CanvasConstraints,
+  event: { target?: fabric.Object },
+): void => {
+  if (!event.target) return;
+  clampObjectSize(event.target, constraints);
+  clampObjectWithinBounds(canvas, event.target, bounds);
+};
+
+const handleRotating = (
+  canvas: fabric.Canvas,
+  bounds: { width: number; height: number },
+  constraints: CanvasConstraints,
+  event: { target?: fabric.Object },
+): void => {
+  if (!event.target) return;
+  applyRotationConstraints(canvas, event.target, constraints);
+  clampObjectWithinBounds(canvas, event.target, bounds);
+};
+
 export const useCanvasLayers = (canvas: fabric.Canvas | undefined) => {
   const [layers, setLayers] = useState<Layer[]>([]);
   const scheduledRef = useRef<number | undefined>();
@@ -153,46 +213,19 @@ export const useCanvasLayers = (canvas: fabric.Canvas | undefined) => {
     }
 
     const constraints = readCanvasConstraints(canvas);
+    const bounds = resolveDesignBounds(canvas);
 
-    const designWidth = (canvas as unknown as { lumiDesignWidth?: number }).lumiDesignWidth;
-    const designHeight = (canvas as unknown as { lumiDesignHeight?: number }).lumiDesignHeight;
-
-    const bounds = {
-      width: typeof designWidth === "number" ? designWidth : canvas.getWidth(),
-      height: typeof designHeight === "number" ? designHeight : canvas.getHeight(),
-    };
-
-    const handleMutation = () => {
-      scheduleSync();
-    };
-
-    const handleMoving = (event: { target?: fabric.Object }) => {
-      if (!event.target) return;
-      clampObjectWithinBounds(canvas, event.target, bounds);
-    };
-
-    const handleScaling = (event: { target?: fabric.Object }) => {
-      if (!event.target) return;
-      clampObjectSize(event.target, constraints);
-      clampObjectWithinBounds(canvas, event.target, bounds);
-    };
-
-    const handleRotating = (event: { target?: fabric.Object }) => {
-      if (!event.target) return;
-      const allowRotation = constraints.allowRotation ?? true;
-      if (!allowRotation) {
-        event.target.set({ angle: 0 });
-        event.target.setCoords();
-      }
-      clampObjectWithinBounds(canvas, event.target, bounds);
-    };
+    const handleMutation = scheduleSync;
+    const handleMovingEvent = handleMoving.bind(undefined, canvas, bounds);
+    const handleScalingEvent = handleScaling.bind(undefined, canvas, bounds, constraints);
+    const handleRotatingEvent = handleRotating.bind(undefined, canvas, bounds, constraints);
 
     canvas.on("object:added", handleMutation);
     canvas.on("object:modified", handleMutation);
     canvas.on("object:removed", handleMutation);
-    canvas.on("object:moving", handleMoving);
-    canvas.on("object:scaling", handleScaling);
-    canvas.on("object:rotating", handleRotating);
+    canvas.on("object:moving", handleMovingEvent);
+    canvas.on("object:scaling", handleScalingEvent);
+    canvas.on("object:rotating", handleRotatingEvent);
 
     scheduleSync();
 
@@ -200,9 +233,9 @@ export const useCanvasLayers = (canvas: fabric.Canvas | undefined) => {
       canvas.off("object:added", handleMutation);
       canvas.off("object:modified", handleMutation);
       canvas.off("object:removed", handleMutation);
-      canvas.off("object:moving", handleMoving);
-      canvas.off("object:scaling", handleScaling);
-      canvas.off("object:rotating", handleRotating);
+      canvas.off("object:moving", handleMovingEvent);
+      canvas.off("object:scaling", handleScalingEvent);
+      canvas.off("object:rotating", handleRotatingEvent);
 
       if (scheduledRef.current !== undefined) {
         cancelSchedule(scheduledRef.current);
