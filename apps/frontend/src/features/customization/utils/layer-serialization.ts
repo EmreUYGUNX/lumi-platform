@@ -325,8 +325,6 @@ export const deserializeLayer = async (layer: Layer): Promise<fabric.Object> => 
     visible: !layer.isHidden,
     selectable: !layer.isLocked,
     evented: !layer.isLocked,
-    originX: "left",
-    originY: "top",
   });
 
   if (layer.layerType === "text") {

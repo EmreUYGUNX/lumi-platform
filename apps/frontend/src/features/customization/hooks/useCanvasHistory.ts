@@ -5,7 +5,8 @@ import type * as fabric from "fabric";
 import type { Layer } from "../types/layer.types";
 import { deserializeLayer } from "../utils/layer-serialization";
 
-const DEFAULT_MAX_ENTRIES = 40;
+const DEFAULT_MAX_ENTRIES = 50;
+const DEFAULT_THROTTLE_MS = 500;
 
 const buildSnapshotKey = (layers: Layer[]): string =>
   JSON.stringify(
@@ -82,14 +83,19 @@ export const useCanvasHistory = (params: {
   canvas?: fabric.Canvas;
   layers: Layer[];
   maxEntries?: number;
+  throttleMs?: number;
 }) => {
   const { canvas, layers } = params;
   const maxEntries = Math.max(5, params.maxEntries ?? DEFAULT_MAX_ENTRIES);
+  const throttleMs = Math.max(0, params.throttleMs ?? DEFAULT_THROTTLE_MS);
 
   const undoStack = useRef<Layer[][]>([]);
   const redoStack = useRef<Layer[][]>([]);
   const lastKey = useRef<string | undefined>();
   const restoring = useRef(false);
+  const lastSnapshotAt = useRef(0);
+  const pendingSnapshot = useRef<Layer[] | undefined>();
+  const pendingTimeout = useRef<number | undefined>();
 
   const [counts, setCounts] = useState({ undo: 0, redo: 0 });
 
@@ -105,9 +111,32 @@ export const useCanvasHistory = (params: {
       }
       redoStack.current = [];
       setCounts({ undo: undoStack.current.length, redo: redoStack.current.length });
+      lastSnapshotAt.current = Date.now();
     },
     [maxEntries],
   );
+
+  const clearPendingTimeout = useCallback(() => {
+    const timeout = pendingTimeout.current;
+    if (timeout === undefined) return;
+    window.clearTimeout(timeout);
+    pendingTimeout.current = undefined;
+  }, []);
+
+  const flushPendingSnapshot = useCallback(() => {
+    if (!canvas) return;
+    if (restoring.current) return;
+
+    const pending = pendingSnapshot.current;
+    if (!pending) return;
+
+    const pendingKey = buildSnapshotKey(pending);
+    if (pendingKey === lastKey.current) return;
+
+    lastKey.current = pendingKey;
+    pushSnapshot(pending);
+    pendingSnapshot.current = undefined;
+  }, [canvas, pushSnapshot]);
 
   useEffect(() => {
     if (!canvas) return;
@@ -116,9 +145,31 @@ export const useCanvasHistory = (params: {
     const key = buildSnapshotKey(layers);
     if (key === lastKey.current) return;
 
-    lastKey.current = key;
-    pushSnapshot(layers);
-  }, [canvas, layers, pushSnapshot]);
+    if (throttleMs <= 0) {
+      lastKey.current = key;
+      pushSnapshot(layers);
+      return;
+    }
+
+    const elapsed = Date.now() - lastSnapshotAt.current;
+
+    if (elapsed >= throttleMs) {
+      lastKey.current = key;
+      pushSnapshot(layers);
+      pendingSnapshot.current = undefined;
+      clearPendingTimeout();
+      return;
+    }
+
+    pendingSnapshot.current = layers;
+
+    if (pendingTimeout.current === undefined) {
+      pendingTimeout.current = window.setTimeout(() => {
+        pendingTimeout.current = undefined;
+        flushPendingSnapshot();
+      }, throttleMs - elapsed);
+    }
+  }, [canvas, clearPendingTimeout, flushPendingSnapshot, layers, pushSnapshot, throttleMs]);
 
   const restore = useCallback(
     async (snapshot: Layer[]) => {
@@ -164,8 +215,11 @@ export const useCanvasHistory = (params: {
     undoStack.current = [];
     redoStack.current = [];
     lastKey.current = undefined;
+    lastSnapshotAt.current = 0;
+    pendingSnapshot.current = undefined;
+    clearPendingTimeout();
     setCounts({ undo: 0, redo: 0 });
-  }, []);
+  }, [clearPendingTimeout]);
 
   useEffect(() => {
     if (!canvas) {
