@@ -14,6 +14,7 @@ import { useCanvasHistory } from "../../hooks/useCanvasHistory";
 import { useCanvasShortcuts } from "../../hooks/useCanvasShortcuts";
 import { useCanvasZoom } from "../../hooks/useCanvasZoom";
 import { usePreviewGeneration } from "../../hooks/usePreviewGeneration";
+import { useSaveDesign } from "../../hooks/useSaveDesign";
 import { alignActiveSelection, distributeActiveSelection } from "../../utils/canvas-align";
 import { addClipartSvgToCanvas, addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 import { setGridOverlayEnabled, setSnapToGridEnabled } from "../../utils/fabric-canvas";
@@ -25,8 +26,10 @@ import { DesignCanvas } from "./DesignCanvas";
 import { DesignLibrary } from "./DesignLibrary";
 import { ImageUploader } from "./ImageUploader";
 import { LayerPanel } from "./LayerPanel";
+import { LoadDesignModal } from "./LoadDesignModal";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { ProductPreview } from "./ProductPreview";
+import { SaveDesignModal } from "./SaveDesignModal";
 
 const DRAFT_STORAGE_KEY = "lumi.editor.draft";
 
@@ -79,6 +82,12 @@ export function CustomizationEditor({
   const [layers, setLayers] = useState<Layer[]>([]);
   const [selectedLayer, setSelectedLayer] = useState<Layer | undefined>();
 
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [loadModalOpen, setLoadModalOpen] = useState(false);
+  const [designName, setDesignName] = useState("Untitled");
+  const [designTags, setDesignTags] = useState<string[]>([]);
+  const [designPublic, setDesignPublic] = useState(false);
+
   const [activeTool, setActiveTool] = useState<CanvasTool>("select");
   const [gridEnabled, setGridEnabled] = useState(false);
   const [gridSize, setGridSize] = useState(10);
@@ -90,6 +99,18 @@ export function CustomizationEditor({
   const zoom = useCanvasZoom({ canvas });
   const preview = usePreviewGeneration();
   const { generatePreview } = preview;
+
+  const saveDesign = useSaveDesign({
+    canvas,
+    layers,
+    productId,
+    designArea: designArea.name,
+    meta: {
+      name: designName,
+      tags: designTags,
+      isPublic: designPublic,
+    },
+  });
 
   useEffect(() => {
     if (!canvas) return;
@@ -281,6 +302,29 @@ export function CustomizationEditor({
     }
   }, [canvas, designArea, generatePreview, layers, productId, productImageUrl]);
 
+  const handleSaveClick = useCallback(() => {
+    if (readOnly) return;
+
+    if (!saveDesign.canSave) {
+      saveDraft();
+      return;
+    }
+
+    setSaveModalOpen(true);
+  }, [readOnly, saveDesign.canSave, saveDraft]);
+
+  const handleLoadClick = useCallback(() => {
+    if (readOnly) return;
+    if (!canvas) {
+      toast({
+        title: "Canvas not ready",
+        description: "Please wait for the editor to initialize.",
+      });
+      return;
+    }
+    setLoadModalOpen(true);
+  }, [canvas, readOnly]);
+
   const exportDesign = useCallback(() => {
     downloadJson(`design-${createLayerId("export")}.json`, {
       productImageUrl,
@@ -408,7 +452,9 @@ export function CustomizationEditor({
         onToggleSnap={setSnapEnabled}
         onAlign={handleAlign}
         onDistribute={handleDistribute}
-        onSave={saveDraft}
+        onSave={handleSaveClick}
+        onLoad={handleLoadClick}
+        saveStatusLabel={saveDesign.statusLabel}
         onExport={exportDesign}
       />
 
@@ -522,6 +568,57 @@ export function CustomizationEditor({
           }).catch(() => {});
         }}
         onSelectTemplate={(template) => loadTemplate(template.id)}
+      />
+
+      <SaveDesignModal
+        open={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
+        name={designName}
+        onNameChange={setDesignName}
+        tags={designTags}
+        onTagsChange={setDesignTags}
+        isPublic={designPublic}
+        onIsPublicChange={setDesignPublic}
+        autoSaveEnabled={saveDesign.autoSaveEnabled}
+        onAutoSaveEnabledChange={saveDesign.setAutoSaveEnabled}
+        canSave={saveDesign.canSave && !readOnly}
+        isSaving={saveDesign.isSaving}
+        statusLabel={saveDesign.statusLabel}
+        shareUrl={saveDesign.shareUrl}
+        onSave={() => {
+          saveDesign
+            .save()
+            .then(() => {
+              if (!designPublic) {
+                setSaveModalOpen(false);
+              }
+              return true;
+            })
+            .catch(() => false);
+        }}
+      />
+
+      <LoadDesignModal
+        open={loadModalOpen}
+        onOpenChange={setLoadModalOpen}
+        canvas={canvas}
+        productId={productId}
+        designArea={designArea.name}
+        onLoaded={(result) => {
+          saveDesign.setSessionId(result.session.id);
+          saveDesign.markClean(new Date(result.session.lastEditedAt));
+          setDesignName(result.meta.name);
+          setDesignTags(result.meta.tags);
+          setDesignPublic(result.session.isPublic);
+
+          toast({
+            title: "Loaded",
+            description:
+              result.failedLayers > 0
+                ? `Design loaded with ${result.failedLayers} missing layer(s).`
+                : "Design loaded successfully.",
+          });
+        }}
       />
     </div>
   );

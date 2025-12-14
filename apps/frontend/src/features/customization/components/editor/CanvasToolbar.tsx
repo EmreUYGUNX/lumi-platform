@@ -13,6 +13,7 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   ChevronDown,
+  FolderOpen,
   Grid3X3,
   Image as ImageIcon,
   Library,
@@ -65,7 +66,9 @@ interface CanvasToolbarProps {
   onAlign?: (action: CanvasAlignAction) => void;
   onDistribute?: (direction: CanvasDistributeAction) => void;
   onSave?: () => void;
+  onLoad?: () => void;
   onExport?: () => void;
+  saveStatusLabel?: string;
   className?: string;
 }
 
@@ -99,7 +102,9 @@ export function CanvasToolbar({
   onAlign,
   onDistribute,
   onSave,
+  onLoad,
   onExport,
+  saveStatusLabel,
   className,
 }: CanvasToolbarProps): JSX.Element {
   const presetZoomLevels = useMemo(() => [25, 50, 75, 100, 125, 150, 200, 300, 400], []);
@@ -432,12 +437,30 @@ export function CanvasToolbar({
         </div>
 
         <div className="flex items-center gap-2">
+          {saveStatusLabel && (
+            <span className="hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60 lg:block">
+              {saveStatusLabel}
+            </span>
+          )}
+          {onLoad && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-9 gap-2 rounded-xl px-4"
+              onClick={onLoad}
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">Load</span>
+            </Button>
+          )}
           <Button
             type="button"
             variant="secondary"
             size="sm"
             className="h-9 gap-2 rounded-xl px-4"
             onClick={onSave}
+            disabled={!onSave}
           >
             <Save className="h-4 w-4" />
             <span className="text-xs font-semibold uppercase tracking-[0.18em]">Save</span>
@@ -448,6 +471,7 @@ export function CanvasToolbar({
             size="sm"
             className="h-9 gap-2 rounded-xl px-4"
             onClick={onExport}
+            disabled={!onExport}
           >
             <span className="text-xs font-semibold uppercase tracking-[0.18em]">Export</span>
           </Button>
