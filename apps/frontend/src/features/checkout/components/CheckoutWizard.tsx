@@ -134,8 +134,10 @@ export function CheckoutWizard(): JSX.Element {
                   deliveryMessage={cart.deliveryMessage ?? methodMeta?.description}
                   compact
                   checkoutHref={"/checkout" as Route}
+                  checkoutMode="button"
                   onCheckout={() => goNext()}
-                  isSubmitting={false}
+                  isSubmitting={cart.isLoading}
+                  checkoutDisabled={cart.items.length === 0 || step === "review"}
                   showPromo={false}
                   checkoutLabel={step === "review" ? "Place order" : "Continue"}
                 />

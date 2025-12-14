@@ -373,6 +373,7 @@ export class OrderService {
       include: {
         items: {
           include: {
+            customization: true,
             productVariant: {
               include: {
                 product: true,
@@ -410,6 +411,7 @@ export class OrderService {
       }
 
       return {
+        id: item.id,
         orderId: "pending",
         productId: product.id,
         productVariantId: item.productVariant.id,
@@ -581,6 +583,45 @@ export class OrderService {
             orderId: order.id,
           })),
         });
+
+        const customizations = cart.items
+          .filter((item) => Boolean(item.customization))
+          .map((item) => {
+            const product = item.productVariant?.product;
+            if (!product || !item.customization) {
+              throw new NotFoundError("Product information missing for customized cart item.", {
+                details: { itemId: item.id },
+              });
+            }
+
+            if (!item.customization.previewUrl || !item.customization.thumbnailUrl) {
+              throw new ConflictError("Customization preview generation failed for a cart item.", {
+                details: {
+                  itemId: item.id,
+                  productId: product.id,
+                  variantId: item.productVariantId,
+                },
+              });
+            }
+
+            return {
+              orderItemId: item.id,
+              productId: product.id,
+              designArea: item.customization.designArea,
+              designData: item.customization.designData as Prisma.InputJsonValue,
+              previewUrl: item.customization.previewUrl,
+              thumbnailUrl: item.customization.thumbnailUrl,
+              layerCount: item.customization.layerCount,
+              hasImages: item.customization.hasImages,
+              hasText: item.customization.hasText,
+            } satisfies Prisma.OrderItemCustomizationCreateManyInput;
+          });
+
+        if (customizations.length > 0) {
+          await tx.orderItemCustomization.createMany({
+            data: customizations,
+          });
+        }
 
         await OrderService.decrementInventory(tx, orderItems);
 

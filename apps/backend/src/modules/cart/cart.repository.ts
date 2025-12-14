@@ -1,4 +1,6 @@
-import type { CartItem, PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+
+import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 import { NotFoundError } from "@/lib/errors.js";
@@ -11,6 +13,7 @@ type CartRepositoryContext = RepositoryContext<
 >;
 
 const CART_ITEM_INCLUDE = Prisma.validator<Prisma.CartItemInclude>()({
+  customization: true,
   productVariant: {
     include: {
       product: true,
@@ -126,9 +129,10 @@ export class CartRepository extends BaseRepository<
 
       await tx.cartItem.upsert({
         where: {
-          cartId_productVariantId: {
+          cartId_productVariantId_lineKey: {
             cartId,
             productVariantId: variantId,
+            lineKey: "standard",
           },
         },
         update: {
@@ -138,6 +142,7 @@ export class CartRepository extends BaseRepository<
         create: {
           cartId,
           productVariantId: variantId,
+          lineKey: "standard",
           quantity,
           unitPrice,
         },
@@ -165,9 +170,10 @@ export class CartRepository extends BaseRepository<
 
       await tx.cartItem.delete({
         where: {
-          cartId_productVariantId: {
+          cartId_productVariantId_lineKey: {
             cartId,
             productVariantId: variantId,
+            lineKey: "standard",
           },
         },
       });
@@ -200,20 +206,29 @@ export class CartRepository extends BaseRepository<
         repo.ensureActiveCart(targetCartId),
       ]);
 
-      const existingItems = new Map<string, CartItem>();
-      target.items.forEach((item) => existingItems.set(item.productVariantId, item));
-
       const itemOperations = source.items.map((item) => {
-        const current = existingItems.get(item.productVariantId);
-        if (current) {
-          return tx.cartItem.update({
+        const isStandardLine = item.lineKey === "standard" && !item.customization;
+
+        if (isStandardLine) {
+          return tx.cartItem.upsert({
             where: {
-              cartId_productVariantId: {
+              cartId_productVariantId_lineKey: {
                 cartId: target.id,
                 productVariantId: item.productVariantId,
+                lineKey: "standard",
               },
             },
-            data: { quantity: { increment: item.quantity } },
+            update: {
+              quantity: { increment: item.quantity },
+              unitPrice: item.unitPrice,
+            },
+            create: {
+              cartId: target.id,
+              productVariantId: item.productVariantId,
+              lineKey: "standard",
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            },
           });
         }
 
@@ -221,8 +236,23 @@ export class CartRepository extends BaseRepository<
           data: {
             cartId: target.id,
             productVariantId: item.productVariantId,
+            lineKey: `line-${randomUUID()}`,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
+            customization: item.customization
+              ? {
+                  create: {
+                    productId: item.customization.productId,
+                    designArea: item.customization.designArea,
+                    designData: item.customization.designData as Prisma.InputJsonValue,
+                    previewUrl: item.customization.previewUrl,
+                    thumbnailUrl: item.customization.thumbnailUrl,
+                    layerCount: item.customization.layerCount,
+                    hasImages: item.customization.hasImages,
+                    hasText: item.customization.hasText,
+                  },
+                }
+              : undefined,
           },
         });
       });

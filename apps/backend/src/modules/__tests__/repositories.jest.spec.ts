@@ -300,9 +300,10 @@ describe("Repository layer", () => {
 
     expect(transactionDelegates.cartItem.upsert).toHaveBeenCalledWith({
       where: {
-        cartId_productVariantId: {
+        cartId_productVariantId_lineKey: {
           cartId: "cart-1",
           productVariantId: "variant-1",
+          lineKey: "standard",
         },
       },
       update: {
@@ -312,6 +313,7 @@ describe("Repository layer", () => {
       create: {
         cartId: "cart-1",
         productVariantId: "variant-1",
+        lineKey: "standard",
         quantity: 2,
         unitPrice: 99.5,
       },
@@ -697,12 +699,14 @@ describe("Repository layer", () => {
         {
           cartId: "cart-1",
           productVariantId: "variant-2",
+          lineKey: "standard",
           quantity: 2,
           unitPrice: new Prisma.Decimal(50),
         },
         {
           cartId: "cart-1",
           productVariantId: "variant-3",
+          lineKey: "standard",
           quantity: 1,
           unitPrice: new Prisma.Decimal(25),
         },
@@ -716,6 +720,7 @@ describe("Repository layer", () => {
         {
           cartId: "cart-2",
           productVariantId: "variant-2",
+          lineKey: "standard",
           quantity: 1,
           unitPrice: new Prisma.Decimal(50),
         },
@@ -768,9 +773,9 @@ describe("Repository layer", () => {
     await repository.clear("cart-1");
     await repository.mergeCarts("cart-1", "cart-2");
 
+    expect(transactionDelegates.cartItem.delete).toHaveBeenCalled();
     expect(transactionDelegates.cartItem.deleteMany).toHaveBeenCalled();
-    expect(transactionDelegates.cartItem.update).toHaveBeenCalled();
-    expect(transactionDelegates.cartItem.create).toHaveBeenCalled();
+    expect(transactionDelegates.cartItem.upsert).toHaveBeenCalled();
   });
 
   it("CartRepository mergeCarts exits early for identical carts", async () => {

@@ -42,9 +42,9 @@ export const useAddToCart = () => {
       await queryClient.cancelQueries({ queryKey: cartKeys.summary() });
       const previous = queryClient.getQueryData<CartSummaryView>(cartKeys.summary());
 
-      if (previous) {
+      if (previous && !input.customization) {
         const existing = previous.cart.items.find(
-          (item) => item.productVariantId === input.productVariantId,
+          (item) => item.productVariantId === input.productVariantId && !item.customization,
         );
 
         if (existing) {

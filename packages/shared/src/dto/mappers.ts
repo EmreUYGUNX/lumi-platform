@@ -10,6 +10,7 @@ import {
 import type { CategorySummaryDTO, ProductSummaryDTO } from "./catalog.dto.js";
 import {
   addressSchema,
+  cartItemCustomizationSchema,
   cartItemSchema,
   cartSummarySchema,
   couponSummarySchema,
@@ -387,6 +388,22 @@ export const mapCartToSummary = (cart: CartWithItems, currency?: string): CartSu
         unitPrice: toMoney(item.unitPrice, resolvedCurrency),
         productVariant: item.productVariant
           ? mapVariant(item.productVariant, resolvedCurrency)
+          : undefined,
+        customization: item.customization
+          ? cartItemCustomizationSchema.parse({
+              id: item.customization.id,
+              cartItemId: item.customization.cartItemId,
+              productId: item.customization.productId,
+              designArea: item.customization.designArea,
+              designData: item.customization.designData,
+              previewUrl: item.customization.previewUrl,
+              thumbnailUrl: item.customization.thumbnailUrl,
+              layerCount: item.customization.layerCount,
+              hasImages: item.customization.hasImages,
+              hasText: item.customization.hasText,
+              createdAt: item.customization.createdAt.toISOString(),
+              updatedAt: item.customization.updatedAt.toISOString(),
+            })
           : undefined,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),

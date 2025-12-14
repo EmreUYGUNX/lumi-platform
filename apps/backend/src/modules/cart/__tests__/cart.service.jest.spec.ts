@@ -3,15 +3,21 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { InventoryPolicy, InventoryReservationStatus, Prisma, ProductStatus } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
+import type { CloudinaryClient } from "@/integrations/cloudinary/cloudinary.client.js";
 import type { EmailService } from "@/lib/email/email.service.js";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js";
+import type { PreviewService } from "@/modules/preview/preview.service.js";
 
 import type { CartCache, CartCacheScope } from "../cart.cache.js";
 import type { CartRepository, CartWithRelations } from "../cart.repository.js";
 import { CartService, cartServiceInternals } from "../cart.service.js";
 import type { CartContext } from "../cart.service.js";
 import type { CartSummaryView, CartValidationReport } from "../cart.types.js";
-import { type AddCartItemInput, CART_ITEM_MAX_QUANTITY } from "../cart.validators.js";
+import {
+  type AddCartItemInput,
+  CART_ITEM_MAX_QUANTITY,
+  type UpdateCartItemInput,
+} from "../cart.validators.js";
 
 const CUID_PATTERN = /^c[\da-z]{24}$/;
 
@@ -125,7 +131,7 @@ type ApplyUpdateItemFn = (
   cart: CartWithRelations,
   ctx: CartContext,
   itemId: string,
-  quantity: number,
+  input: UpdateCartItemInput,
 ) => Promise<{
   itemId: string;
   variantId: string;
@@ -196,13 +202,23 @@ const createTransactionClientMock = (
     },
     cartItem: {
       create: jest.fn(async () => ({})),
+      upsert: jest.fn(async () => ({})),
       update: jest.fn(async () => ({})),
       deleteMany: jest.fn(async () => ({})),
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      findFirst: jest.fn(async () => null),
       findUnique: jest.fn(async () => null),
+    },
+    cartItemCustomization: {
+      deleteMany: jest.fn(async () => ({})),
+      upsert: jest.fn(async () => ({})),
     },
     productVariant: {
       findUnique: jest.fn(async () => null),
       findMany: jest.fn(async () => []),
+    },
+    productCustomization: {
+      findUnique: jest.fn(async () => null),
     },
     inventoryReservation: {
       updateMany: jest.fn(async () => ({})),
@@ -252,10 +268,26 @@ const createService = (overrides: ServiceOverrides = {}) => {
     sendCartRecoveryEmail: jest.fn(async () => {}),
   } as unknown as EmailService;
 
+  const prisma = {
+    productCustomization: {
+      findMany: jest.fn(async () => []),
+    },
+  } as unknown as PrismaClient;
+
+  const previewService = {
+    buildCloudinaryTransformation: jest.fn(),
+  } as unknown as { buildCloudinaryTransformation: jest.Mock };
+
+  const cloudinary = {
+    generateImageUrl: jest.fn(() => "https://res.cloudinary.com/demo/image/upload/sample.jpg"),
+  } as unknown as { generateImageUrl: jest.Mock };
+
   const service = new CartService({
     repository: repository as unknown as CartRepository,
     cache,
-    prisma: {} as PrismaClient,
+    prisma,
+    previewService: previewService as unknown as PreviewService,
+    cloudinary: cloudinary as unknown as CloudinaryClient,
     disableCleanupJob: true,
     now: () => new Date("2025-03-01T10:00:00.000Z"),
     emailService,
@@ -381,11 +413,13 @@ const createCartWithItems = ({
         id: itemId,
         cartId,
         productVariantId: variant.id,
+        lineKey: "standard",
         quantity,
         unitPrice: variant.price,
         createdAt: timestamp,
         updatedAt: timestamp,
         productVariant: variant,
+        customization: null,
       },
     ],
     user: {
@@ -415,9 +449,12 @@ const createMergeTransaction = (
       ),
     },
     cartItem: {
-      update: jest.fn(async () => {}),
+      upsert: jest.fn(async () => ({ id: ensureCuid("merged-item") })),
       create: jest.fn(async () => {}),
       deleteMany: jest.fn(async () => {}),
+    },
+    cartItemCustomization: {
+      deleteMany: jest.fn(async () => ({})),
     },
     cart: {
       update: jest.fn(async () => {}),
@@ -497,15 +534,28 @@ const createMaintenanceService = (options: MaintenanceServiceOptions = {}) => {
       findMany: jest.fn(async () => options.staleCarts ?? []),
       update: jest.fn(async () => {}),
     },
+    productCustomization: {
+      findMany: jest.fn(async () => []),
+    },
     inventoryReservation: {
       updateMany: jest.fn(async () => ({})),
     },
   };
 
+  const previewService = {
+    buildCloudinaryTransformation: jest.fn(),
+  } as unknown as { buildCloudinaryTransformation: jest.Mock };
+
+  const cloudinary = {
+    generateImageUrl: jest.fn(() => "https://res.cloudinary.com/demo/image/upload/sample.jpg"),
+  } as unknown as { generateImageUrl: jest.Mock };
+
   const service = new CartService({
     repository: repositoryMock as unknown as CartRepository,
     cache,
     prisma: prismaMock as unknown as PrismaClient,
+    previewService: previewService as unknown as PreviewService,
+    cloudinary: cloudinary as unknown as CloudinaryClient,
     emailService: emailServiceMock as unknown as EmailService,
     disableCleanupJob: true,
     now: () => new Date("2025-03-01T10:00:00.000Z"),
@@ -560,6 +610,7 @@ const createAddItemTransaction = ({
           id: ensureCuid(`${cart.id}-existing`),
           cartId: cart.id,
           productVariantId: variant.id,
+          lineKey: "standard",
           quantity: existingQuantity,
         }
       : null;
@@ -568,6 +619,7 @@ const createAddItemTransaction = ({
     id: existing?.id ?? ensureCuid(`${cart.id}-item`),
     cartId: cart.id,
     productVariantId: variant.id,
+    lineKey: "standard",
     quantity: (existing?.quantity ?? 0) + inputQuantity,
     unitPrice: variantEntity.price,
     createdAt: cart.createdAt,
@@ -580,7 +632,11 @@ const createAddItemTransaction = ({
     },
     cartItem: {
       findUnique: jest.fn(async () => existing),
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
       upsert: jest.fn(async () => upsertResult),
+    },
+    cartItemCustomization: {
+      deleteMany: jest.fn(async () => ({})),
     },
     cart: {
       update: jest.fn(async () => {}),
@@ -631,6 +687,7 @@ const createUpdateItemEntity = (
     id: ensureCuid(`${cart.id}-item`),
     cartId: cart.id,
     productVariantId: variant.id,
+    lineKey: "standard",
     quantity,
     unitPrice: variant.price,
     createdAt: cart.createdAt,
@@ -640,6 +697,7 @@ const createUpdateItemEntity = (
       userId: overrides.userId ?? cart.userId,
     },
     productVariant: variantEntity,
+    customization: null,
   };
 };
 
@@ -649,7 +707,16 @@ const createUpdateTransaction = (
   ({
     cartItem: {
       findUnique: jest.fn(async () => item),
+      aggregate: jest.fn(async () => ({ _sum: { quantity: 0 } })),
+      findFirst: jest.fn(async () => null),
       update: jest.fn(async () => item),
+    },
+    cartItemCustomization: {
+      deleteMany: jest.fn(async () => ({})),
+      upsert: jest.fn(async () => ({})),
+    },
+    productCustomization: {
+      findUnique: jest.fn(async () => null),
     },
     cart: {
       update: jest.fn(async () => {}),
@@ -844,7 +911,7 @@ describe("CartService", () => {
     expect(delivery.status).toBe("backorder");
   });
 
-  it("detects price mismatches during cart evaluation", () => {
+  it("detects price mismatches during cart evaluation", async () => {
     const mismatchCart = createCartFixture();
     const item = mismatchCart.items[0];
     if (!item) {
@@ -861,10 +928,10 @@ describe("CartService", () => {
 
     const { service } = createService({ cart: mismatchCart });
     const internals = service as unknown as {
-      evaluateCart: (cart: CartWithRelations) => CartValidationReport;
+      evaluateCart: (cart: CartWithRelations) => Promise<CartValidationReport>;
     };
 
-    const report = internals.evaluateCart(mismatchCart);
+    const report = await internals.evaluateCart(mismatchCart);
     expect(report.valid).toBe(true);
     expect(report.issues).toEqual(
       expect.arrayContaining([
@@ -1099,7 +1166,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<{ previousQuantity: number; newQuantity: number }>;
     };
 
@@ -1108,7 +1175,7 @@ describe("CartService.applyUpdateItem", () => {
     const tx = createUpdateTransaction(item);
     const itemId = item.id;
 
-    const result = await internals.applyUpdateItem(tx, cart, context, itemId, 4);
+    const result = await internals.applyUpdateItem(tx, cart, context, itemId, { quantity: 4 });
     const txInternals = tx as unknown as {
       cartItem: { update: jest.Mock };
     };
@@ -1132,7 +1199,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<{ newQuantity: number }>;
     };
 
@@ -1140,7 +1207,7 @@ describe("CartService.applyUpdateItem", () => {
     const item = createUpdateItemEntity(cart, variant, { quantity: 1 });
     const tx = createUpdateTransaction(item);
 
-    const result = await internals.applyUpdateItem(tx, cart, context, item.id, 0);
+    const result = await internals.applyUpdateItem(tx, cart, context, item.id, { quantity: 0 });
     const txInternals = tx as unknown as { cartItem: { update: jest.Mock } };
 
     expect(result.newQuantity).toBe(0);
@@ -1160,7 +1227,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<unknown>;
     };
 
@@ -1169,7 +1236,9 @@ describe("CartService.applyUpdateItem", () => {
     const tx = createUpdateTransaction(item);
 
     await expect(
-      internals.applyUpdateItem(tx, cart, context, item.id, CART_ITEM_MAX_QUANTITY + 1),
+      internals.applyUpdateItem(tx, cart, context, item.id, {
+        quantity: CART_ITEM_MAX_QUANTITY + 1,
+      }),
     ).rejects.toThrow(ValidationError);
   });
 
@@ -1181,7 +1250,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<unknown>;
     };
 
@@ -1189,9 +1258,9 @@ describe("CartService.applyUpdateItem", () => {
     const item = createUpdateItemEntity(cart, variant, { quantity: 1, stock: 1 });
     const tx = createUpdateTransaction(item);
 
-    await expect(internals.applyUpdateItem(tx, cart, context, item.id, 3)).rejects.toThrow(
-      ConflictError,
-    );
+    await expect(
+      internals.applyUpdateItem(tx, cart, context, item.id, { quantity: 3 }),
+    ).rejects.toThrow(ConflictError);
   });
 
   it("rejects when the variant is unavailable", async () => {
@@ -1202,7 +1271,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<unknown>;
     };
 
@@ -1210,9 +1279,9 @@ describe("CartService.applyUpdateItem", () => {
     const item = createUpdateItemEntity(cart, variant, { includeVariant: false });
     const tx = createUpdateTransaction(item);
 
-    await expect(internals.applyUpdateItem(tx, cart, context, item.id, 1)).rejects.toThrow(
-      ValidationError,
-    );
+    await expect(
+      internals.applyUpdateItem(tx, cart, context, item.id, { quantity: 1 }),
+    ).rejects.toThrow(ValidationError);
   });
 
   it("rejects when the cart item belongs to a different user", async () => {
@@ -1223,7 +1292,7 @@ describe("CartService.applyUpdateItem", () => {
         cart: CartWithRelations,
         ctx: { userId: string; sessionId?: string },
         itemId: string,
-        quantity: number,
+        input: UpdateCartItemInput,
       ) => Promise<unknown>;
     };
 
@@ -1231,9 +1300,9 @@ describe("CartService.applyUpdateItem", () => {
     const item = createUpdateItemEntity(cart, variant, { userId: "other-user" });
     const tx = createUpdateTransaction(item);
 
-    await expect(internals.applyUpdateItem(tx, cart, context, item.id, 2)).rejects.toThrow(
-      NotFoundError,
-    );
+    await expect(
+      internals.applyUpdateItem(tx, cart, context, item.id, { quantity: 2 }),
+    ).rejects.toThrow(NotFoundError);
   });
 });
 
@@ -1245,16 +1314,6 @@ describe("CartService.applyMergeCarts", () => {
       variant: baseVariant,
       quantity: 3,
     });
-    guestCart.items.push({
-      id: "guest-item-2",
-      cartId: guestCart.id,
-      productVariantId: baseVariant.id,
-      quantity: 4,
-      unitPrice: baseVariant.price,
-      createdAt: guestCart.createdAt,
-      updatedAt: guestCart.updatedAt,
-      productVariant: baseVariant,
-    } as unknown as (typeof guestCart.items)[number]);
 
     const userCart = createCartWithItems({
       id: "user-cart",
@@ -1285,12 +1344,20 @@ describe("CartService.applyMergeCarts", () => {
       throw new Error("User cart item missing");
     }
 
-    expect(transaction.cartItem.update).toHaveBeenCalledWith({
-      where: { id: userItem.id },
-      data: expect.objectContaining({
-        quantity: { set: Math.min(2 + 3 + 4, CART_ITEM_MAX_QUANTITY) },
+    expect(transaction.cartItem.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          cartId_productVariantId_lineKey: {
+            cartId: userCart.id,
+            productVariantId: baseVariant.id,
+            lineKey: "standard",
+          },
+        },
+        update: expect.objectContaining({
+          quantity: { set: Math.min(2 + 3, CART_ITEM_MAX_QUANTITY) },
+        }),
       }),
-    });
+    );
     expect(transaction.cart.update).toHaveBeenCalledWith({
       where: { id: guestCart.id },
       data: expect.objectContaining({ status: "ABANDONED" }),
@@ -1298,7 +1365,7 @@ describe("CartService.applyMergeCarts", () => {
     expect(transaction.cartItem.deleteMany).toHaveBeenCalledWith({
       where: { cartId: guestCart.id },
     });
-    expect(result.mergedItems).toBe(2);
+    expect(result.mergedItems).toBe(1);
   });
 
   it("creates new cart items when merging distinct variants", async () => {
@@ -1334,14 +1401,24 @@ describe("CartService.applyMergeCarts", () => {
       "sum",
     );
 
-    expect(txDistinct.cartItem.create).toHaveBeenCalledWith({
-      data: {
-        cartId: userCart.id,
-        productVariantId: guestVariant.id,
-        quantity: 2,
-        unitPrice: guestVariant.price,
-      },
-    });
+    expect(txDistinct.cartItem.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          cartId_productVariantId_lineKey: {
+            cartId: userCart.id,
+            productVariantId: guestVariant.id,
+            lineKey: "standard",
+          },
+        },
+        create: {
+          cartId: userCart.id,
+          productVariantId: guestVariant.id,
+          lineKey: "standard",
+          quantity: 2,
+          unitPrice: guestVariant.price,
+        },
+      }),
+    );
     expect(result.mergedItems).toBe(1);
   });
 
@@ -1381,13 +1458,21 @@ describe("CartService.applyMergeCarts", () => {
       throw new Error("User cart item missing");
     }
 
-    expect(txReplace.cartItem.update).toHaveBeenCalledWith({
-      where: { id: userItem.id },
-      data: expect.objectContaining({
-        quantity: { set: 4 },
-        unitPrice: variant.price,
+    expect(txReplace.cartItem.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          cartId_productVariantId_lineKey: {
+            cartId: userCart.id,
+            productVariantId: variant.id,
+            lineKey: "standard",
+          },
+        },
+        update: expect.objectContaining({
+          quantity: { set: 4 },
+          unitPrice: variant.price,
+        }),
       }),
-    });
+    );
   });
 });
 
@@ -1486,7 +1571,7 @@ describe("CartService public operations", () => {
       expect.objectContaining({ id: cart.id }),
       context,
       item.id,
-      0,
+      { quantity: 0 },
     );
     expect(view.cart.id).toBe(cart.id);
 

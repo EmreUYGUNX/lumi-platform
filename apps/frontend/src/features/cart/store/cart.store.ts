@@ -182,7 +182,10 @@ export const cartStore = create<CartStore>()(
       addItem: (item) => {
         set((state) => {
           const existingIndex = state.items.findIndex(
-            (entry) => entry.productVariantId === item.productVariantId,
+            (entry) =>
+              entry.productVariantId === item.productVariantId &&
+              !entry.customization &&
+              !item.customization,
           );
           const nextItems =
             existingIndex === -1

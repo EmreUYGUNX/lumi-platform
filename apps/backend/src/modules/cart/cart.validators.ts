@@ -2,8 +2,54 @@ import { z } from "zod";
 
 import { cuidSchema, localeStringSchema, moneySchema } from "@lumi/shared/dto";
 
+import { previewLayersSchema } from "../preview/preview.validators.js";
+
 export const CART_ITEM_MIN_QUANTITY = 1;
 export const CART_ITEM_MAX_QUANTITY = 10;
+
+const MAX_CUSTOMIZATION_DATA_LENGTH = 2_000_000;
+
+const customizationDesignDataRecordSchema = z.record(z.unknown());
+
+const customizationDesignDataSchema = z.union([
+  customizationDesignDataRecordSchema,
+  z
+    .string()
+    .trim()
+    .min(2)
+    .max(MAX_CUSTOMIZATION_DATA_LENGTH)
+    .transform((value, ctx) => {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "designData must be a JSON object.",
+          });
+          return z.NEVER;
+        }
+        return parsed as Record<string, unknown>;
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "designData must be valid JSON.",
+          fatal: true,
+        });
+        return z.NEVER;
+      }
+    })
+    .pipe(customizationDesignDataRecordSchema),
+]);
+
+export const cartItemCustomizationSchema = z
+  .object({
+    designArea: z.string().trim().min(1).max(64),
+    designData: customizationDesignDataSchema,
+    layers: previewLayersSchema,
+    previewUrl: z.string().url().optional(),
+    thumbnailUrl: z.string().url().optional(),
+  })
+  .strict();
 
 export const addCartItemSchema = z
   .object({
@@ -13,6 +59,7 @@ export const addCartItemSchema = z
       .int()
       .min(CART_ITEM_MIN_QUANTITY, "Quantity must be at least 1.")
       .max(CART_ITEM_MAX_QUANTITY, "Quantity limit exceeded."),
+    customization: cartItemCustomizationSchema.optional(),
   })
   .strict();
 
@@ -23,6 +70,7 @@ export const updateCartItemSchema = z
       .int()
       .min(0, "Quantity cannot be negative.")
       .max(CART_ITEM_MAX_QUANTITY, "Quantity limit exceeded."),
+    customization: z.union([cartItemCustomizationSchema, z.null()]).optional(),
   })
   .strict();
 

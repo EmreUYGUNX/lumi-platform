@@ -309,11 +309,12 @@ model Product {
   collections             ProductCollection[]
   productMedia            ProductMedia[]
   reviews                 Review[]
-  orderItems              OrderItem[]
-  orderItemCustomizations OrderItemCustomization[]
-  mediaAssets             MediaAsset[]             @relation("ProductMediaAssets")
-  customization           ProductCustomization?
-  designSessions          DesignSession[]
+	  orderItems              OrderItem[]
+	  orderItemCustomizations OrderItemCustomization[]
+	  cartItemCustomizations  CartItemCustomization[]
+	  mediaAssets             MediaAsset[]             @relation("ProductMediaAssets")
+	  customization           ProductCustomization?
+	  designSessions          DesignSession[]
 
   @@index([status])
   @@index([status, createdAt])
@@ -674,6 +675,7 @@ model CartItem {
   id               String   @id @default(cuid())
   cartId           String
   productVariantId String
+  lineKey          String   @default("standard")
   quantity         Int      @default(1)
   unitPrice        Decimal  @db.Decimal(12, 2)
   createdAt        DateTime @default(now())
@@ -681,10 +683,38 @@ model CartItem {
 
   cart           Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  customization  CartItemCustomization?
 
-  @@unique([cartId, productVariantId])
+  @@unique([cartId, productVariantId, lineKey])
   @@index([cartId])
   @@index([productVariantId])
+}
+
+// Cart item customization (personalized cart line items)
+model CartItemCustomization {
+  id         String @id @default(cuid())
+  cartItemId String @unique
+  productId  String
+
+  designArea String
+  designData Json
+
+  previewUrl   String?
+  thumbnailUrl String?
+
+  layerCount Int     @default(0)
+  hasImages  Boolean @default(false)
+  hasText    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cartItem CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([cartItemId])
+  @@index([productId])
+  @@map("cart_item_customizations")
 }
 
 model Address {

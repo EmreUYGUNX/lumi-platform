@@ -19,6 +19,7 @@ import {
   nullableLocaleStringSchema,
   optionalJsonSchema,
   phoneNumberSchema,
+  urlSchema,
 } from "./base.js";
 import { mediaAssetSchema, productVariantSchema } from "./catalog.dto.js";
 
@@ -47,6 +48,22 @@ export const addressSchema = z
   .merge(auditTimestampsSchema)
   .strict();
 
+export const cartItemCustomizationSchema = z
+  .object({
+    id: cuidSchema,
+    cartItemId: cuidSchema,
+    productId: cuidSchema,
+    designArea: localeStringSchema.max(64),
+    designData: z.unknown(),
+    previewUrl: urlSchema.nullable().optional(),
+    thumbnailUrl: urlSchema.nullable().optional(),
+    layerCount: z.number().int().nonnegative().default(0),
+    hasImages: z.boolean().default(false),
+    hasText: z.boolean().default(false),
+  })
+  .merge(auditTimestampsSchema)
+  .strict();
+
 export const cartItemSchema = z
   .object({
     id: cuidSchema,
@@ -55,6 +72,7 @@ export const cartItemSchema = z
     quantity: z.number().int().positive(),
     unitPrice: moneySchema,
     productVariant: productVariantSchema.optional(),
+    customization: cartItemCustomizationSchema.optional(),
   })
   .merge(auditTimestampsSchema)
   .strict();
@@ -258,6 +276,7 @@ export const createOrderRequestSchema = z
   .strict();
 
 export type AddressDTO = z.infer<typeof addressSchema>;
+export type CartItemCustomizationDTO = z.infer<typeof cartItemCustomizationSchema>;
 export type CartItemDTO = z.infer<typeof cartItemSchema>;
 export type CartSummaryDTO = z.infer<typeof cartSummarySchema>;
 export type CartUpsertItemDTO = z.infer<typeof cartUpsertItemSchema>;
