@@ -28,8 +28,10 @@ interface CartSummaryProps {
   deliveryMessage?: string;
   compact?: boolean;
   checkoutHref?: Route | UrlObject;
+  checkoutMode?: "link" | "button";
   onCheckout?: () => void;
   isSubmitting?: boolean;
+  checkoutDisabled?: boolean;
   showPromo?: boolean;
   checkoutLabel?: string;
 }
@@ -46,8 +48,10 @@ export function CartSummary({
   deliveryMessage,
   compact = false,
   checkoutHref = "/checkout" as Route,
+  checkoutMode = "link",
   onCheckout,
   isSubmitting = false,
+  checkoutDisabled = false,
   showPromo = true,
   checkoutLabel = "Proceed to checkout",
 }: CartSummaryProps): JSX.Element {
@@ -90,6 +94,8 @@ export function CartSummary({
     }
     onCheckout?.();
   };
+
+  const isCheckoutDisabled = isSubmitting || checkoutDisabled;
 
   return (
     <div
@@ -171,17 +177,31 @@ export function CartSummary({
       )}
 
       <div className="flex flex-col gap-2">
-        <Button
-          asChild
-          disabled={isSubmitting}
-          className="bg-lumi-text hover:bg-lumi-text/90 rounded-full uppercase tracking-[0.22em] text-white"
-          onClick={handleCheckout}
-        >
-          <Link href={checkoutHref ?? ("/checkout" as Route)}>
+        {checkoutMode === "link" && !isCheckoutDisabled ? (
+          <Button
+            asChild
+            className="bg-lumi-text hover:bg-lumi-text/90 rounded-full uppercase tracking-[0.22em] text-white"
+            onClick={handleCheckout}
+          >
+            <Link href={checkoutHref}>
+              {checkoutLabel}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            disabled={isCheckoutDisabled}
+            className="bg-lumi-text hover:bg-lumi-text/90 rounded-full uppercase tracking-[0.22em] text-white disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => {
+              if (isCheckoutDisabled) return;
+              handleCheckout();
+            }}
+          >
             {checkoutLabel}
             <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
+          </Button>
+        )}
         {!compact && (
           <Button
             asChild

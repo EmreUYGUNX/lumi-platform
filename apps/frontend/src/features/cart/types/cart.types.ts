@@ -101,6 +101,92 @@ export const cartSummaryViewSchema = z
   })
   .strict();
 
+const previewLayerPositionSchema = z
+  .object({
+    x: z.number().finite().min(0),
+    y: z.number().finite().min(0),
+    width: z.number().finite().positive(),
+    height: z.number().finite().positive(),
+    rotation: z.number().finite().min(-360).max(360).optional(),
+  })
+  .strict();
+
+const previewLayerEffectsSchema = z
+  .object({
+    shadow: z
+      .object({
+        azimuth: z.number().int().min(0).max(360).optional(),
+        elevation: z.number().int().min(-100).max(100).optional(),
+      })
+      .strict()
+      .optional(),
+    outline: z
+      .object({
+        width: z.number().int().min(1).max(100),
+        color: z
+          .string()
+          .trim()
+          .regex(/^#?[\dA-Fa-f]{6}$/)
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    blur: z.number().int().min(0).max(2000).optional(),
+    brightness: z.number().int().min(-100).max(100).optional(),
+    contrast: z.number().int().min(-100).max(100).optional(),
+  })
+  .strict();
+
+const previewLayerBaseSchema = z
+  .object({
+    layerId: z.string().trim().min(1).max(64),
+    zIndex: z.number().int().min(0).max(1000),
+    position: previewLayerPositionSchema,
+    opacity: z.number().int().min(0).max(100).optional(),
+    effects: previewLayerEffectsSchema.optional(),
+  })
+  .strict();
+
+const previewImageLayerSchema = previewLayerBaseSchema
+  .extend({
+    type: z.literal("image"),
+    designId: cuidSchema.optional(),
+    publicId: z.string().trim().min(1).max(256).optional(),
+  })
+  .superRefine((layer, ctx) => {
+    if (!layer.designId && !layer.publicId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["designId"],
+        message: "Either designId or publicId must be provided for image layers.",
+      });
+    }
+  });
+
+const previewTextLayerSchema = previewLayerBaseSchema.extend({
+  type: z.literal("text"),
+  text: z.string().trim().min(1).max(300),
+  font: z.string().trim().min(1).max(128),
+  fontSize: z.number().finite().min(1).max(512),
+  fontWeight: z.union([z.string().trim().min(1).max(32), z.number().int()]).optional(),
+  letterSpacing: z.number().finite().min(-100).max(100).optional(),
+  color: z.string().trim().min(1).max(32).optional(),
+});
+
+export const previewLayerSchema = z.union([previewImageLayerSchema, previewTextLayerSchema]);
+
+export const previewLayersSchema = z.array(previewLayerSchema).min(1).max(200);
+
+export const cartItemCustomizationInputSchema = z
+  .object({
+    designArea: z.string().trim().min(1).max(64),
+    designData: z.record(z.unknown()),
+    layers: previewLayersSchema,
+    previewUrl: z.string().url().optional(),
+    thumbnailUrl: z.string().url().optional(),
+  })
+  .strict();
+
 export const addCartItemInputSchema = z
   .object({
     productVariantId: cuidSchema,
@@ -109,6 +195,7 @@ export const addCartItemInputSchema = z
       .int()
       .min(CART_ITEM_MIN_QUANTITY, "Quantity must be at least 1.")
       .max(CART_ITEM_MAX_QUANTITY, "Quantity limit exceeded."),
+    customization: cartItemCustomizationInputSchema.optional(),
   })
   .strict();
 
@@ -117,3 +204,4 @@ export type CartStockIssue = z.infer<typeof cartStockIssueSchema>;
 export type AddCartItemInput = z.infer<typeof addCartItemInputSchema>;
 export type CartItemWithProduct = z.infer<typeof cartItemWithProductSchema>;
 export type CartSummaryWithProducts = z.infer<typeof cartSummaryWithProductsSchema>;
+export type CartItemCustomizationInput = z.infer<typeof cartItemCustomizationInputSchema>;

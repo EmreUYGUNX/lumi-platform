@@ -93,6 +93,7 @@ export type CartWithItems = PrismaNamespace.CartGetPayload<{
   include: {
     items: {
       include: {
+        customization: true;
         productVariant: {
           include: {
             product: true;

@@ -3,16 +3,29 @@
 /* cart service flows validated through end-to-end suites */
 
 /* eslint-disable max-lines, unicorn/no-null */
+import { randomUUID } from "node:crypto";
 import { setInterval as scheduleInterval } from "node:timers";
 
 import { InventoryPolicy, InventoryReservationStatus, Prisma, ProductStatus } from "@prisma/client";
 import type { CartStatus, PrismaClient } from "@prisma/client";
 
 import { getConfig } from "@/config/index.js";
+import type {
+  CloudinaryClient,
+  GenerateImageUrlOptions,
+} from "@/integrations/cloudinary/cloudinary.client.js";
+import { getCloudinaryClient } from "@/integrations/cloudinary/cloudinary.client.js";
+import {
+  applyImageOverlay,
+  applyTextOverlay,
+} from "@/integrations/cloudinary/cloudinary-overlay.js";
+import type { PreviewLayerInput } from "@/integrations/cloudinary/cloudinary-overlay.js";
 import { type EmailService, createEmailService } from "@/lib/email/email.service.js";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js";
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
+import { PreviewService } from "@/modules/preview/preview.service.js";
+import type { PreviewLayer } from "@/modules/preview/preview.validators.js";
 import { recordCartOperationMetric } from "@/observability/index.js";
 import {
   type CartSummaryDTO,
@@ -44,6 +57,35 @@ import {
   type UpdateCartItemInput,
   type ValidateCartQueryInput,
 } from "./cart.validators.js";
+
+type TransformationDefinition = NonNullable<GenerateImageUrlOptions["transformation"]>;
+
+const buildOverlaySteps = (layers: PreviewLayerInput[]): Record<string, unknown>[] =>
+  layers.map((layer) => {
+    if (layer.type === "text") {
+      return applyTextOverlay(layer.text, layer.style, layer.position);
+    }
+
+    return applyImageOverlay(layer.publicId, layer.transform, layer.position);
+  });
+
+const WEB_OUTPUT_STEP = {
+  width: 1200,
+  crop: "limit",
+  quality: "80",
+  format: "webp",
+  fetch_format: "webp",
+} as const;
+
+const THUMBNAIL_OUTPUT_STEP = {
+  width: 300,
+  height: 300,
+  crop: "fill",
+  gravity: "auto",
+  quality: "70",
+  format: "webp",
+  fetch_format: "webp",
+} as const;
 
 const CART_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const DEFAULT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -102,15 +144,32 @@ interface CartProductVariant {
   };
 }
 
+interface CartItemCustomizationEntity {
+  id: string;
+  cartItemId: string;
+  productId: string;
+  designArea: string;
+  designData: Prisma.JsonValue;
+  previewUrl: string | null;
+  thumbnailUrl: string | null;
+  layerCount: number;
+  hasImages: boolean;
+  hasText: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface CartItemEntity {
   id: string;
   cartId: string;
   productVariantId: string;
+  lineKey: string;
   quantity: number;
   unitPrice: Prisma.Decimal | number;
   createdAt: Date;
   updatedAt: Date;
   productVariant: CartProductVariant | null;
+  customization: CartItemCustomizationEntity | null;
 }
 
 interface CartEntity {
@@ -147,6 +206,8 @@ export interface CartServiceOptions {
   prisma?: PrismaClient;
   repository?: CartRepository;
   cache?: CartCache;
+  previewService?: PreviewService;
+  cloudinary?: CloudinaryClient;
   logger?: ReturnType<typeof createChildLogger>;
   now?: () => Date;
   cleanupIntervalMs?: number;
@@ -191,12 +252,18 @@ export class CartService {
 
   private readonly emailService: EmailService;
 
+  private readonly previewService: PreviewService;
+
+  private readonly cloudinary: CloudinaryClient;
+
   private cleanupTimer: NodeJS.Timeout | undefined;
 
   constructor(options: CartServiceOptions = {}) {
     this.prisma = options.prisma ?? getPrismaClient();
     this.repository = options.repository ?? new CartRepository(this.prisma);
     this.cache = options.cache ?? createCartCache();
+    this.previewService = options.previewService ?? new PreviewService({ prisma: this.prisma });
+    this.cloudinary = options.cloudinary ?? getCloudinaryClient();
     this.logger = options.logger ?? createChildLogger("cart:service");
     this.now = options.now ?? (() => new Date());
     this.cleanupIntervalMs = Math.max(
@@ -273,7 +340,7 @@ export class CartService {
   ): Promise<CartSummaryView> {
     const result = await this.repository.withTransaction(async (repo, tx) => {
       const cart = await this.ensureActiveCartForUser(context, { repo });
-      const mutation = await this.applyUpdateItem(tx, cart, context, itemId, input.quantity);
+      const mutation = await this.applyUpdateItem(tx, cart, context, itemId, input);
       const refreshed = (await repo.findById(cart.id, {
         include: CART_DEFAULT_INCLUDE,
       })) as CartWithRelations | null;
@@ -428,7 +495,7 @@ export class CartService {
       ...options,
     };
     const cart = await this.ensureActiveCartForUser(context);
-    const baseReport = this.evaluateCart(cart);
+    const baseReport = await this.evaluateCart(cart);
     recordCartOperationMetric("validate_cart");
 
     if (resolvedOptions.reserveInventory) {
@@ -667,19 +734,36 @@ export class CartService {
     } satisfies ProductVariantDTO;
   }
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- Stock status combines variant grouping + multiple issue types.
   private computeStockStatus(cart: CartEntity): CartStockStatus {
     const issues: CartStockIssue[] = [];
 
+    const grouped = new Map<string, { items: CartItemEntity[]; totalQuantity: number }>();
+
     cart.items.forEach((item) => {
-      const variant = item.productVariant;
+      if (item.quantity <= 0) return;
+      const existing = grouped.get(item.productVariantId);
+      if (existing) {
+        existing.items.push(item);
+        existing.totalQuantity += item.quantity;
+        return;
+      }
+      grouped.set(item.productVariantId, { items: [item], totalQuantity: item.quantity });
+    });
+
+    grouped.forEach(({ items, totalQuantity }, variantId) => {
+      const representative = items[0];
+      if (!representative) return;
+      const variant = representative.productVariant;
       const product = variant?.product;
+
       if (!variant || !product) {
         issues.push({
           type: "variant_unavailable",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product?.id ?? "unknown",
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: 0,
           message: VARIANT_UNAVAILABLE_MESSAGE,
         });
@@ -689,36 +773,36 @@ export class CartService {
       if (product.status !== ProductStatus.ACTIVE) {
         issues.push({
           type: "variant_unavailable",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: variant.stock,
           message: PRODUCT_INACTIVE_MESSAGE,
         });
         return;
       }
 
-      if (variant.stock <= 0 || variant.stock < item.quantity) {
+      if (variant.stock <= 0 || variant.stock < totalQuantity) {
         issues.push({
           type: "out_of_stock",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: Math.max(0, variant.stock),
           message: "Requested quantity exceeds available stock.",
         });
         return;
       }
 
-      if (variant.stock - item.quantity <= 2) {
+      if (variant.stock - totalQuantity <= 2) {
         issues.push({
           type: "low_stock",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: variant.stock,
           message: "Stock levels are low for this item.",
         });
@@ -776,20 +860,38 @@ export class CartService {
     };
   }
 
-  private evaluateCart(cart: CartWithRelations): CartValidationReport {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- Cart validation covers stock, availability and pricing rules.
+  private async evaluateCart(cart: CartWithRelations): Promise<CartValidationReport> {
     const materialised = cart as unknown as CartEntity;
     const currency = materialised.items[0]?.productVariant?.product?.currency ?? "TRY";
     const { totals } = mapCartToSummary(cart as unknown as CartWithItems, currency);
 
     const issues: CartValidationIssue[] = [];
+
+    const grouped = new Map<string, { items: CartItemEntity[]; totalQuantity: number }>();
+
     materialised.items.forEach((item) => {
-      const { productVariant: variant } = item;
+      if (item.quantity <= 0) return;
+      const existing = grouped.get(item.productVariantId);
+      if (existing) {
+        existing.items.push(item);
+        existing.totalQuantity += item.quantity;
+        return;
+      }
+      grouped.set(item.productVariantId, { items: [item], totalQuantity: item.quantity });
+    });
+
+    grouped.forEach(({ items, totalQuantity }, variantId) => {
+      const representative = items[0];
+      if (!representative) return;
+      const variant = representative.productVariant;
       const product = variant?.product;
+
       if (!variant || !product) {
         issues.push({
           type: "variant_unavailable",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product?.id ?? "unknown",
           message: VARIANT_UNAVAILABLE_MESSAGE,
         });
@@ -799,41 +901,104 @@ export class CartService {
       if (product.status !== ProductStatus.ACTIVE) {
         issues.push({
           type: "product_unavailable",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
           message: PRODUCT_INACTIVE_MESSAGE,
         });
+        return;
       }
 
-      if (variant.stock <= 0 || variant.stock < item.quantity) {
+      if (variant.stock <= 0 || variant.stock < totalQuantity) {
         issues.push({
           type: "out_of_stock",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: Math.max(0, variant.stock),
           message: "Insufficient inventory to fulfill this item.",
         });
-      } else if (variant.stock - item.quantity <= 2) {
+        return;
+      }
+
+      if (variant.stock - totalQuantity <= 2) {
         issues.push({
           type: "low_stock",
-          itemId: item.id,
-          variantId: item.productVariantId,
+          itemId: representative.id,
+          variantId,
           productId: product.id,
-          requestedQuantity: item.quantity,
+          requestedQuantity: totalQuantity,
           availableQuantity: variant.stock,
           message: "Low stock for this item.",
         });
       }
+    });
 
-      const expectedUnitPrice =
-        variant.product.currency === currency ? variant.price : new Prisma.Decimal(variant.price);
+    const customizationProductIds = new Set<string>();
+    materialised.items.forEach((item) => {
+      if (!item.customization) return;
+      const productId = item.productVariant?.product?.id;
+      if (productId) {
+        customizationProductIds.add(productId);
+      }
+    });
+
+    const customizationConfigs =
+      customizationProductIds.size > 0
+        ? await this.prisma.productCustomization.findMany({
+            where: { productId: { in: [...customizationProductIds] } },
+            select: {
+              productId: true,
+              enabled: true,
+              basePriceModifier: true,
+              pricePerLayer: true,
+            },
+          })
+        : [];
+
+    const customizationConfigByProductId = new Map(
+      customizationConfigs.map((config) => [config.productId, config]),
+    );
+
+    materialised.items.forEach((item) => {
+      const variant = item.productVariant;
+      const product = variant?.product;
+      if (!variant || !product) {
+        return;
+      }
+
       const actualUnitPrice =
         item.unitPrice instanceof Prisma.Decimal
           ? item.unitPrice
           : new Prisma.Decimal(item.unitPrice);
+
+      const expectedBasePrice =
+        product.currency === currency ? variant.price : new Prisma.Decimal(variant.price);
+
+      const expectedUnitPrice = (() => {
+        if (!item.customization) {
+          return expectedBasePrice;
+        }
+
+        const config = customizationConfigByProductId.get(product.id);
+        if (!config || !config.enabled) {
+          throw new ValidationError("Product customization is not enabled.", {
+            issues: [
+              {
+                path: "customization",
+                message: "Customization is not available for this product.",
+              },
+            ],
+          });
+        }
+
+        const modifier = config.basePriceModifier.plus(
+          config.pricePerLayer.times(item.customization.layerCount),
+        );
+
+        return expectedBasePrice.plus(modifier);
+      })();
 
       if (!compareMoney(expectedUnitPrice, actualUnitPrice)) {
         issues.push({
@@ -864,6 +1029,90 @@ export class CartService {
       totals,
       checkedAt: this.now().toISOString(),
     };
+  }
+
+  private static async getVariantQuantityTotal(
+    tx: Prisma.TransactionClient,
+    cartId: string,
+    productVariantId: string,
+    options: { excludeItemId?: string } = {},
+  ): Promise<number> {
+    const aggregate = await tx.cartItem.aggregate({
+      where: {
+        cartId,
+        productVariantId,
+        quantity: { gt: 0 },
+        ...(options.excludeItemId ? { NOT: { id: options.excludeItemId } } : {}),
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    // eslint-disable-next-line dot-notation -- Prisma aggregate helpers expose underscored fields.
+    return aggregate["_sum"]?.quantity ?? 0;
+  }
+
+  private static async computeCustomizationPriceModifier(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    layerCount: number,
+  ): Promise<Prisma.Decimal> {
+    const config = await tx.productCustomization.findUnique({
+      where: { productId },
+      select: {
+        enabled: true,
+        basePriceModifier: true,
+        pricePerLayer: true,
+      },
+    });
+
+    if (!config || !config.enabled) {
+      throw new ValidationError("Product customization is not enabled.", {
+        issues: [
+          {
+            path: "customization",
+            message: "Customization is not available for this product.",
+          },
+        ],
+      });
+    }
+
+    const safeLayerCount = Math.max(0, Math.min(layerCount, 200));
+
+    return config.basePriceModifier.plus(config.pricePerLayer.times(safeLayerCount));
+  }
+
+  private async generateCustomizationAssets(
+    userId: string,
+    input: { productId: string; designArea: string; layers: PreviewLayer[] },
+  ): Promise<{ previewUrl: string; thumbnailUrl: string }> {
+    const transformation = await this.previewService.buildCloudinaryTransformation(
+      input.productId,
+      {
+        designArea: input.designArea,
+        resolution: "web",
+        layers: input.layers,
+      },
+      userId,
+    );
+
+    const overlaySteps = buildOverlaySteps(transformation.layers);
+
+    const previewUrl = this.cloudinary.generateImageUrl(transformation.basePublicId, {
+      transformation: [...overlaySteps, WEB_OUTPUT_STEP] as unknown as TransformationDefinition,
+      secure: true,
+    });
+
+    const thumbnailUrl = this.cloudinary.generateImageUrl(transformation.basePublicId, {
+      transformation: [
+        ...overlaySteps,
+        THUMBNAIL_OUTPUT_STEP,
+      ] as unknown as TransformationDefinition,
+      secure: true,
+    });
+
+    return { previewUrl, thumbnailUrl };
   }
 
   private async applyAddItem(
@@ -902,19 +1151,84 @@ export class CartService {
       });
     }
 
-    const existingItem = await tx.cartItem.findUnique({
-      where: {
-        cartId_productVariantId: {
+    const requestedQuantity = input.quantity;
+    const customizationInput = input.customization;
+
+    if (!customizationInput) {
+      const lineKey = "standard";
+      const existingItem = await tx.cartItem.findUnique({
+        where: {
+          cartId_productVariantId_lineKey: {
+            cartId: cart.id,
+            productVariantId: input.productVariantId,
+            lineKey,
+          },
+        },
+      });
+
+      const previousQuantity = existingItem?.quantity ?? 0;
+      const nextQuantity = previousQuantity + requestedQuantity;
+
+      if (nextQuantity > CART_ITEM_MAX_QUANTITY) {
+        throw new ValidationError("Maximum quantity per item exceeded.", {
+          issues: [
+            {
+              path: "quantity",
+              message: `You can only purchase up to ${CART_ITEM_MAX_QUANTITY} units of this item.`,
+            },
+          ],
+        });
+      }
+
+      const otherQuantity = await CartService.getVariantQuantityTotal(tx, cart.id, variant.id, {
+        excludeItemId: existingItem?.id,
+      });
+      await this.ensureInventoryCapacity(tx, cart.id, variant, otherQuantity + nextQuantity);
+
+      const item = await tx.cartItem.upsert({
+        where: {
+          cartId_productVariantId_lineKey: {
+            cartId: cart.id,
+            productVariantId: input.productVariantId,
+            lineKey,
+          },
+        },
+        update: {
+          quantity: { set: nextQuantity },
+          unitPrice: variant.price,
+          updatedAt: this.now(),
+        },
+        create: {
           cartId: cart.id,
           productVariantId: input.productVariantId,
+          lineKey,
+          quantity: nextQuantity,
+          unitPrice: variant.price,
         },
-      },
-    });
+      });
 
-    const previousQuantity = existingItem?.quantity ?? 0;
-    const nextQuantity = previousQuantity + input.quantity;
+      await tx.cartItemCustomization.deleteMany({ where: { cartItemId: item.id } });
 
-    if (nextQuantity > CART_ITEM_MAX_QUANTITY) {
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: {
+          expiresAt: this.computeExpiryDate(),
+          updatedAt: this.now(),
+          sessionId: context.sessionId ?? cart.sessionId,
+        },
+      });
+
+      await this.invalidateActiveReservations(tx, cart.id);
+
+      return {
+        itemId: item.id,
+        variantId: variant.id,
+        previousQuantity,
+        newQuantity: nextQuantity,
+      };
+    }
+
+    if (requestedQuantity > CART_ITEM_MAX_QUANTITY) {
       throw new ValidationError("Maximum quantity per item exceeded.", {
         issues: [
           {
@@ -925,25 +1239,53 @@ export class CartService {
       });
     }
 
-    await this.ensureInventoryCapacity(tx, cart.id, variant, nextQuantity);
+    const existingQuantity = await CartService.getVariantQuantityTotal(tx, cart.id, variant.id);
+    await this.ensureInventoryCapacity(tx, cart.id, variant, existingQuantity + requestedQuantity);
 
-    const item = await tx.cartItem.upsert({
-      where: {
-        cartId_productVariantId: {
-          cartId: cart.id,
-          productVariantId: input.productVariantId,
-        },
-      },
-      update: {
-        quantity: { set: nextQuantity },
-        unitPrice: variant.price,
-        updatedAt: this.now(),
-      },
-      create: {
+    const lineKey = `custom-${randomUUID()}`;
+    const { previewUrl, thumbnailUrl } = await this.generateCustomizationAssets(context.userId, {
+      productId: variant.productId,
+      designArea: customizationInput.designArea,
+      layers: customizationInput.layers,
+    });
+
+    const layerCount = customizationInput.layers.length;
+    const hasImages = customizationInput.layers.some((layer) => layer.type === "image");
+    const hasText = customizationInput.layers.some((layer) => layer.type === "text");
+
+    const priceModifier = await CartService.computeCustomizationPriceModifier(
+      tx,
+      variant.productId,
+      layerCount,
+    );
+    const unitPrice = variant.price.plus(priceModifier);
+
+    const designData: Record<string, unknown> = {
+      ...(customizationInput.designData as Record<string, unknown>),
+      layers: customizationInput.layers,
+      productId: variant.productId,
+      designArea: customizationInput.designArea,
+    };
+
+    const item = await tx.cartItem.create({
+      data: {
         cartId: cart.id,
         productVariantId: input.productVariantId,
-        quantity: nextQuantity,
-        unitPrice: variant.price,
+        lineKey,
+        quantity: requestedQuantity,
+        unitPrice,
+        customization: {
+          create: {
+            productId: variant.productId,
+            designArea: customizationInput.designArea,
+            designData: designData as Prisma.InputJsonValue,
+            previewUrl,
+            thumbnailUrl,
+            layerCount,
+            hasImages,
+            hasText,
+          },
+        },
       },
     });
 
@@ -961,21 +1303,24 @@ export class CartService {
     return {
       itemId: item.id,
       variantId: variant.id,
-      previousQuantity,
-      newQuantity: nextQuantity,
+      previousQuantity: 0,
+      newQuantity: requestedQuantity,
     };
   }
 
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- Update flow handles quantity + customization + inventory reconciliation.
   private async applyUpdateItem(
     tx: Prisma.TransactionClient,
     cart: CartWithRelations,
     context: CartContext,
     itemId: string,
-    quantity: number,
+    input: UpdateCartItemInput,
   ): Promise<{ itemId: string; variantId: string; previousQuantity: number; newQuantity: number }> {
+    const { quantity, customization } = input;
     const item = await tx.cartItem.findUnique({
       where: { id: itemId },
       include: {
+        customization: true,
         productVariant: {
           include: {
             product: true,
@@ -1014,31 +1359,116 @@ export class CartService {
     }
 
     if (quantity > 0) {
-      await this.ensureInventoryCapacity(tx, cart.id, variant, quantity);
+      const otherQuantity = await CartService.getVariantQuantityTotal(tx, cart.id, variant.id, {
+        excludeItemId: item.id,
+      });
+      await this.ensureInventoryCapacity(tx, cart.id, variant, otherQuantity + quantity);
     }
 
-    const cartItemUpdateData =
-      quantity === 0
-        ? {
-            quantity: { set: 0 },
-            updatedAt: this.now(),
-          }
-        : {
-            quantity: { set: quantity },
-            unitPrice: variant.price,
-            updatedAt: this.now(),
-          };
+    const now = this.now();
+    const hadCustomization = Boolean(item.customization);
+
+    const nextHasCustomization =
+      customization === undefined
+        ? hadCustomization
+        : Boolean(customization && customization !== null);
+
+    let nextLineKey = item.lineKey;
+
+    if (nextHasCustomization && item.lineKey === "standard") {
+      nextLineKey = `custom-${randomUUID()}`;
+    }
+
+    if (!nextHasCustomization && item.lineKey !== "standard") {
+      const existingStandard = await tx.cartItem.findFirst({
+        where: {
+          cartId: cart.id,
+          productVariantId: item.productVariantId,
+          lineKey: "standard",
+          id: { not: item.id },
+        },
+        select: { id: true },
+      });
+
+      if (!existingStandard) {
+        nextLineKey = "standard";
+      }
+    }
+
+    const layerCount = (() => {
+      if (!nextHasCustomization) return 0;
+      if (customization && customization !== null) return customization.layers.length;
+      return item.customization?.layerCount ?? 0;
+    })();
+
+    const priceModifier = nextHasCustomization
+      ? await CartService.computeCustomizationPriceModifier(tx, variant.productId, layerCount)
+      : new Prisma.Decimal(0);
+
+    const unitPrice = nextHasCustomization ? variant.price.plus(priceModifier) : variant.price;
+
+    if (customization === null) {
+      await tx.cartItemCustomization.deleteMany({ where: { cartItemId: item.id } });
+    }
+
+    if (customization && customization !== null) {
+      const { previewUrl, thumbnailUrl } = await this.generateCustomizationAssets(context.userId, {
+        productId: variant.productId,
+        designArea: customization.designArea,
+        layers: customization.layers,
+      });
+
+      const hasImages = customization.layers.some((layer) => layer.type === "image");
+      const hasText = customization.layers.some((layer) => layer.type === "text");
+
+      const designData: Record<string, unknown> = {
+        ...(customization.designData as Record<string, unknown>),
+        layers: customization.layers,
+        productId: variant.productId,
+        designArea: customization.designArea,
+      };
+
+      await tx.cartItemCustomization.upsert({
+        where: { cartItemId: item.id },
+        update: {
+          designArea: customization.designArea,
+          designData: designData as Prisma.InputJsonValue,
+          previewUrl,
+          thumbnailUrl,
+          layerCount,
+          hasImages,
+          hasText,
+          updatedAt: now,
+        },
+        create: {
+          cartItemId: item.id,
+          productId: variant.productId,
+          designArea: customization.designArea,
+          designData: designData as Prisma.InputJsonValue,
+          previewUrl,
+          thumbnailUrl,
+          layerCount,
+          hasImages,
+          hasText,
+        },
+      });
+    }
 
     await tx.cartItem.update({
       where: { id: item.id },
-      data: cartItemUpdateData,
+      data: {
+        quantity: { set: quantity },
+        unitPrice,
+        lineKey: nextLineKey,
+        updatedAt: now,
+      },
     });
 
     await tx.cart.update({
       where: { id: cart.id },
       data: {
         expiresAt: this.computeExpiryDate(),
-        updatedAt: this.now(),
+        updatedAt: now,
       },
     });
 
@@ -1082,38 +1512,77 @@ export class CartService {
     const target = userCart as unknown as CartEntity;
     const source = guestCart as unknown as CartEntity;
 
-    const userItems = new Map<string, { id: string; quantity: number }>();
+    const userTotals = new Map<string, number>();
+    const userStandardByVariant = new Map<string, { id: string; quantity: number }>();
+
     target.items.forEach((item) => {
-      userItems.set(item.productVariantId, { id: item.id, quantity: item.quantity });
+      if (item.lineKey === "standard" && !item.customization) {
+        userStandardByVariant.set(item.productVariantId, { id: item.id, quantity: item.quantity });
+      }
+      if (item.quantity <= 0) return;
+      userTotals.set(
+        item.productVariantId,
+        (userTotals.get(item.productVariantId) ?? 0) + item.quantity,
+      );
     });
 
-    const desiredQuantities = new Map<
-      string,
-      { desiredQuantity: number; existingId?: string; guestItemCount: number }
-    >();
+    const guestStandardByVariant = new Map<string, number>();
+    const guestNonStandardTotals = new Map<string, number>();
+    const guestNonStandardItems: CartItemEntity[] = [];
 
-    source.items.forEach((guestItem) => {
-      const existing = userItems.get(guestItem.productVariantId);
-      const entry = desiredQuantities.get(guestItem.productVariantId);
-      const currentDesired =
-        entry?.desiredQuantity ?? (strategy === "replace" ? 0 : (existing?.quantity ?? 0));
-      const nextDesired = currentDesired + guestItem.quantity;
-      desiredQuantities.set(guestItem.productVariantId, {
-        desiredQuantity: Math.min(nextDesired, CART_ITEM_MAX_QUANTITY),
-        existingId: entry?.existingId ?? existing?.id,
-        guestItemCount: (entry?.guestItemCount ?? 0) + 1,
-      });
+    source.items.forEach((item) => {
+      if (item.quantity <= 0) return;
+
+      if (item.lineKey === "standard" && !item.customization) {
+        guestStandardByVariant.set(item.productVariantId, item.quantity);
+        return;
+      }
+
+      guestNonStandardItems.push(item);
+      guestNonStandardTotals.set(
+        item.productVariantId,
+        (guestNonStandardTotals.get(item.productVariantId) ?? 0) + item.quantity,
+      );
     });
 
-    const variantIds = [...desiredQuantities.keys()];
+    const variantIds = [
+      ...new Set([
+        ...userTotals.keys(),
+        ...guestStandardByVariant.keys(),
+        ...guestNonStandardTotals.keys(),
+      ]),
+    ];
+
     const reservedTotals = await this.getReservedQuantities(tx, variantIds, {
       excludeCartIds: [userCart.id, guestCart.id],
     });
+
     const variants = await tx.productVariant.findMany({
       where: { id: { in: variantIds } },
       include: { product: true, inventory: true },
     });
     const variantLookup = new Map(variants.map((variant) => [variant.id, variant]));
+
+    const desiredTotals = new Map<string, number>();
+    variantIds.forEach((variantId) => {
+      const existingTotal = userTotals.get(variantId) ?? 0;
+      const existingStandardQty = userStandardByVariant.get(variantId)?.quantity ?? 0;
+      const guestStandardQty = guestStandardByVariant.get(variantId) ?? 0;
+      const guestNonStandardQty = guestNonStandardTotals.get(variantId) ?? 0;
+
+      const mergedStandardQty =
+        guestStandardQty > 0
+          ? strategy === "replace"
+            ? Math.min(guestStandardQty, CART_ITEM_MAX_QUANTITY)
+            : Math.min(existingStandardQty + guestStandardQty, CART_ITEM_MAX_QUANTITY)
+          : existingStandardQty;
+
+      const standardDelta = userStandardByVariant.has(variantId)
+        ? mergedStandardQty - existingStandardQty
+        : mergedStandardQty;
+
+      desiredTotals.set(variantId, existingTotal + standardDelta + guestNonStandardQty);
+    });
 
     variantIds.forEach((variantId) => {
       const variant = variantLookup.get(variantId);
@@ -1126,11 +1595,11 @@ export class CartService {
       }
 
       const reserved = reservedTotals.get(variantId) ?? 0;
-      const desiredQuantity = desiredQuantities.get(variantId)?.desiredQuantity ?? 0;
+      const desiredQuantity = desiredTotals.get(variantId) ?? 0;
       const available = variant.stock - reserved;
 
       if (available < desiredQuantity) {
-        throw new ConflictError("Insufficient inventory to merge cart item.", {
+        throw new ConflictError("Insufficient inventory to merge cart items.", {
           details: {
             variantId,
             available,
@@ -1141,47 +1610,98 @@ export class CartService {
       }
     });
 
-    const operations = [...desiredQuantities.entries()].map(async ([variantId, details]) => {
-      const variant = variantLookup.get(variantId);
-      if (!variant || !variant.product) {
-        return 0;
-      }
+    const now = this.now();
 
-      if (details.existingId) {
-        await tx.cartItem.update({
-          where: { id: details.existingId },
-          data: {
-            quantity: { set: details.desiredQuantity },
+    await Promise.all(
+      [...guestStandardByVariant.entries()].map(async ([variantId, guestQty]) => {
+        const variant = variantLookup.get(variantId);
+        if (!variant) return;
+
+        const existingQuantity = userStandardByVariant.get(variantId)?.quantity ?? 0;
+        const nextQuantity =
+          strategy === "replace"
+            ? Math.min(guestQty, CART_ITEM_MAX_QUANTITY)
+            : Math.min(existingQuantity + guestQty, CART_ITEM_MAX_QUANTITY);
+
+        const item = await tx.cartItem.upsert({
+          where: {
+            cartId_productVariantId_lineKey: {
+              cartId: userCart.id,
+              productVariantId: variantId,
+              lineKey: "standard",
+            },
+          },
+          update: {
+            quantity: { set: nextQuantity },
             unitPrice: variant.price,
-            updatedAt: this.now(),
+            updatedAt: now,
+          },
+          create: {
+            cartId: userCart.id,
+            productVariantId: variantId,
+            lineKey: "standard",
+            quantity: nextQuantity,
+            unitPrice: variant.price,
           },
         });
-        return details.guestItemCount;
-      }
 
-      await tx.cartItem.create({
-        data: {
-          cartId: userCart.id,
-          productVariantId: variantId,
-          quantity: details.desiredQuantity,
-          unitPrice: variant.price,
-        },
-      });
-      return details.guestItemCount;
-    });
+        await tx.cartItemCustomization.deleteMany({ where: { cartItemId: item.id } });
+      }),
+    );
 
-    const mergedResults = await Promise.all(operations);
-    let mergedCount = 0;
-    mergedResults.forEach((value) => {
-      mergedCount += value;
-    });
+    await Promise.all(
+      guestNonStandardItems.map(async (guestItem) => {
+        const variant = variantLookup.get(guestItem.productVariantId);
+        if (!variant || !variant.product) return;
+
+        const quantity = Math.min(guestItem.quantity, CART_ITEM_MAX_QUANTITY);
+        const hasCustomization = Boolean(guestItem.customization);
+        const lineKey = `${hasCustomization ? "custom" : "line"}-${randomUUID()}`;
+
+        const priceModifier = hasCustomization
+          ? await CartService.computeCustomizationPriceModifier(
+              tx,
+              variant.productId,
+              guestItem.customization?.layerCount ?? 0,
+            )
+          : new Prisma.Decimal(0);
+
+        const unitPrice = hasCustomization ? variant.price.plus(priceModifier) : variant.price;
+
+        await tx.cartItem.create({
+          data: {
+            cartId: userCart.id,
+            productVariantId: guestItem.productVariantId,
+            lineKey,
+            quantity,
+            unitPrice,
+            customization: guestItem.customization
+              ? {
+                  create: {
+                    productId: variant.productId,
+                    designArea: guestItem.customization.designArea,
+                    designData: guestItem.customization.designData as Prisma.InputJsonValue,
+                    previewUrl: guestItem.customization.previewUrl,
+                    thumbnailUrl: guestItem.customization.thumbnailUrl,
+                    layerCount: guestItem.customization.layerCount,
+                    hasImages: guestItem.customization.hasImages,
+                    hasText: guestItem.customization.hasText,
+                  },
+                }
+              : undefined,
+          },
+        });
+      }),
+    );
+
+    const mergedCount = source.items.filter((item) => item.quantity > 0).length;
 
     await tx.cart.update({
       where: { id: guestCart.id },
       data: {
         status: "ABANDONED",
-        expiresAt: this.now(),
-        updatedAt: this.now(),
+        expiresAt: now,
+        updatedAt: now,
       },
     });
     await this.invalidateActiveReservations(tx, guestCart.id);
@@ -1194,7 +1714,7 @@ export class CartService {
       where: { id: userCart.id },
       data: {
         expiresAt: this.computeExpiryDate(),
-        updatedAt: this.now(),
+        updatedAt: now,
       },
     });
     await this.invalidateActiveReservations(tx, userCart.id);
@@ -1221,13 +1741,29 @@ export class CartService {
 
       await this.invalidateActiveReservations(tx, refreshed.id);
 
-      const variantIds = refreshed.items.map((item) => item.productVariantId);
+      const variantQuantities = new Map<
+        string,
+        { quantity: number; sample: CartWithRelations["items"][number] }
+      >();
+
+      refreshed.items.forEach((item) => {
+        const existing = variantQuantities.get(item.productVariantId);
+        if (existing) {
+          existing.quantity += item.quantity;
+          return;
+        }
+        variantQuantities.set(item.productVariantId, { quantity: item.quantity, sample: item });
+      });
+
+      const variantIds = [...variantQuantities.keys()];
       const reservedTotals = await this.getReservedQuantities(tx, variantIds, {
         excludeCartIds: [refreshed.id],
       });
 
-      refreshed.items.forEach((item) => {
-        CartService.ensureItemReservable(item, reservedTotals);
+      variantIds.forEach((variantId) => {
+        const entry = variantQuantities.get(variantId);
+        if (!entry) return;
+        CartService.ensureItemReservable(entry.sample, reservedTotals, entry.quantity);
       });
 
       return tx.inventoryReservation.create({
@@ -1237,9 +1773,9 @@ export class CartService {
           status: InventoryReservationStatus.ACTIVE,
           expiresAt: this.computeReservationExpiryDate(),
           items: {
-            create: refreshed.items.map((item) => ({
-              productVariantId: item.productVariantId,
-              quantity: item.quantity,
+            create: variantIds.map((productVariantId) => ({
+              productVariantId,
+              quantity: variantQuantities.get(productVariantId)?.quantity ?? 0,
             })),
           },
         },
@@ -1364,6 +1900,7 @@ export class CartService {
   private static ensureItemReservable(
     item: CartWithRelations["items"][number],
     reservedTotals: Map<string, number>,
+    requestedQuantity = item.quantity,
   ): void {
     const variant = item.productVariant;
     if (!variant || !variant.product) {
@@ -1384,13 +1921,13 @@ export class CartService {
     const reserved = reservedTotals.get(item.productVariantId) ?? 0;
     const available = variant.stock - reserved;
 
-    if (available < item.quantity) {
+    if (available < requestedQuantity) {
       throw new ConflictError("Insufficient inventory to reserve this cart.", {
         details: {
           variantId: variant.id,
           available,
           reserved,
-          requested: item.quantity,
+          requested: requestedQuantity,
         },
       });
     }

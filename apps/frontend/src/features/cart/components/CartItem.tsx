@@ -2,19 +2,27 @@
 
 /* eslint-disable import/order */
 
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { Minus, Plus, Sparkles, Trash2 } from "lucide-react";
 import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DesignEditorModal } from "@/features/customization/components/editor/DesignEditorModal";
+import { useProductCustomizationConfig } from "@/features/customization/hooks/useProductCustomizationConfig";
+import { useProductDetail } from "@/features/product/hooks/useProductDetail";
 import { buildBlurPlaceholder, buildCloudinaryUrl } from "@/lib/cloudinary";
 import { formatMoney } from "@/lib/formatters/price";
 import { cloudinaryImageLoader } from "@/lib/image-loader";
 import { cn } from "@/lib/utils";
+import { uiStore } from "@/store";
 
 import type { CartItemWithProduct } from "../types/cart.types";
+import { useUpdateCartItem } from "../hooks/useUpdateCartItem";
 
 const fallbackImage = buildCloudinaryUrl({
   publicId: "lumi/products/jeans-428614_1920_uflws5",
@@ -79,6 +87,7 @@ export function CartItem({
   onRemove,
   onMoveToWishlist,
 }: CartItemProps): JSX.Element {
+  const [editorOpen, setEditorOpen] = useState(false);
   const lineTotal = buildLineTotal(item);
   const unitPrice = formatMoney(item.unitPrice);
   const variantLabel = resolveVariantLabel(item);
@@ -86,12 +95,62 @@ export function CartItem({
   const router = useRouter();
   const productHref = `/products/${item.product.slug}` as Route;
   const prefetchProduct = () => router.prefetch(productHref);
+  const updateItem = useUpdateCartItem();
+  const { customization } = item;
+  const isCustomized = Boolean(customization);
   const lowStock =
     item.availableStock <= 0
       ? "Out of stock"
       : item.availableStock <= 3
         ? `Only ${item.availableStock} left`
         : undefined;
+
+  const customizationConfig = useProductCustomizationConfig(item.product.id, {
+    enabled: editorOpen,
+  });
+  const productDetail = useProductDetail(item.product.slug, { enabled: editorOpen });
+
+  const productImageUrl = useMemo(() => {
+    const product = productDetail.data?.product;
+    const primary =
+      product?.media.find((entry) => entry.isPrimary)?.media.url ?? product?.media[0]?.media.url;
+    return primary ?? fallbackImage;
+  }, [productDetail.data?.product]);
+
+  const mediaSrc = customization?.thumbnailUrl ?? customization?.previewUrl ?? media.src;
+
+  const layerCountLabel =
+    customization && customization.layerCount > 0
+      ? `${customization.layerCount} layers`
+      : undefined;
+
+  const handleEditDesign = async () => {
+    const result = await customizationConfig.refetch();
+    if (!result.data) {
+      uiStore.getState().enqueueToast({
+        variant: "error",
+        title: "Customization unavailable",
+        description: "This item cannot be edited because the customization config is missing.",
+      });
+      return;
+    }
+    setEditorOpen(true);
+  };
+
+  const handleRemoveDesign = () => {
+    if (!customization) return;
+    const confirmed = window.confirm("Remove the custom design from this cart item?");
+    if (!confirmed) return;
+
+    updateItem.mutate({
+      itemId: item.id,
+      quantity: item.quantity,
+      // eslint-disable-next-line unicorn/no-null -- Null sentinel triggers removing customization for the cart line.
+      customization: null,
+    });
+  };
+
+  const actionsDisabled = disabled || updateItem.isPending;
 
   return (
     <div
@@ -109,7 +168,7 @@ export function CartItem({
       >
         <Image
           loader={cloudinaryImageLoader}
-          src={media.src}
+          src={mediaSrc}
           alt={media.alt}
           fill
           sizes="120px"
@@ -131,6 +190,18 @@ export function CartItem({
             >
               {item.product.title}
             </Link>
+            {customization && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border-lumi-primary/30 bg-lumi-primary/10 text-lumi-primary px-3 py-1 text-[10px] uppercase tracking-[0.18em]">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Customized
+                </Badge>
+                <span className="text-lumi-text-secondary text-[10px] uppercase tracking-[0.18em]">
+                  {customization.designArea}
+                  {layerCountLabel ? ` • ${layerCountLabel}` : ""}
+                </span>
+              </div>
+            )}
             <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.18em]">
               {variantLabel}
             </p>
@@ -142,9 +213,31 @@ export function CartItem({
                 type="button"
                 className="text-lumi-text-secondary hover:text-lumi-text text-[10px] uppercase tracking-[0.16em] underline decoration-dotted underline-offset-4 transition disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onMoveToWishlist}
-                disabled={disabled}
+                disabled={actionsDisabled}
               >
                 Move to wishlist
+              </button>
+            )}
+            {!compact && isCustomized && (
+              <button
+                type="button"
+                className="text-lumi-text-secondary hover:text-lumi-primary text-[10px] uppercase tracking-[0.16em] underline decoration-dotted underline-offset-4 transition disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  handleEditDesign().catch(() => {});
+                }}
+                disabled={actionsDisabled}
+              >
+                Edit design
+              </button>
+            )}
+            {!compact && isCustomized && (
+              <button
+                type="button"
+                className="text-lumi-text-secondary hover:text-lumi-error text-[10px] uppercase tracking-[0.16em] underline decoration-dotted underline-offset-4 transition disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleRemoveDesign}
+                disabled={actionsDisabled}
+              >
+                Remove design
               </button>
             )}
             <Button
@@ -152,7 +245,7 @@ export function CartItem({
               size="icon"
               className="text-lumi-text-secondary hover:text-lumi-error"
               onClick={onRemove}
-              disabled={disabled}
+              disabled={actionsDisabled}
               aria-label="Remove item"
             >
               <Trash2 className="h-4 w-4" />
@@ -165,7 +258,7 @@ export function CartItem({
             <button
               type="button"
               onClick={onDecrement}
-              disabled={disabled || item.quantity <= 1}
+              disabled={actionsDisabled || item.quantity <= 1}
               className="hover:text-lumi-primary text-lumi-text px-3 py-2 transition disabled:opacity-40"
               aria-label="Decrease quantity"
             >
@@ -177,7 +270,9 @@ export function CartItem({
             <button
               type="button"
               onClick={onIncrement}
-              disabled={disabled || item.quantity >= item.availableStock || item.quantity >= 10}
+              disabled={
+                actionsDisabled || item.quantity >= item.availableStock || item.quantity >= 10
+              }
               className="hover:text-lumi-primary text-lumi-text px-3 py-2 transition disabled:opacity-40"
               aria-label="Increase quantity"
             >
@@ -197,6 +292,20 @@ export function CartItem({
           </div>
         </div>
       </div>
+
+      {!compact && customization && customizationConfig.data && (
+        <DesignEditorModal
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          productId={item.product.id}
+          productName={item.product.title}
+          productImageUrl={productImageUrl}
+          customizationConfig={customizationConfig.data}
+          cartItem={{ id: item.id, quantity: item.quantity }}
+          initialDesignArea={customization.designArea}
+          initialDesignData={customization.designData}
+        />
+      )}
     </div>
   );
 }

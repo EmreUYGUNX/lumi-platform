@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { CheckCircle2, Edit2, Lock, ShieldCheck, Truck } from "lucide-react";
+import { AlertCircle, CheckCircle2, Edit2, Lock, ShieldCheck, Truck } from "lucide-react";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -35,8 +35,8 @@ const buildLineTotal = (item: CartItemWithProduct) => {
 };
 
 const resolveItemMedia = (item: CartItemWithProduct): { src: string; alt: string } => {
-  // Cart payload omits media; rely on fallback visual for review step.
-  return { src: fallbackImage, alt: item.product.title };
+  const src = item.customization?.thumbnailUrl ?? item.customization?.previewUrl ?? fallbackImage;
+  return { src, alt: item.product.title };
 };
 
 export function OrderReview(): JSX.Element {
@@ -45,6 +45,21 @@ export function OrderReview(): JSX.Element {
   const createOrder = useCreateOrder();
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+
+  const customizedItems = useMemo(
+    () => cart.items.filter((item) => Boolean(item.customization)),
+    [cart.items],
+  );
+
+  const invalidCustomizationItems = useMemo(
+    () =>
+      customizedItems.filter((item) => {
+        const previewUrl = item.customization?.previewUrl;
+        const thumbnailUrl = item.customization?.thumbnailUrl;
+        return !previewUrl || !thumbnailUrl;
+      }),
+    [customizedItems],
+  );
 
   const methodMeta = useMemo(
     () => SHIPPING_METHODS.find((entry) => entry.id === shippingMethod),
@@ -72,7 +87,11 @@ export function OrderReview(): JSX.Element {
 
   const readyForOrder = Boolean(shippingAddress && shippingMethod && cart.items.length > 0);
   const disablePlaceOrder =
-    !acceptTerms || !acceptPrivacy || !readyForOrder || createOrder.isPending;
+    !acceptTerms ||
+    !acceptPrivacy ||
+    !readyForOrder ||
+    createOrder.isPending ||
+    invalidCustomizationItems.length > 0;
 
   const renderItems = () => {
     if (cart.isLoading) {
@@ -141,6 +160,14 @@ export function OrderReview(): JSX.Element {
                 <p className="text-lumi-text-secondary text-[11px] uppercase tracking-[0.18em]">
                   Qty {item.quantity}
                 </p>
+                {item.customization && (
+                  <p className="text-lumi-text-secondary text-[10px] uppercase tracking-[0.18em]">
+                    Customized • {item.customization.designArea}
+                    {item.customization.layerCount > 0
+                      ? ` • ${item.customization.layerCount} layers`
+                      : ""}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-lumi-text text-sm font-semibold">{buildLineTotal(item)}</p>
@@ -172,6 +199,35 @@ export function OrderReview(): JSX.Element {
       </div>
 
       <div className="space-y-4">{renderItems()}</div>
+
+      {customizedItems.length > 0 && (
+        <div className="border-lumi-warning/60 bg-lumi-warning/10 text-lumi-warning rounded-2xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">
+              Custom items are non-returnable
+            </p>
+          </div>
+          <p className="text-lumi-text mt-2 text-[11px] uppercase tracking-[0.16em]">
+            Please review your customization previews before placing the order.
+          </p>
+        </div>
+      )}
+
+      {invalidCustomizationItems.length > 0 && (
+        <div className="border-lumi-error/60 bg-lumi-error/10 text-lumi-error rounded-2xl border p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">
+              Customization preview missing
+            </p>
+          </div>
+          <p className="text-lumi-text mt-2 text-[11px] uppercase tracking-[0.16em]">
+            One or more customized items are missing previews. Edit the design or remove it from the
+            cart before checkout.
+          </p>
+        </div>
+      )}
 
       <Separator className="bg-lumi-border/60" />
 

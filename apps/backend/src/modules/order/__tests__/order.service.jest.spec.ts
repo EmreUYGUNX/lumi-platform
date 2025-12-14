@@ -617,10 +617,12 @@ describe("OrderService", () => {
             id: ensureCuid("cart-low-stock"),
             cartId: CART_ID,
             productVariantId: VARIANT_ID,
+            lineKey: "standard",
             quantity: 5,
             unitPrice: new Prisma.Decimal("140.00"),
             createdAt: FIXTURE_TIMESTAMP,
             updatedAt: FIXTURE_TIMESTAMP,
+            customization: null,
             productVariant: {
               ...createVariantFixture(),
               stock: 0,

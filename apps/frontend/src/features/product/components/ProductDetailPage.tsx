@@ -12,9 +12,12 @@ import { useProductDetail } from "@/features/product/hooks/useProductDetail";
 import { useProductReviews } from "@/features/product/hooks/useProductReviews";
 import { useVariantSelection } from "@/features/product/hooks/useVariantSelection";
 import type { ProductDetail } from "@/features/product/types/product-detail.types";
+import { useProductCustomizationConfig } from "@/features/customization/hooks/useProductCustomizationConfig";
 import { trackProductView } from "@/lib/analytics/events";
+import { buildCloudinaryUrl } from "@/lib/cloudinary";
 
 import { AddToCartButton } from "./AddToCartButton";
+import { CustomizeButton } from "./CustomizeButton";
 import { ProductInfo } from "./ProductInfo";
 import { ProductTabs } from "./ProductTabs";
 import { RelatedProducts } from "./RelatedProducts";
@@ -49,6 +52,11 @@ const LazyProductGallery = dynamic(
   },
 );
 
+const fallbackProductImage = buildCloudinaryUrl({
+  publicId: "lumi/products/jeans-428614_1920_uflws5",
+  transformations: ["c_fill,g_auto,f_auto,q_auto:eco,w_1280,h_1280"],
+});
+
 export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps): JSX.Element {
   const detailQuery = useProductDetail(slug, { initialData });
   const product = detailQuery.data?.product;
@@ -63,6 +71,15 @@ export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps)
   });
 
   const pageTitle = useMemo(() => product?.title ?? "Product detail", [product?.title]);
+
+  const customizationConfig = useProductCustomizationConfig(product?.id);
+  const customizationEnabled = Boolean(customizationConfig.data?.enabled);
+
+  const productImage = useMemo(() => {
+    const primary =
+      product?.media.find((item) => item.isPrimary)?.media.url ?? product?.media[0]?.media.url;
+    return primary ?? fallbackProductImage;
+  }, [product?.media]);
 
   useEffect(() => {
     if (!product) return;
@@ -141,11 +158,29 @@ export function ProductDetailPage({ slug, initialData }: ProductDetailPageProps)
               onSelectAttribute={variantState.selectAttribute}
               onReset={variantState.resetSelection}
             />
-            <AddToCartButton
-              product={product}
-              variant={variantState.selectedVariant}
-              availability={variantState.availability}
-            />
+            {customizationConfig.isLoading ? (
+              <Skeleton className="h-[74px] w-full rounded-2xl" />
+            ) : customizationEnabled && customizationConfig.data ? (
+              <div className="border-lumi-border/70 bg-lumi-bg-secondary/60 space-y-3 rounded-2xl border p-4 shadow-md backdrop-blur">
+                <p className="text-lumi-text-secondary text-[11px] font-semibold uppercase tracking-[0.24em]">
+                  Personalize
+                </p>
+                <CustomizeButton
+                  productId={product.id}
+                  productName={product.title}
+                  productImage={productImage}
+                  customizationConfig={customizationConfig.data}
+                  variantId={variantState.selectedVariant?.id}
+                  availability={variantState.availability}
+                />
+              </div>
+            ) : (
+              <AddToCartButton
+                product={product}
+                variant={variantState.selectedVariant}
+                availability={variantState.availability}
+              />
+            )}
           </div>
         </div>
 

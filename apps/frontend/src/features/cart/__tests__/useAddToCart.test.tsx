@@ -206,6 +206,90 @@ describe("useAddToCart hook", () => {
     ).toBe(3);
   });
 
+  it("does not optimistically merge customized items", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = createWrapper(queryClient);
+    const existingItem = buildCartItem({ quantity: 1 });
+    const existingView = buildCartView(existingItem);
+
+    cartStore.getState().sync(existingView);
+    queryClient.setQueryData(cartKeys.summary(), existingView);
+
+    const customizedItem = buildCartItem({
+      id: "c000000000000000000000206",
+      quantity: 1,
+      customization: {
+        id: "c000000000000000000000207",
+        cartItemId: "c000000000000000000000206",
+        productId: existingItem.product.id,
+        designArea: "front",
+        designData: { lumiEditor: { editorLayers: [] } },
+        previewUrl: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+        thumbnailUrl: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+        layerCount: 1,
+        hasImages: false,
+        hasText: true,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    });
+
+    const updatedView: CartSummaryView = {
+      ...existingView,
+      cart: {
+        ...existingView.cart,
+        items: [existingItem, customizedItem],
+        totals: {
+          subtotal: { amount: "240.00", currency: "TRY" },
+          tax: { amount: "43.20", currency: "TRY" },
+          discount: { amount: "0.00", currency: "TRY" },
+          total: { amount: "283.20", currency: "TRY" },
+        },
+        updatedAt: timestamp,
+      },
+    };
+
+    const postSpy = vi
+      .spyOn(apiClient, "post")
+      .mockResolvedValue({ data: updatedView, meta: undefined });
+
+    const { result } = renderHook(() => useAddToCart(), { wrapper });
+
+    await act(async () => {
+      const mutation = result.current.mutateAsync({
+        productVariantId: existingItem.productVariantId,
+        quantity: 1,
+        customization: {
+          designArea: "front",
+          designData: { lumiEditor: { editorLayers: [] } },
+          layers: [
+            {
+              type: "text",
+              layerId: "layer_1",
+              zIndex: 0,
+              position: { x: 10, y: 10, width: 100, height: 48, rotation: 0 },
+              text: "Hello",
+              font: "Inter",
+              fontSize: 24,
+              color: "#111111",
+            },
+          ],
+        },
+      });
+
+      await waitFor(() => expect(cartStore.getState().items[0]?.quantity).toBe(1));
+      await mutation;
+    });
+
+    expect(postSpy).toHaveBeenCalledWith(
+      "/cart/items",
+      expect.objectContaining({
+        body: expect.objectContaining({ customization: expect.any(Object) }),
+      }),
+    );
+    expect(cartStore.getState().items).toHaveLength(2);
+  });
+
   it("rolls back to the previous state and surfaces an error toast on failure", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = createWrapper(queryClient);

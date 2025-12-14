@@ -6,13 +6,14 @@ import { apiClient } from "@/lib/api-client";
 import { uiStore } from "@/store";
 
 import type { CartSummaryView } from "../types/cart.types";
-import { cartSummaryViewSchema } from "../types/cart.types";
+import { cartItemCustomizationInputSchema, cartSummaryViewSchema } from "../types/cart.types";
 import { cartStore } from "../store/cart.store";
 import { cartKeys } from "./cart.keys";
 
 const updateCartItemInputSchema = z.object({
   itemId: cuidSchema,
   quantity: z.number().int().min(0).max(10),
+  customization: z.union([cartItemCustomizationInputSchema, z.null()]).optional(),
 });
 
 interface UpdateCartContext {
@@ -38,7 +39,10 @@ export const useUpdateCartItem = () => {
 
       const response = await apiClient.put(`/cart/items/${payload.itemId}`, {
         dataSchema: cartSummaryViewSchema,
-        body: { quantity: payload.quantity },
+        body: {
+          quantity: payload.quantity,
+          ...(payload.customization === undefined ? {} : { customization: payload.customization }),
+        },
       });
       return response.data;
     },
@@ -53,7 +57,11 @@ export const useUpdateCartItem = () => {
             ? previous.cart.items.filter((item) => item.id !== parsed.data.itemId)
             : previous.cart.items.map((item) => {
                 return item.id === parsed.data.itemId
-                  ? { ...item, quantity: parsed.data.quantity }
+                  ? {
+                      ...item,
+                      quantity: parsed.data.quantity,
+                      ...(parsed.data.customization === null ? { customization: undefined } : {}),
+                    }
                   : item;
               });
 
@@ -73,13 +81,18 @@ export const useUpdateCartItem = () => {
 
       return { previous };
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.setQueryData(cartKeys.summary(), data);
       cartStore.getState().sync(data);
       uiStore.getState().enqueueToast({
         variant: "success",
         title: "Sepet güncellendi",
-        description: "Ürün miktarı güncellendi.",
+        description:
+          variables.customization === null
+            ? "Tasarım kaldırıldı."
+            : variables.customization
+              ? "Tasarım güncellendi."
+              : "Ürün miktarı güncellendi.",
       });
     },
     onError: (error, _variables, context) => {

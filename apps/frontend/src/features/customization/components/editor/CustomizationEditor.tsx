@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 
 import * as fabric from "fabric";
 
@@ -70,556 +70,572 @@ interface CustomizationEditorProps {
   className?: string;
 }
 
-export function CustomizationEditor({
-  productId,
-  productImageUrl,
-  designArea,
-  initialLayers,
-  readOnly = false,
-  className,
-}: CustomizationEditorProps): JSX.Element {
-  const [canvas, setCanvas] = useState<fabric.Canvas | undefined>();
-  const [layers, setLayers] = useState<Layer[]>([]);
-  const [selectedLayer, setSelectedLayer] = useState<Layer | undefined>();
+export interface CustomizationEditorHandle {
+  getCanvas: () => fabric.Canvas | undefined;
+  getLayers: () => Layer[];
+  isDirty: () => boolean;
+  requestSave: () => void;
+}
 
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [loadModalOpen, setLoadModalOpen] = useState(false);
-  const [designName, setDesignName] = useState("Untitled");
-  const [designTags, setDesignTags] = useState<string[]>([]);
-  const [designPublic, setDesignPublic] = useState(false);
+export const CustomizationEditor = forwardRef<CustomizationEditorHandle, CustomizationEditorProps>(
+  function CustomizationEditor(
+    { productId, productImageUrl, designArea, initialLayers, readOnly = false, className },
+    ref,
+  ): JSX.Element {
+    const [canvas, setCanvas] = useState<fabric.Canvas | undefined>();
+    const [layers, setLayers] = useState<Layer[]>([]);
+    const [selectedLayer, setSelectedLayer] = useState<Layer | undefined>();
 
-  const [activeTool, setActiveTool] = useState<CanvasTool>("select");
-  const [gridEnabled, setGridEnabled] = useState(false);
-  const [gridSize, setGridSize] = useState(10);
-  const [snapEnabled, setSnapEnabled] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [sidePanelTab, setSidePanelTab] = useState<"tool" | "properties" | "preview">("tool");
+    const [saveModalOpen, setSaveModalOpen] = useState(false);
+    const [loadModalOpen, setLoadModalOpen] = useState(false);
+    const [designName, setDesignName] = useState("Untitled");
+    const [designTags, setDesignTags] = useState<string[]>([]);
+    const [designPublic, setDesignPublic] = useState(false);
 
-  const history = useCanvasHistory({ canvas, layers });
-  const zoom = useCanvasZoom({ canvas });
-  const preview = usePreviewGeneration();
-  const { generatePreview } = preview;
+    const [activeTool, setActiveTool] = useState<CanvasTool>("select");
+    const [gridEnabled, setGridEnabled] = useState(false);
+    const [gridSize, setGridSize] = useState(10);
+    const [snapEnabled, setSnapEnabled] = useState(false);
+    const [libraryOpen, setLibraryOpen] = useState(false);
+    const [sidePanelTab, setSidePanelTab] = useState<"tool" | "properties" | "preview">("tool");
 
-  const saveDesign = useSaveDesign({
-    canvas,
-    layers,
-    productId,
-    designArea: designArea.name,
-    meta: {
-      name: designName,
-      tags: designTags,
-      isPublic: designPublic,
-    },
-  });
+    const history = useCanvasHistory({ canvas, layers });
+    const zoom = useCanvasZoom({ canvas });
+    const preview = usePreviewGeneration();
+    const { generatePreview } = preview;
 
-  useEffect(() => {
-    if (!canvas) return;
-    setGridOverlayEnabled(canvas, gridEnabled, gridSize);
-    setSnapToGridEnabled(canvas, snapEnabled, gridSize);
-  }, [canvas, gridEnabled, gridSize, snapEnabled]);
-
-  const handleToolChange = useCallback((tool: CanvasTool) => {
-    setActiveTool(tool);
-    if (tool === "library") {
-      setLibraryOpen(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTool === "text" || activeTool === "image" || activeTool === "library") {
-      setSidePanelTab("tool");
-    }
-  }, [activeTool]);
-
-  const handleSelectLayer = useCallback(
-    (layerId: string) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      canvas.setActiveObject(object);
-      canvas.requestRenderAll();
-    },
-    [canvas],
-  );
-
-  const handleToggleVisibility = useCallback(
-    (layerId: string, hidden: boolean) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      updateObjectMetadata(object, { isHidden: hidden });
-      object.set({ visible: !hidden });
-      object.setCoords();
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target: object });
-    },
-    [canvas],
-  );
-
-  const handleToggleLock = useCallback(
-    (layerId: string, locked: boolean) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      updateObjectMetadata(object, { isLocked: locked });
-      object.set({
-        selectable: !locked,
-        evented: !locked,
-      });
-      object.setCoords();
-      canvas.discardActiveObject();
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target: object });
-    },
-    [canvas],
-  );
-
-  const handleReorder = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      if (!canvas) return;
-      const objects = canvas.getObjects();
-      const target = objects[fromIndex];
-      if (!target) return;
-      canvas.moveObjectTo(target, toIndex);
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target });
-    },
-    [canvas],
-  );
-
-  const handleDuplicate = useCallback(
-    async (layerId: string) => {
-      if (!canvas) return;
-      const target = findObjectByLayerId(canvas, layerId);
-      if (!target) return;
-
-      const clone = await (
-        target as unknown as { clone: (props?: string[]) => Promise<fabric.Object> }
-      ).clone([]);
-
-      const raw = clone as unknown as Record<string, unknown>;
-      const layerName = typeof raw.layerName === "string" ? raw.layerName : "LAYER";
-
-      ensureFabricLayerMetadata(clone, {
-        layerId: createLayerId("layer"),
-        layerName: clampLayerName(`${layerName} COPY`),
-        isHidden: false,
-        isLocked: false,
-        zIndex: canvas.getObjects().length,
-      });
-
-      clone.set({
-        left: (clone.left ?? 0) + 12,
-        top: (clone.top ?? 0) + 12,
-      });
-
-      canvas.add(clone);
-      canvas.setActiveObject(clone);
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target: clone });
-    },
-    [canvas],
-  );
-
-  const handleDelete = useCallback(
-    (layerId: string) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      canvas.remove(object);
-      canvas.discardActiveObject();
-      canvas.requestRenderAll();
-    },
-    [canvas],
-  );
-
-  const handleBringToFront = useCallback(
-    (layerId: string) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      canvas.bringObjectToFront(object);
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target: object });
-    },
-    [canvas],
-  );
-
-  const handleSendToBack = useCallback(
-    (layerId: string) => {
-      if (!canvas) return;
-      const object = findObjectByLayerId(canvas, layerId);
-      if (!object) return;
-      canvas.sendObjectToBack(object);
-      canvas.requestRenderAll();
-      canvas.fire("object:modified", { target: object });
-    },
-    [canvas],
-  );
-
-  const handleAlign = useCallback(
-    (action: Parameters<typeof alignActiveSelection>[1]) => {
-      if (!canvas) return;
-      alignActiveSelection(canvas, action);
-    },
-    [canvas],
-  );
-
-  const handleDistribute = useCallback(
-    (direction: Parameters<typeof distributeActiveSelection>[1]) => {
-      if (!canvas) return;
-      distributeActiveSelection(canvas, direction);
-    },
-    [canvas],
-  );
-
-  useCanvasShortcuts({
-    canvas,
-    readOnly,
-    undo: history.undo,
-    redo: history.redo,
-    zoomIn: zoom.zoomIn,
-    zoomOut: zoom.zoomOut,
-  });
-
-  const saveDraft = useCallback(() => {
-    const payload = {
-      productImageUrl,
-      designArea,
+    const saveDesign = useSaveDesign({
+      canvas,
       layers,
-      savedAt: new Date().toISOString(),
-    };
-
-    try {
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
-      toast({ title: "Saved", description: "Design draft saved locally." });
-    } catch {
-      toast({ title: "Save failed", description: "Unable to save draft in this browser." });
-    }
-
-    if (productId && canvas) {
-      generatePreview({ productId, designArea: designArea.name, canvas }, "web").catch(() => {});
-    }
-  }, [canvas, designArea, generatePreview, layers, productId, productImageUrl]);
-
-  const handleSaveClick = useCallback(() => {
-    if (readOnly) return;
-
-    if (!saveDesign.canSave) {
-      saveDraft();
-      return;
-    }
-
-    setSaveModalOpen(true);
-  }, [readOnly, saveDesign.canSave, saveDraft]);
-
-  const handleLoadClick = useCallback(() => {
-    if (readOnly) return;
-    if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the editor to initialize.",
-      });
-      return;
-    }
-    setLoadModalOpen(true);
-  }, [canvas, readOnly]);
-
-  const exportDesign = useCallback(() => {
-    downloadJson(`design-${createLayerId("export")}.json`, {
-      productImageUrl,
-      designArea,
-      layers,
+      productId,
+      designArea: designArea.name,
+      meta: {
+        name: designName,
+        tags: designTags,
+        isPublic: designPublic,
+      },
     });
-    toast({ title: "Exported", description: "Design JSON downloaded." });
-  }, [designArea, layers, productImageUrl]);
 
-  const loadTemplate = useCallback(
-    (templateId: string) => {
+    useEffect(() => {
       if (!canvas) return;
+      setGridOverlayEnabled(canvas, gridEnabled, gridSize);
+      setSnapToGridEnabled(canvas, snapEnabled, gridSize);
+    }, [canvas, gridEnabled, gridSize, snapEnabled]);
 
-      clearObjects(canvas);
+    const handleToolChange = useCallback((tool: CanvasTool) => {
+      setActiveTool(tool);
+      if (tool === "library") {
+        setLibraryOpen(true);
+      }
+    }, []);
 
-      const designWidth = (canvas as unknown as { lumiDesignWidth?: number }).lumiDesignWidth;
-      const designHeight = (canvas as unknown as { lumiDesignHeight?: number }).lumiDesignHeight;
-      const bounds = {
-        width: typeof designWidth === "number" ? designWidth : canvas.getWidth(),
-        height: typeof designHeight === "number" ? designHeight : canvas.getHeight(),
+    useEffect(() => {
+      if (activeTool === "text" || activeTool === "image" || activeTool === "library") {
+        setSidePanelTab("tool");
+      }
+    }, [activeTool]);
+
+    const handleSelectLayer = useCallback(
+      (layerId: string) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        canvas.setActiveObject(object);
+        canvas.requestRenderAll();
+      },
+      [canvas],
+    );
+
+    const handleToggleVisibility = useCallback(
+      (layerId: string, hidden: boolean) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        updateObjectMetadata(object, { isHidden: hidden });
+        object.set({ visible: !hidden });
+        object.setCoords();
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target: object });
+      },
+      [canvas],
+    );
+
+    const handleToggleLock = useCallback(
+      (layerId: string, locked: boolean) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        updateObjectMetadata(object, { isLocked: locked });
+        object.set({
+          selectable: !locked,
+          evented: !locked,
+        });
+        object.setCoords();
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target: object });
+      },
+      [canvas],
+    );
+
+    const handleReorder = useCallback(
+      (fromIndex: number, toIndex: number) => {
+        if (!canvas) return;
+        const objects = canvas.getObjects();
+        const target = objects[fromIndex];
+        if (!target) return;
+        canvas.moveObjectTo(target, toIndex);
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target });
+      },
+      [canvas],
+    );
+
+    const handleDuplicate = useCallback(
+      async (layerId: string) => {
+        if (!canvas) return;
+        const target = findObjectByLayerId(canvas, layerId);
+        if (!target) return;
+
+        const clone = await (
+          target as unknown as { clone: (props?: string[]) => Promise<fabric.Object> }
+        ).clone([]);
+
+        const raw = clone as unknown as Record<string, unknown>;
+        const layerName = typeof raw.layerName === "string" ? raw.layerName : "LAYER";
+
+        ensureFabricLayerMetadata(clone, {
+          layerId: createLayerId("layer"),
+          layerName: clampLayerName(`${layerName} COPY`),
+          isHidden: false,
+          isLocked: false,
+          zIndex: canvas.getObjects().length,
+        });
+
+        clone.set({
+          left: (clone.left ?? 0) + 12,
+          top: (clone.top ?? 0) + 12,
+        });
+
+        canvas.add(clone);
+        canvas.setActiveObject(clone);
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target: clone });
+      },
+      [canvas],
+    );
+
+    const handleDelete = useCallback(
+      (layerId: string) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        canvas.remove(object);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      },
+      [canvas],
+    );
+
+    const handleBringToFront = useCallback(
+      (layerId: string) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        canvas.bringObjectToFront(object);
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target: object });
+      },
+      [canvas],
+    );
+
+    const handleSendToBack = useCallback(
+      (layerId: string) => {
+        if (!canvas) return;
+        const object = findObjectByLayerId(canvas, layerId);
+        if (!object) return;
+        canvas.sendObjectToBack(object);
+        canvas.requestRenderAll();
+        canvas.fire("object:modified", { target: object });
+      },
+      [canvas],
+    );
+
+    const handleAlign = useCallback(
+      (action: Parameters<typeof alignActiveSelection>[1]) => {
+        if (!canvas) return;
+        alignActiveSelection(canvas, action);
+      },
+      [canvas],
+    );
+
+    const handleDistribute = useCallback(
+      (direction: Parameters<typeof distributeActiveSelection>[1]) => {
+        if (!canvas) return;
+        distributeActiveSelection(canvas, direction);
+      },
+      [canvas],
+    );
+
+    useCanvasShortcuts({
+      canvas,
+      readOnly,
+      undo: history.undo,
+      redo: history.redo,
+      zoomIn: zoom.zoomIn,
+      zoomOut: zoom.zoomOut,
+    });
+
+    const saveDraft = useCallback(() => {
+      const payload = {
+        productImageUrl,
+        designArea,
+        layers,
+        savedAt: new Date().toISOString(),
       };
 
-      const addText = (text: string, options: Partial<fabric.ITextProps> = {}) => {
-        const textbox = new fabric.Textbox(text, {
-          left: bounds.width / 2,
-          top: bounds.height / 2,
-          originX: "center",
-          originY: "center",
-          width: Math.min(420, bounds.width),
-          fontFamily: "Inter",
-          fontSize: 64,
-          fontWeight: "800",
-          textAlign: "center",
-          fill: "#111827",
-          ...options,
-        });
-
-        ensureFabricLayerMetadata(textbox, {
-          layerId: createLayerId("text"),
-          layerType: "text",
-          layerName: "TEMPLATE TEXT",
-          zIndex: canvas.getObjects().length,
-          customData: { templateId },
-        });
-
-        canvas.add(textbox);
-      };
-
-      if (templateId === "template-sale") {
-        const circle = new fabric.Circle({
-          left: bounds.width / 2,
-          top: bounds.height / 2,
-          originX: "center",
-          originY: "center",
-          radius: Math.min(bounds.width, bounds.height) * 0.22,
-          fill: "#ef4444",
-        });
-        ensureFabricLayerMetadata(circle, {
-          layerId: createLayerId("shape"),
-          layerType: "shape",
-          layerName: "BADGE",
-          zIndex: canvas.getObjects().length,
-          customData: { templateId },
-        });
-        canvas.add(circle);
-        addText("SALE", { fontSize: 54, fill: "#ffffff" });
-      } else if (templateId === "template-bold") {
-        addText("BOLD", {
-          fontSize: 84,
-          fill: "#111827",
-          stroke: "#ffffff",
-          strokeWidth: 3,
-        });
-      } else {
-        addText("LUMI", { fontSize: 72, fontWeight: "700" });
-        addText("CUSTOM", { top: bounds.height / 2 + 64, fontSize: 26, fontWeight: "500" });
+      try {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
+        toast({ title: "Saved", description: "Design draft saved locally." });
+      } catch {
+        toast({ title: "Save failed", description: "Unable to save draft in this browser." });
       }
 
-      canvas.requestRenderAll();
-    },
-    [canvas],
-  );
+      if (productId && canvas) {
+        generatePreview({ productId, designArea: designArea.name, canvas }, "web").catch(() => {});
+      }
+    }, [canvas, designArea, generatePreview, layers, productId, productImageUrl]);
 
-  const editorReady = Boolean(canvas);
+    const handleSaveClick = useCallback(() => {
+      if (readOnly) return;
 
-  const secondaryPanel = useMemo(() => {
-    if (activeTool === "text") {
-      return <TextTool canvas={canvas} active className="h-full" />;
-    }
+      if (!saveDesign.canSave) {
+        saveDraft();
+        return;
+      }
 
-    if (activeTool === "image") {
-      return <ImageUploader canvas={canvas} className="h-full" />;
-    }
+      setSaveModalOpen(true);
+    }, [readOnly, saveDesign.canSave, saveDraft]);
 
-    return <SelectTool canvas={canvas} active={activeTool === "select"} className="h-full" />;
-  }, [activeTool, canvas]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        getCanvas: () => canvas,
+        getLayers: () => layers,
+        isDirty: () => saveDesign.dirty,
+        requestSave: () => handleSaveClick(),
+      }),
+      [canvas, handleSaveClick, layers, saveDesign.dirty],
+    );
 
-  const wrapperClassName = useMemo(() => cn("grid h-full gap-4", className), [className]);
+    const handleLoadClick = useCallback(() => {
+      if (readOnly) return;
+      if (!canvas) {
+        toast({
+          title: "Canvas not ready",
+          description: "Please wait for the editor to initialize.",
+        });
+        return;
+      }
+      setLoadModalOpen(true);
+    }, [canvas, readOnly]);
 
-  return (
-    <div className={wrapperClassName}>
-      <CanvasToolbar
-        activeTool={activeTool}
-        onToolChange={handleToolChange}
-        canUndo={history.canUndo}
-        canRedo={history.canRedo}
-        onUndo={() => {
-          history.undo().catch(() => {});
-        }}
-        onRedo={() => {
-          history.redo().catch(() => {});
-        }}
-        zoomLabel={zoom.zoomLabel}
-        onZoomIn={zoom.zoomIn}
-        onZoomOut={zoom.zoomOut}
-        onZoomTo={zoom.zoomTo}
-        onZoomToFit={zoom.zoomToFit}
-        onZoomToActualSize={zoom.zoomToActualSize}
-        onZoomToSelection={zoom.zoomToSelection}
-        gridEnabled={gridEnabled}
-        onToggleGrid={setGridEnabled}
-        gridSize={gridSize}
-        onGridSizeChange={setGridSize}
-        snapEnabled={snapEnabled}
-        onToggleSnap={setSnapEnabled}
-        onAlign={handleAlign}
-        onDistribute={handleDistribute}
-        onSave={handleSaveClick}
-        onLoad={handleLoadClick}
-        saveStatusLabel={saveDesign.statusLabel}
-        onExport={exportDesign}
-      />
+    const exportDesign = useCallback(() => {
+      downloadJson(`design-${createLayerId("export")}.json`, {
+        productImageUrl,
+        designArea,
+        layers,
+      });
+      toast({ title: "Exported", description: "Design JSON downloaded." });
+    }, [designArea, layers, productImageUrl]);
 
-      <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_360px]">
-        <LayerPanel
-          layers={layers}
-          selectedLayerId={selectedLayer?.layerId}
-          onSelect={handleSelectLayer}
-          onToggleVisibility={handleToggleVisibility}
-          onToggleLock={handleToggleLock}
-          onReorder={handleReorder}
-          onDuplicate={(layerId) => {
-            handleDuplicate(layerId).catch(() => {});
+    const loadTemplate = useCallback(
+      (templateId: string) => {
+        if (!canvas) return;
+
+        clearObjects(canvas);
+
+        const designWidth = (canvas as unknown as { lumiDesignWidth?: number }).lumiDesignWidth;
+        const designHeight = (canvas as unknown as { lumiDesignHeight?: number }).lumiDesignHeight;
+        const bounds = {
+          width: typeof designWidth === "number" ? designWidth : canvas.getWidth(),
+          height: typeof designHeight === "number" ? designHeight : canvas.getHeight(),
+        };
+
+        const addText = (text: string, options: Partial<fabric.ITextProps> = {}) => {
+          const textbox = new fabric.Textbox(text, {
+            left: bounds.width / 2,
+            top: bounds.height / 2,
+            originX: "center",
+            originY: "center",
+            width: Math.min(420, bounds.width),
+            fontFamily: "Inter",
+            fontSize: 64,
+            fontWeight: "800",
+            textAlign: "center",
+            fill: "#111827",
+            ...options,
+          });
+
+          ensureFabricLayerMetadata(textbox, {
+            layerId: createLayerId("text"),
+            layerType: "text",
+            layerName: "TEMPLATE TEXT",
+            zIndex: canvas.getObjects().length,
+            customData: { templateId },
+          });
+
+          canvas.add(textbox);
+        };
+
+        if (templateId === "template-sale") {
+          const circle = new fabric.Circle({
+            left: bounds.width / 2,
+            top: bounds.height / 2,
+            originX: "center",
+            originY: "center",
+            radius: Math.min(bounds.width, bounds.height) * 0.22,
+            fill: "#ef4444",
+          });
+          ensureFabricLayerMetadata(circle, {
+            layerId: createLayerId("shape"),
+            layerType: "shape",
+            layerName: "BADGE",
+            zIndex: canvas.getObjects().length,
+            customData: { templateId },
+          });
+          canvas.add(circle);
+          addText("SALE", { fontSize: 54, fill: "#ffffff" });
+        } else if (templateId === "template-bold") {
+          addText("BOLD", {
+            fontSize: 84,
+            fill: "#111827",
+            stroke: "#ffffff",
+            strokeWidth: 3,
+          });
+        } else {
+          addText("LUMI", { fontSize: 72, fontWeight: "700" });
+          addText("CUSTOM", { top: bounds.height / 2 + 64, fontSize: 26, fontWeight: "500" });
+        }
+
+        canvas.requestRenderAll();
+      },
+      [canvas],
+    );
+
+    const editorReady = Boolean(canvas);
+
+    const secondaryPanel = useMemo(() => {
+      if (activeTool === "text") {
+        return <TextTool canvas={canvas} active className="h-full" />;
+      }
+
+      if (activeTool === "image") {
+        return <ImageUploader canvas={canvas} className="h-full" />;
+      }
+
+      return <SelectTool canvas={canvas} active={activeTool === "select"} className="h-full" />;
+    }, [activeTool, canvas]);
+
+    const wrapperClassName = useMemo(() => cn("grid h-full gap-4", className), [className]);
+
+    return (
+      <div className={wrapperClassName}>
+        <CanvasToolbar
+          activeTool={activeTool}
+          onToolChange={handleToolChange}
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
+          onUndo={() => {
+            history.undo().catch(() => {});
           }}
-          onDelete={handleDelete}
-          onBringToFront={handleBringToFront}
-          onSendToBack={handleSendToBack}
+          onRedo={() => {
+            history.redo().catch(() => {});
+          }}
+          zoomLabel={zoom.zoomLabel}
+          onZoomIn={zoom.zoomIn}
+          onZoomOut={zoom.zoomOut}
+          onZoomTo={zoom.zoomTo}
+          onZoomToFit={zoom.zoomToFit}
+          onZoomToActualSize={zoom.zoomToActualSize}
+          onZoomToSelection={zoom.zoomToSelection}
+          gridEnabled={gridEnabled}
+          onToggleGrid={setGridEnabled}
+          gridSize={gridSize}
+          onGridSizeChange={setGridSize}
+          snapEnabled={snapEnabled}
+          onToggleSnap={setSnapEnabled}
+          onAlign={handleAlign}
+          onDistribute={handleDistribute}
+          onSave={handleSaveClick}
+          onLoad={handleLoadClick}
+          saveStatusLabel={saveDesign.statusLabel}
+          onExport={exportDesign}
         />
 
-        <div className="flex min-h-[520px] flex-col rounded-2xl border border-white/10 bg-black/5 p-4">
-          <div className="flex-1">
-            <DesignCanvas
-              productImageUrl={productImageUrl}
-              designArea={designArea}
-              initialLayers={initialLayers}
-              onLayerChange={setLayers}
-              onSelectionChange={setSelectedLayer}
-              onCanvasReady={setCanvas}
-              readOnly={readOnly}
-              className="h-full"
-            />
+        <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-[280px_1fr_360px]">
+          <LayerPanel
+            layers={layers}
+            selectedLayerId={selectedLayer?.layerId}
+            onSelect={handleSelectLayer}
+            onToggleVisibility={handleToggleVisibility}
+            onToggleLock={handleToggleLock}
+            onReorder={handleReorder}
+            onDuplicate={(layerId) => {
+              handleDuplicate(layerId).catch(() => {});
+            }}
+            onDelete={handleDelete}
+            onBringToFront={handleBringToFront}
+            onSendToBack={handleSendToBack}
+          />
+
+          <div className="flex min-h-[520px] flex-col rounded-2xl border border-white/10 bg-black/5 p-4">
+            <div className="flex-1">
+              <DesignCanvas
+                productImageUrl={productImageUrl}
+                designArea={designArea}
+                initialLayers={initialLayers}
+                onLayerChange={setLayers}
+                onSelectionChange={setSelectedLayer}
+                onCanvasReady={setCanvas}
+                readOnly={readOnly}
+                className="h-full"
+              />
+            </div>
+            {!editorReady && (
+              <p className="mt-3 text-[11px] text-white/50">Canvas is initializing…</p>
+            )}
           </div>
-          {!editorReady && (
-            <p className="mt-3 text-[11px] text-white/50">Canvas is initializing…</p>
-          )}
+
+          <Tabs
+            value={sidePanelTab}
+            onValueChange={(value) => {
+              if (value === "tool" || value === "properties" || value === "preview") {
+                setSidePanelTab(value);
+              }
+            }}
+            className="flex h-full flex-col gap-3"
+          >
+            <TabsList className="h-11 justify-start rounded-2xl border border-white/10 bg-black/5 p-1">
+              <TabsTrigger
+                value="tool"
+                className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              >
+                Tool
+              </TabsTrigger>
+              <TabsTrigger
+                value="properties"
+                className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              >
+                Properties
+              </TabsTrigger>
+              <TabsTrigger
+                value="preview"
+                className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              >
+                Preview
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tool" className="mt-0 flex-1">
+              {secondaryPanel}
+            </TabsContent>
+            <TabsContent value="properties" className="mt-0 flex-1">
+              <PropertiesPanel canvas={canvas} readOnly={readOnly} className="h-full" />
+            </TabsContent>
+            <TabsContent value="preview" className="mt-0 flex-1">
+              <ProductPreview
+                productId={productId}
+                productImageUrl={productImageUrl}
+                designArea={designArea.name}
+                canvas={canvas}
+                previewControls={preview}
+                className="h-full"
+              />
+            </TabsContent>
+          </Tabs>
         </div>
 
-        <Tabs
-          value={sidePanelTab}
-          onValueChange={(value) => {
-            if (value === "tool" || value === "properties" || value === "preview") {
-              setSidePanelTab(value);
+        <DesignLibrary
+          open={libraryOpen}
+          onOpenChange={(openState) => {
+            setLibraryOpen(openState);
+            if (!openState && activeTool === "library") {
+              setActiveTool("select");
             }
           }}
-          className="flex h-full flex-col gap-3"
-        >
-          <TabsList className="h-11 justify-start rounded-2xl border border-white/10 bg-black/5 p-1">
-            <TabsTrigger
-              value="tool"
-              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
-            >
-              Tool
-            </TabsTrigger>
-            <TabsTrigger
-              value="properties"
-              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
-            >
-              Properties
-            </TabsTrigger>
-            <TabsTrigger
-              value="preview"
-              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
-            >
-              Preview
-            </TabsTrigger>
-          </TabsList>
+          onSelectDesign={(design) => {
+            if (!canvas) return;
+            addCustomerDesignToCanvas({
+              canvas,
+              design,
+              layerName: clampLayerName(`DESIGN ${design.id.slice(-4)}`),
+            }).catch(() => {});
+          }}
+          onSelectClipart={(asset) => {
+            if (!canvas) return;
+            addClipartSvgToCanvas({
+              canvas,
+              svg: asset.svg,
+              layerName: clampLayerName(asset.name.toUpperCase()),
+              clipartId: asset.id,
+              isPaid: asset.isPaid,
+            }).catch(() => {});
+          }}
+          onSelectTemplate={(template) => loadTemplate(template.id)}
+        />
 
-          <TabsContent value="tool" className="mt-0 flex-1">
-            {secondaryPanel}
-          </TabsContent>
-          <TabsContent value="properties" className="mt-0 flex-1">
-            <PropertiesPanel canvas={canvas} readOnly={readOnly} className="h-full" />
-          </TabsContent>
-          <TabsContent value="preview" className="mt-0 flex-1">
-            <ProductPreview
-              productId={productId}
-              productImageUrl={productImageUrl}
-              designArea={designArea.name}
-              canvas={canvas}
-              previewControls={preview}
-              className="h-full"
-            />
-          </TabsContent>
-        </Tabs>
+        <SaveDesignModal
+          open={saveModalOpen}
+          onOpenChange={setSaveModalOpen}
+          name={designName}
+          onNameChange={setDesignName}
+          tags={designTags}
+          onTagsChange={setDesignTags}
+          isPublic={designPublic}
+          onIsPublicChange={setDesignPublic}
+          autoSaveEnabled={saveDesign.autoSaveEnabled}
+          onAutoSaveEnabledChange={saveDesign.setAutoSaveEnabled}
+          canSave={saveDesign.canSave && !readOnly}
+          isSaving={saveDesign.isSaving}
+          statusLabel={saveDesign.statusLabel}
+          shareUrl={saveDesign.shareUrl}
+          onSave={() => {
+            saveDesign
+              .save()
+              .then(() => {
+                if (!designPublic) {
+                  setSaveModalOpen(false);
+                }
+                return true;
+              })
+              .catch(() => false);
+          }}
+        />
+
+        <LoadDesignModal
+          open={loadModalOpen}
+          onOpenChange={setLoadModalOpen}
+          canvas={canvas}
+          productId={productId}
+          designArea={designArea.name}
+          onLoaded={(result) => {
+            saveDesign.setSessionId(result.session.id);
+            saveDesign.markClean(new Date(result.session.lastEditedAt));
+            setDesignName(result.meta.name);
+            setDesignTags(result.meta.tags);
+            setDesignPublic(result.session.isPublic);
+
+            toast({
+              title: "Loaded",
+              description:
+                result.failedLayers > 0
+                  ? `Design loaded with ${result.failedLayers} missing layer(s).`
+                  : "Design loaded successfully.",
+            });
+          }}
+        />
       </div>
-
-      <DesignLibrary
-        open={libraryOpen}
-        onOpenChange={(openState) => {
-          setLibraryOpen(openState);
-          if (!openState && activeTool === "library") {
-            setActiveTool("select");
-          }
-        }}
-        onSelectDesign={(design) => {
-          if (!canvas) return;
-          addCustomerDesignToCanvas({
-            canvas,
-            design,
-            layerName: clampLayerName(`DESIGN ${design.id.slice(-4)}`),
-          }).catch(() => {});
-        }}
-        onSelectClipart={(asset) => {
-          if (!canvas) return;
-          addClipartSvgToCanvas({
-            canvas,
-            svg: asset.svg,
-            layerName: clampLayerName(asset.name.toUpperCase()),
-            clipartId: asset.id,
-            isPaid: asset.isPaid,
-          }).catch(() => {});
-        }}
-        onSelectTemplate={(template) => loadTemplate(template.id)}
-      />
-
-      <SaveDesignModal
-        open={saveModalOpen}
-        onOpenChange={setSaveModalOpen}
-        name={designName}
-        onNameChange={setDesignName}
-        tags={designTags}
-        onTagsChange={setDesignTags}
-        isPublic={designPublic}
-        onIsPublicChange={setDesignPublic}
-        autoSaveEnabled={saveDesign.autoSaveEnabled}
-        onAutoSaveEnabledChange={saveDesign.setAutoSaveEnabled}
-        canSave={saveDesign.canSave && !readOnly}
-        isSaving={saveDesign.isSaving}
-        statusLabel={saveDesign.statusLabel}
-        shareUrl={saveDesign.shareUrl}
-        onSave={() => {
-          saveDesign
-            .save()
-            .then(() => {
-              if (!designPublic) {
-                setSaveModalOpen(false);
-              }
-              return true;
-            })
-            .catch(() => false);
-        }}
-      />
-
-      <LoadDesignModal
-        open={loadModalOpen}
-        onOpenChange={setLoadModalOpen}
-        canvas={canvas}
-        productId={productId}
-        designArea={designArea.name}
-        onLoaded={(result) => {
-          saveDesign.setSessionId(result.session.id);
-          saveDesign.markClean(new Date(result.session.lastEditedAt));
-          setDesignName(result.meta.name);
-          setDesignTags(result.meta.tags);
-          setDesignPublic(result.session.isPublic);
-
-          toast({
-            title: "Loaded",
-            description:
-              result.failedLayers > 0
-                ? `Design loaded with ${result.failedLayers} missing layer(s).`
-                : "Design loaded successfully.",
-          });
-        }}
-      />
-    </div>
-  );
-}
+    );
+  },
+);
