@@ -21,68 +21,19 @@ import {
 import { cn } from "@/lib/utils";
 
 import { createLayerId, ensureFabricLayerMetadata } from "../../utils/layer-serialization";
+import {
+  DEFAULT_FONT,
+  FONT_FAMILIES,
+  FONT_WEIGHTS,
+  ensureGoogleFontsStylesheet,
+} from "../../utils/text-fonts";
 
 type TextTransform = "none" | "uppercase" | "lowercase" | "capitalize";
-
-const FONT_FAMILIES = [
-  "Inter",
-  "Roboto",
-  "Open Sans",
-  "Lato",
-  "Montserrat",
-  "Poppins",
-  "Raleway",
-  "Nunito",
-  "Work Sans",
-  "Source Sans 3",
-  "Fira Sans",
-  "Merriweather",
-  "Playfair Display",
-  "Oswald",
-  "Bebas Neue",
-  "Abril Fatface",
-  "Anton",
-  "Pacifico",
-  "Caveat",
-  "DM Sans",
-  "Quicksand",
-  "Rubik",
-] as const;
-
-const DEFAULT_FONT = "Inter";
-const FONT_WEIGHTS = ["300", "400", "500", "600", "700", "800"] as const;
-
-const GOOGLE_FONTS_STYLESHEET_ID = "lumi-editor-google-fonts";
 const RECENT_FONTS_STORAGE_KEY = "lumi.editor.recent-fonts";
 const MAX_RECENT_FONTS = 6;
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
-
-const buildGoogleFontsUrl = (families: readonly string[]) => {
-  const weights = FONT_WEIGHTS.join(";");
-  const params = families
-    .map((family) => {
-      const encoded = encodeURIComponent(family).replaceAll("%20", "+");
-      return `family=${encoded}:wght@${weights}`;
-    })
-    .join("&");
-
-  return `https://fonts.googleapis.com/css2?${params}&display=swap`;
-};
-
-const ensureGoogleFontsStylesheet = (): void => {
-  if (typeof document === "undefined") return;
-
-  const existing = document.querySelector(`#${GOOGLE_FONTS_STYLESHEET_ID}`);
-  if (existing) return;
-
-  const link = document.createElement("link");
-  link.id = GOOGLE_FONTS_STYLESHEET_ID;
-  link.rel = "stylesheet";
-  link.href = buildGoogleFontsUrl(FONT_FAMILIES);
-  document.head.append(link);
-};
 
 const readRecentFonts = (): string[] => {
   if (typeof window === "undefined") return [];
