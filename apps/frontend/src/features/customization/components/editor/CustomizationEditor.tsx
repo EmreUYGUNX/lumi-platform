@@ -13,6 +13,7 @@ import type { Layer } from "../../types/layer.types";
 import { useCanvasHistory } from "../../hooks/useCanvasHistory";
 import { useCanvasShortcuts } from "../../hooks/useCanvasShortcuts";
 import { useCanvasZoom } from "../../hooks/useCanvasZoom";
+import { usePreviewGeneration } from "../../hooks/usePreviewGeneration";
 import { alignActiveSelection, distributeActiveSelection } from "../../utils/canvas-align";
 import { addClipartSvgToCanvas, addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 import { setGridOverlayEnabled, setSnapToGridEnabled } from "../../utils/fabric-canvas";
@@ -25,6 +26,7 @@ import { DesignLibrary } from "./DesignLibrary";
 import { ImageUploader } from "./ImageUploader";
 import { LayerPanel } from "./LayerPanel";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { ProductPreview } from "./ProductPreview";
 
 const DRAFT_STORAGE_KEY = "lumi.editor.draft";
 
@@ -57,6 +59,7 @@ const clearObjects = (canvas: fabric.Canvas) => {
 };
 
 interface CustomizationEditorProps {
+  productId?: string;
   productImageUrl: string;
   designArea: DesignArea;
   initialLayers?: Layer[];
@@ -65,6 +68,7 @@ interface CustomizationEditorProps {
 }
 
 export function CustomizationEditor({
+  productId,
   productImageUrl,
   designArea,
   initialLayers,
@@ -80,10 +84,12 @@ export function CustomizationEditor({
   const [gridSize, setGridSize] = useState(10);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [sidePanelTab, setSidePanelTab] = useState<"tool" | "properties">("tool");
+  const [sidePanelTab, setSidePanelTab] = useState<"tool" | "properties" | "preview">("tool");
 
   const history = useCanvasHistory({ canvas, layers });
   const zoom = useCanvasZoom({ canvas });
+  const preview = usePreviewGeneration();
+  const { generatePreview } = preview;
 
   useEffect(() => {
     if (!canvas) return;
@@ -269,7 +275,11 @@ export function CustomizationEditor({
     } catch {
       toast({ title: "Save failed", description: "Unable to save draft in this browser." });
     }
-  }, [designArea, layers, productImageUrl]);
+
+    if (productId && canvas) {
+      generatePreview({ productId, designArea: designArea.name, canvas }, "web").catch(() => {});
+    }
+  }, [canvas, designArea, generatePreview, layers, productId, productImageUrl]);
 
   const exportDesign = useCallback(() => {
     downloadJson(`design-${createLayerId("export")}.json`, {
@@ -439,7 +449,7 @@ export function CustomizationEditor({
         <Tabs
           value={sidePanelTab}
           onValueChange={(value) => {
-            if (value === "tool" || value === "properties") {
+            if (value === "tool" || value === "properties" || value === "preview") {
               setSidePanelTab(value);
             }
           }}
@@ -458,6 +468,12 @@ export function CustomizationEditor({
             >
               Properties
             </TabsTrigger>
+            <TabsTrigger
+              value="preview"
+              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+            >
+              Preview
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="tool" className="mt-0 flex-1">
@@ -465,6 +481,16 @@ export function CustomizationEditor({
           </TabsContent>
           <TabsContent value="properties" className="mt-0 flex-1">
             <PropertiesPanel canvas={canvas} readOnly={readOnly} className="h-full" />
+          </TabsContent>
+          <TabsContent value="preview" className="mt-0 flex-1">
+            <ProductPreview
+              productId={productId}
+              productImageUrl={productImageUrl}
+              designArea={designArea.name}
+              canvas={canvas}
+              previewControls={preview}
+              className="h-full"
+            />
           </TabsContent>
         </Tabs>
       </div>
