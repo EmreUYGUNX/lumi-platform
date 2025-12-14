@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import * as fabric from "fabric";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ import { DesignCanvas } from "./DesignCanvas";
 import { DesignLibrary } from "./DesignLibrary";
 import { ImageUploader } from "./ImageUploader";
 import { LayerPanel } from "./LayerPanel";
+import { PropertiesPanel } from "./PropertiesPanel";
 
 const DRAFT_STORAGE_KEY = "lumi.editor.draft";
 
@@ -78,6 +80,7 @@ export function CustomizationEditor({
   const [gridSize, setGridSize] = useState(10);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [sidePanelTab, setSidePanelTab] = useState<"tool" | "properties">("tool");
 
   const history = useCanvasHistory({ canvas, layers });
   const zoom = useCanvasZoom({ canvas });
@@ -94,6 +97,12 @@ export function CustomizationEditor({
       setLibraryOpen(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTool === "text" || activeTool === "image" || activeTool === "library") {
+      setSidePanelTab("tool");
+    }
+  }, [activeTool]);
 
   const handleSelectLayer = useCallback(
     (layerId: string) => {
@@ -427,7 +436,37 @@ export function CustomizationEditor({
           )}
         </div>
 
-        {secondaryPanel}
+        <Tabs
+          value={sidePanelTab}
+          onValueChange={(value) => {
+            if (value === "tool" || value === "properties") {
+              setSidePanelTab(value);
+            }
+          }}
+          className="flex h-full flex-col gap-3"
+        >
+          <TabsList className="h-11 justify-start rounded-2xl border border-white/10 bg-black/5 p-1">
+            <TabsTrigger
+              value="tool"
+              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+            >
+              Tool
+            </TabsTrigger>
+            <TabsTrigger
+              value="properties"
+              className="h-9 rounded-xl px-4 text-[11px] font-semibold uppercase tracking-[0.18em]"
+            >
+              Properties
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tool" className="mt-0 flex-1">
+            {secondaryPanel}
+          </TabsContent>
+          <TabsContent value="properties" className="mt-0 flex-1">
+            <PropertiesPanel canvas={canvas} readOnly={readOnly} className="h-full" />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <DesignLibrary
