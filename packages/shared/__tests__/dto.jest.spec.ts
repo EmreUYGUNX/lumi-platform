@@ -272,10 +272,12 @@ const createCartFixture = (product: ProductWithRelations): CartWithItems => {
         id: "ckcartitemfixture00000000000",
         cartId: "ckcartfixture000000000000000",
         productVariantId: product.variants[0]!.id,
+        lineKey: "standard",
         quantity: 2,
         unitPrice: createDecimal("249.90"),
         createdAt: timestamp,
         updatedAt: timestamp,
+        customization: null,
         productVariant: {
           ...product.variants[0]!,
           product,
