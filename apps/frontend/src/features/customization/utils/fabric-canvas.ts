@@ -1,6 +1,13 @@
 import * as fabric from "fabric";
 
 import type { DesignArea } from "../types/design-area.types";
+import { setAlignmentGuidesEnabled } from "./alignment-guides";
+import {
+  DEFAULT_GRID_COLOR,
+  DEFAULT_GRID_SIZE,
+  setGridOverlayEnabled as setGridOverlayEnabledInternal,
+  setSnapToGridEnabled as setSnapToGridEnabledInternal,
+} from "./snap-to-grid";
 
 export interface CanvasViewport {
   scale: number;
@@ -15,13 +22,6 @@ export interface InitializeCanvasOptions {
   readOnly?: boolean;
   enableSnapToGrid?: boolean;
   gridSize?: number;
-}
-
-const DEFAULT_GRID_SIZE = 10;
-const DEFAULT_GRID_COLOR = "rgba(255, 255, 255, 0.14)";
-
-interface CanvasInternals {
-  lumiSnapToGridHandler?: (event: { target?: fabric.Object }) => void;
 }
 
 const clampNumber = (value: number, min: number, max: number): number =>
@@ -157,30 +157,6 @@ const installShiftMultiSelect = (canvas: fabric.Canvas): void => {
   });
 };
 
-const installSnapToGrid = (canvas: fabric.Canvas, gridSize: number): void => {
-  const raw = canvas as unknown as CanvasInternals;
-
-  if (raw.lumiSnapToGridHandler) {
-    canvas.off("object:moving", raw.lumiSnapToGridHandler);
-  }
-
-  const handler = (event: { target?: fabric.Object }) => {
-    const object = event.target;
-    if (!object) return;
-
-    const left = typeof object.left === "number" ? object.left : 0;
-    const top = typeof object.top === "number" ? object.top : 0;
-
-    object.set({
-      left: Math.round(left / gridSize) * gridSize,
-      top: Math.round(top / gridSize) * gridSize,
-    });
-  };
-
-  raw.lumiSnapToGridHandler = handler;
-  canvas.on("object:moving", handler);
-};
-
 export const initializeCanvas = (
   containerId: string,
   options: InitializeCanvasOptions,
@@ -198,12 +174,13 @@ export const initializeCanvas = (
 
   configureCanvasDefaults(canvas);
   installShiftMultiSelect(canvas);
+  setAlignmentGuidesEnabled(canvas, !(options.readOnly ?? false));
 
   const gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
   const enableSnapToGrid = options.enableSnapToGrid ?? false;
 
   if (enableSnapToGrid) {
-    installSnapToGrid(canvas, gridSize);
+    setSnapToGridEnabledInternal(canvas, true, gridSize);
   }
 
   return canvas;
@@ -214,15 +191,7 @@ export const setSnapToGridEnabled = (
   enabled: boolean,
   gridSize = DEFAULT_GRID_SIZE,
 ): void => {
-  const raw = canvas as unknown as CanvasInternals;
-
-  if (raw.lumiSnapToGridHandler) {
-    canvas.off("object:moving", raw.lumiSnapToGridHandler);
-    raw.lumiSnapToGridHandler = undefined;
-  }
-
-  if (!enabled) return;
-  installSnapToGrid(canvas, gridSize);
+  setSnapToGridEnabledInternal(canvas, enabled, gridSize);
 };
 
 export const setGridOverlayEnabled = (
@@ -231,37 +200,7 @@ export const setGridOverlayEnabled = (
   gridSize = DEFAULT_GRID_SIZE,
   color = DEFAULT_GRID_COLOR,
 ): void => {
-  const overlayCanvas = document.createElement("canvas");
-
-  if (!enabled) {
-    canvas.set({ overlayColor: undefined });
-    canvas.requestRenderAll();
-    return;
-  }
-
-  overlayCanvas.width = gridSize;
-  overlayCanvas.height = gridSize;
-
-  const ctx = overlayCanvas.getContext("2d");
-  if (!ctx) {
-    canvas.set({ overlayColor: undefined });
-    canvas.requestRenderAll();
-    return;
-  }
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(gridSize, 0);
-  ctx.lineTo(0, 0);
-  ctx.lineTo(0, gridSize);
-  ctx.stroke();
-
-  const pattern = new fabric.Pattern({ source: overlayCanvas, repeat: "repeat" });
-  const overlayConfig = canvas as unknown as { overlayVpt?: boolean };
-  overlayConfig.overlayVpt = true;
-  canvas.set({ overlayColor: pattern as unknown as string });
-  canvas.requestRenderAll();
+  setGridOverlayEnabledInternal(canvas, enabled, gridSize, color);
 };
 
 export const disposeCanvas = (canvas: fabric.Canvas, containerId?: string): void => {

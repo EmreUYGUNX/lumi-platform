@@ -296,6 +296,7 @@ export function TextTool({ canvas, active, className }: TextToolProps): JSX.Elem
       object.set(rest);
       object.setCoords();
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: object });
     },
     [canvas],
   );

@@ -1,13 +1,18 @@
 "use client";
 
+import { useCallback, useMemo, useState } from "react";
+
 import {
   AlignCenter,
   AlignHorizontalJustifyCenter,
+  AlignHorizontalDistributeCenter,
   AlignHorizontalJustifyEnd,
   AlignHorizontalJustifyStart,
   AlignVerticalJustifyCenter,
+  AlignVerticalDistributeCenter,
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
+  ChevronDown,
   Grid3X3,
   Image as ImageIcon,
   Library,
@@ -21,10 +26,19 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-import type { CanvasAlignAction } from "../../utils/canvas-align";
+import type { CanvasAlignAction, CanvasDistributeAction } from "../../utils/canvas-align";
 
 export type CanvasTool = "select" | "text" | "image" | "library";
 
@@ -38,11 +52,18 @@ interface CanvasToolbarProps {
   zoomLabel?: string;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
+  onZoomTo?: (zoom: number) => void;
+  onZoomToFit?: () => void;
+  onZoomToActualSize?: () => void;
+  onZoomToSelection?: () => void;
   gridEnabled: boolean;
   onToggleGrid: (enabled: boolean) => void;
+  gridSize?: number;
+  onGridSizeChange?: (gridSize: number) => void;
   snapEnabled: boolean;
   onToggleSnap: (enabled: boolean) => void;
   onAlign?: (action: CanvasAlignAction) => void;
+  onDistribute?: (direction: CanvasDistributeAction) => void;
   onSave?: () => void;
   onExport?: () => void;
   className?: string;
@@ -65,15 +86,37 @@ export function CanvasToolbar({
   zoomLabel,
   onZoomIn,
   onZoomOut,
+  onZoomTo,
+  onZoomToFit,
+  onZoomToActualSize,
+  onZoomToSelection,
   gridEnabled,
   onToggleGrid,
+  gridSize = 10,
+  onGridSizeChange,
   snapEnabled,
   onToggleSnap,
   onAlign,
+  onDistribute,
   onSave,
   onExport,
   className,
 }: CanvasToolbarProps): JSX.Element {
+  const presetZoomLevels = useMemo(() => [25, 50, 75, 100, 125, 150, 200, 300, 400], []);
+
+  const inferredZoomPercent = useMemo(() => {
+    const match = (zoomLabel ?? "").match(/(\d+)\s*%/);
+    return match ? match[1] : "";
+  }, [zoomLabel]);
+
+  const [customZoomInput, setCustomZoomInput] = useState(inferredZoomPercent);
+
+  const applyCustomZoom = useCallback(() => {
+    const numeric = Number(customZoomInput);
+    if (!Number.isFinite(numeric) || numeric <= 0) return;
+    onZoomTo?.(numeric / 100);
+  }, [customZoomInput, onZoomTo]);
+
   return (
     <section
       className={cn(
@@ -142,9 +185,98 @@ export function CanvasToolbar({
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="min-w-[64px] text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
-            {zoomLabel ?? "100%"}
-          </span>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (!open) return;
+              setCustomZoomInput(inferredZoomPercent);
+            }}
+          >
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 min-w-[92px] justify-between gap-2 rounded-lg px-3"
+                aria-label="Zoom options"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                  {zoomLabel ?? "100%"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-white/60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.18em]">
+                Zoom
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                disabled={!onZoomToFit}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onZoomToFit?.();
+                }}
+              >
+                Fit to viewport
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!onZoomToActualSize}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onZoomToActualSize?.();
+                }}
+              >
+                Actual size (100%)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!onZoomToSelection}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onZoomToSelection?.();
+                }}
+              >
+                Zoom to selection
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {presetZoomLevels.map((level) => (
+                <DropdownMenuItem
+                  key={level}
+                  disabled={!onZoomTo}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    onZoomTo?.(level / 100);
+                  }}
+                >
+                  {level}%
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <div className="flex items-center gap-2 px-2 py-2">
+                <Input
+                  value={customZoomInput}
+                  inputMode="numeric"
+                  aria-label="Custom zoom percent"
+                  className="h-8"
+                  onChange={(event) => {
+                    setCustomZoomInput(event.target.value.replaceAll(/\D/g, "").slice(0, 3));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    applyCustomZoom();
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-lg px-3"
+                  disabled={!onZoomTo}
+                  onClick={applyCustomZoom}
+                >
+                  Set
+                </Button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             type="button"
             variant="ghost"
@@ -165,6 +297,37 @@ export function CanvasToolbar({
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
               Grid
             </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 rounded-lg px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70"
+                  aria-label="Grid size"
+                >
+                  {gridSize}px
+                  <ChevronDown className="h-4 w-4 text-white/50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-40">
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.18em]">
+                  Grid size
+                </DropdownMenuLabel>
+                {[4, 8, 10, 12, 16, 20, 24, 32].map((size) => (
+                  <DropdownMenuItem
+                    key={size}
+                    disabled={!onGridSizeChange}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      onGridSizeChange?.(size);
+                    }}
+                  >
+                    {size}px
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Switch checked={gridEnabled} onCheckedChange={onToggleGrid} aria-label="Grid toggle" />
           </div>
           <div className="h-6 w-px bg-white/10" aria-hidden="true" />
@@ -242,6 +405,29 @@ export function CanvasToolbar({
             onClick={() => onAlign?.("bottom")}
           >
             <AlignVerticalJustifyEnd className="h-4 w-4" />
+          </Button>
+          <div className="mx-1 h-6 w-px bg-white/10" aria-hidden="true" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg"
+            aria-label="Distribute horizontally"
+            disabled={!onDistribute}
+            onClick={() => onDistribute?.("horizontal")}
+          >
+            <AlignHorizontalDistributeCenter className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-lg"
+            aria-label="Distribute vertically"
+            disabled={!onDistribute}
+            onClick={() => onDistribute?.("vertical")}
+          >
+            <AlignVerticalDistributeCenter className="h-4 w-4" />
           </Button>
         </div>
 

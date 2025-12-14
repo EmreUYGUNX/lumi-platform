@@ -10,8 +10,9 @@ import { cn } from "@/lib/utils";
 import type { DesignArea } from "../../types/design-area.types";
 import type { Layer } from "../../types/layer.types";
 import { useCanvasHistory } from "../../hooks/useCanvasHistory";
+import { useCanvasShortcuts } from "../../hooks/useCanvasShortcuts";
 import { useCanvasZoom } from "../../hooks/useCanvasZoom";
-import { alignActiveSelection } from "../../utils/canvas-align";
+import { alignActiveSelection, distributeActiveSelection } from "../../utils/canvas-align";
 import { addClipartSvgToCanvas, addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 import { setGridOverlayEnabled, setSnapToGridEnabled } from "../../utils/fabric-canvas";
 import { createLayerId, ensureFabricLayerMetadata } from "../../utils/layer-serialization";
@@ -74,6 +75,7 @@ export function CustomizationEditor({
 
   const [activeTool, setActiveTool] = useState<CanvasTool>("select");
   const [gridEnabled, setGridEnabled] = useState(false);
+  const [gridSize, setGridSize] = useState(10);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
@@ -82,9 +84,9 @@ export function CustomizationEditor({
 
   useEffect(() => {
     if (!canvas) return;
-    setGridOverlayEnabled(canvas, gridEnabled);
-    setSnapToGridEnabled(canvas, snapEnabled);
-  }, [canvas, gridEnabled, snapEnabled]);
+    setGridOverlayEnabled(canvas, gridEnabled, gridSize);
+    setSnapToGridEnabled(canvas, snapEnabled, gridSize);
+  }, [canvas, gridEnabled, gridSize, snapEnabled]);
 
   const handleToolChange = useCallback((tool: CanvasTool) => {
     setActiveTool(tool);
@@ -113,6 +115,7 @@ export function CustomizationEditor({
       object.set({ visible: !hidden });
       object.setCoords();
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: object });
     },
     [canvas],
   );
@@ -130,6 +133,7 @@ export function CustomizationEditor({
       object.setCoords();
       canvas.discardActiveObject();
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: object });
     },
     [canvas],
   );
@@ -142,6 +146,7 @@ export function CustomizationEditor({
       if (!target) return;
       canvas.moveObjectTo(target, toIndex);
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target });
     },
     [canvas],
   );
@@ -175,6 +180,7 @@ export function CustomizationEditor({
       canvas.add(clone);
       canvas.setActiveObject(clone);
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: clone });
     },
     [canvas],
   );
@@ -198,6 +204,7 @@ export function CustomizationEditor({
       if (!object) return;
       canvas.bringObjectToFront(object);
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: object });
     },
     [canvas],
   );
@@ -209,6 +216,7 @@ export function CustomizationEditor({
       if (!object) return;
       canvas.sendObjectToBack(object);
       canvas.requestRenderAll();
+      canvas.fire("object:modified", { target: object });
     },
     [canvas],
   );
@@ -220,6 +228,23 @@ export function CustomizationEditor({
     },
     [canvas],
   );
+
+  const handleDistribute = useCallback(
+    (direction: Parameters<typeof distributeActiveSelection>[1]) => {
+      if (!canvas) return;
+      distributeActiveSelection(canvas, direction);
+    },
+    [canvas],
+  );
+
+  useCanvasShortcuts({
+    canvas,
+    readOnly,
+    undo: history.undo,
+    redo: history.redo,
+    zoomIn: zoom.zoomIn,
+    zoomOut: zoom.zoomOut,
+  });
 
   const saveDraft = useCallback(() => {
     const payload = {
@@ -352,11 +377,18 @@ export function CustomizationEditor({
         zoomLabel={zoom.zoomLabel}
         onZoomIn={zoom.zoomIn}
         onZoomOut={zoom.zoomOut}
+        onZoomTo={zoom.zoomTo}
+        onZoomToFit={zoom.zoomToFit}
+        onZoomToActualSize={zoom.zoomToActualSize}
+        onZoomToSelection={zoom.zoomToSelection}
         gridEnabled={gridEnabled}
         onToggleGrid={setGridEnabled}
+        gridSize={gridSize}
+        onGridSizeChange={setGridSize}
         snapEnabled={snapEnabled}
         onToggleSnap={setSnapEnabled}
         onAlign={handleAlign}
+        onDistribute={handleDistribute}
         onSave={saveDraft}
         onExport={exportDesign}
       />

@@ -58,6 +58,7 @@ services:
       - -c
       - >
         pnpm install --filter @lumi/backend... --frozen-lockfile &&
+        pnpm --filter @lumi/backend run prisma:generate:if-needed &&
         cd apps/backend &&
         BACKEND_DEBUG_PORT=$${BACKEND_INSPECT_PORT:-9229} &&
         node --inspect-port=$${BACKEND_DEBUG_PORT} --inspect=0.0.0.0 /workspace/node_modules/tsx/dist/cli.mjs watch src/index.ts
@@ -89,7 +90,7 @@ services:
 
   frontend:
     <<: *node-base
-    restart: "no"
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
