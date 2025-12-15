@@ -8,6 +8,7 @@ const adminNav = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/systems", label: "Systems" },
+  { href: "/admin/production", label: "Production" },
 ];
 
 export function AdminSidebar(): JSX.Element {

@@ -253,8 +253,14 @@ export const createAdminRouter = (
   router.get("/production/download/:id", requireAdminOrStaffRole, productionController.download);
   registerAdminRoute(registerRoute, "GET", "/production/download/:id");
 
+  router.get("/production/orders", requireAdminRole, productionController.listOrders);
+  registerAdminRoute(registerRoute, "GET", "/production/orders");
+
   router.get("/production/order/:orderId", requireAdminRole, productionController.listOrder);
   registerAdminRoute(registerRoute, "GET", "/production/order/:orderId");
+
+  router.post("/production/batch/download", requireAdminRole, productionController.batchDownload);
+  registerAdminRoute(registerRoute, "POST", "/production/batch/download");
 
   router.use(requireAdminRole);
 

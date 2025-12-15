@@ -105,11 +105,38 @@ const serviceMocks = {
     downloadUrl: "https://cdn.example/download",
     expiresAt: new Date("2999-01-01T00:00:00.000Z").toISOString(),
   })),
+  listProductionOrders: jest.fn(async () => ({
+    items: [
+      {
+        orderId: "ckorder0000000000000000000",
+        orderReference: "ORDER-1",
+        orderStatus: "PAID",
+        orderDate: "2025-01-01",
+        customer: { userId: "ckuseradmin00000000000000000", name: "Jane Doe", email: "a@b.c" },
+        totals: { totalAmount: { amount: "120.00", currency: "TRY" }, currency: "TRY" },
+        customizationCount: 1,
+        pendingCount: 0,
+        downloadedCount: 0,
+        productionStatus: "ready",
+      },
+    ],
+    meta: {
+      totalItems: 1,
+      totalPages: 1,
+      page: 1,
+      pageSize: 25,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  })),
   getOrderProductionFiles: jest.fn(async () => ({
     orderId: "ckorder0000000000000000000",
     orderReference: "ORDER-1",
     orderStatus: "PAID",
     orderDate: "2025-01-01",
+    customer: { userId: "ckuseradmin00000000000000000", name: "Jane Doe", email: "a@b.c" },
+    totals: { totalAmount: { amount: "120.00", currency: "TRY" }, currency: "TRY" },
+    shippingAddress: undefined,
     printSpecs: {
       dpi: 300,
       width: 5000,
@@ -119,7 +146,31 @@ const serviceMocks = {
       bleedPx: 59,
       safePx: 118,
     },
-    items: [],
+    items: [
+      {
+        customizationId: "ckcustom0000000000000000000",
+        orderItemId: "ckitem0000000000000000000",
+        productId: "ckproduct00000000000000000",
+        productName: "T-Shirt",
+        productVariantId: "ckvariant0000000000000000",
+        variantTitle: "White / M",
+        sku: "TSHIRT-WHITE-M",
+        quantity: 1,
+        designArea: "front",
+        previewUrl: "https://cdn.example/preview.png",
+        thumbnailUrl: "https://cdn.example/thumb.png",
+        designData: { layers: [] },
+        layerCount: 0,
+        printMethod: "DTG",
+        productionGenerated: true,
+        productionFileUrl: "https://cdn.example/production.png",
+        productionPublicId: "prod_public",
+        productionDpi: 300,
+        downloadedAt: undefined,
+        downloadUrl: "https://cdn.example/download",
+        downloadExpiresAt: new Date("2999-01-01T00:00:00.000Z").toISOString(),
+      },
+    ],
     batchDownload: { available: false, items: [] },
     manifest: {
       orderId: "ckorder0000000000000000000",
@@ -136,6 +187,8 @@ jest.mock("@/modules/production/production.service.js", () => {
     getDownloadUrl = serviceMocks.getDownloadUrl;
 
     getOrderProductionFiles = serviceMocks.getOrderProductionFiles;
+
+    listProductionOrders = serviceMocks.listProductionOrders;
   }
 
   return { ProductionService };
@@ -237,5 +290,53 @@ describe("admin production routes", () => {
       expect(response.body.success).toBe(true);
       expect(serviceMocks.getOrderProductionFiles).toHaveBeenCalledWith(orderId);
     });
+  });
+
+  it("lists production orders for admins", async () => {
+    const adminHeader = JSON.stringify(buildUser("admin"));
+
+    await withTestApp(async ({ app }) => {
+      const response = await request(app)
+        .get("/api/v1/admin/production/orders?page=1&pageSize=25")
+        .set("x-auth-user", adminHeader)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(serviceMocks.listProductionOrders).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: 25,
+      });
+    });
+  });
+
+  it("returns a zipped archive for batch downloads", async () => {
+    const adminHeader = JSON.stringify(buildUser("admin"));
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(Buffer.from("file")) as unknown as Response);
+
+    await withTestApp(async ({ app }) => {
+      const response = await request(app)
+        .post("/api/v1/admin/production/batch/download")
+        .set("x-auth-user", adminHeader)
+        .send({ orderIds: [orderId] })
+        .buffer()
+        .parse((res, callback) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+          res.on("end", () => {
+            // eslint-disable-next-line unicorn/no-null -- supertest parse callback uses `null` for success.
+            callback(null, Buffer.concat(chunks));
+          });
+        })
+        .expect(200);
+
+      expect(response.headers["content-type"]).toContain("application/zip");
+      expect(response.headers["content-disposition"]).toContain("attachment;");
+      expect(fetchSpy).toHaveBeenCalledWith("https://cdn.example/download");
+      expect(response.body.length).toBeGreaterThan(0);
+    });
+
+    fetchSpy.mockRestore();
   });
 });

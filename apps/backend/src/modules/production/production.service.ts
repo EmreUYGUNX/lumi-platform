@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null */
 import type { UploadApiOptions } from "cloudinary";
-import { OrderStatus, PrintMethod } from "@prisma/client";
+import { OrderStatus, PrintMethod, Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import { getConfig } from "@/config/index.js";
@@ -16,9 +16,11 @@ import {
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js";
 import { createChildLogger } from "@/lib/logger.js";
 import { getPrismaClient } from "@/lib/prisma.js";
+import type { PaginationMeta } from "@/lib/response.js";
 import type { PreviewLayer } from "@/modules/preview/preview.validators.js";
 import { PreviewService } from "@/modules/preview/preview.service.js";
 
+import type { ProductionOrdersListQuery, ProductionOrderStatus } from "./production.validators.js";
 import { orderItemDesignDataSchema } from "./production.validators.js";
 
 type TransformationDefinition = Exclude<NonNullable<UploadApiOptions["transformation"]>, string>;
@@ -95,18 +97,47 @@ export interface ProductionOrderFilesResult {
   orderReference: string;
   orderStatus: string;
   orderDate: string;
+  customer: {
+    userId?: string;
+    name: string;
+    email?: string;
+  };
+  totals: {
+    totalAmount: { amount: string; currency: string };
+    currency: string;
+  };
+  shippingAddress?: {
+    fullName: string;
+    phone?: string | null;
+    line1: string;
+    line2?: string | null;
+    city: string;
+    state?: string | null;
+    postalCode: string;
+    country: string;
+  } | null;
   printSpecs: PrintSpecifications;
   items: {
     customizationId: string;
     orderItemId: string;
     productId: string;
     productName: string;
+    productImageUrl?: string | null;
+    productVariantId?: string;
+    variantTitle?: string | null;
+    sku?: string | null;
+    quantity: number;
     designArea: string;
+    previewUrl?: string | null;
+    thumbnailUrl?: string | null;
+    designData?: unknown;
+    layerCount?: number;
     printMethod: PrintMethod;
     productionGenerated: boolean;
     productionFileUrl: string | null;
     productionPublicId: string | null;
     productionDpi: number;
+    downloadedAt?: string | null;
     downloadUrl?: string;
     downloadExpiresAt?: string;
   }[];
@@ -115,6 +146,19 @@ export interface ProductionOrderFilesResult {
     items: ProductionDownloadResult[];
   };
   manifest: ProductionOrderManifest;
+}
+
+export interface ProductionOrderListItem {
+  orderId: string;
+  orderReference: string;
+  orderStatus: string;
+  orderDate: string;
+  customer: ProductionOrderFilesResult["customer"];
+  totals: ProductionOrderFilesResult["totals"];
+  customizationCount: number;
+  pendingCount: number;
+  downloadedCount: number;
+  productionStatus: ProductionOrderStatus;
 }
 
 export interface ProductionServiceOptions {
@@ -184,6 +228,342 @@ const formatPrintMethod = (method: PrintMethod): string => {
       return "DTG";
     }
   }
+};
+
+interface ProductionOrderItemRow {
+  id: string;
+  quantity: number;
+  productId: string;
+  productVariantId: string;
+  product: {
+    title: string;
+    productMedia: {
+      media: {
+        url: string;
+      };
+    }[];
+  };
+  productVariant: { title: string; sku: string } | null;
+  customization: {
+    id: string;
+    designArea: string;
+    designData: unknown;
+    previewUrl: string | null;
+    thumbnailUrl: string | null;
+    printMethod: PrintMethod;
+    productionGenerated: boolean;
+    productionFileUrl: string | null;
+    productionPublicId: string | null;
+    productionDpi: number;
+    layerCount: number;
+    downloadedAt: Date | null;
+  } | null;
+}
+
+interface ProductionOrdersListRow {
+  id: string;
+  reference: string;
+  status: OrderStatus;
+  placedAt: Date | null;
+  createdAt: Date;
+  totalAmount: Prisma.Decimal;
+  currency: string;
+  user: { id: string; email: string; firstName: string | null; lastName: string | null } | null;
+  shippingAddress: { fullName: string } | null;
+  items: {
+    customization: {
+      productionGenerated: boolean;
+      productionPublicId: string | null;
+      downloadedAt: Date | null;
+    } | null;
+  }[];
+}
+
+const resolveCustomerName = (params: {
+  shippingFullName?: string | null;
+  userFirstName?: string | null;
+  userLastName?: string | null;
+  userEmail?: string | null;
+}): string => {
+  const shippingName = params.shippingFullName?.trim();
+  if (shippingName) return shippingName;
+
+  const firstName = params.userFirstName?.trim();
+  const lastName = params.userLastName?.trim();
+  if (firstName || lastName) {
+    return [firstName, lastName].filter(Boolean).join(" ");
+  }
+
+  return params.userEmail ?? "Unknown customer";
+};
+
+const buildOrderTotals = (
+  totalAmount: Prisma.Decimal,
+  currency: string,
+): ProductionOrderFilesResult["totals"] => ({
+  totalAmount: {
+    amount: new Prisma.Decimal(totalAmount).toFixed(2),
+    currency,
+  },
+  currency,
+});
+
+const buildOrderProductionItems = (
+  orderItems: readonly ProductionOrderItemRow[],
+  buildDownloadUrl: (
+    customizationId: string,
+    productionPublicId: string,
+  ) => { downloadUrl: string; expiresAt: string },
+): ProductionOrderFilesResult["items"] => {
+  return orderItems.flatMap((item) => {
+    const { customization } = item;
+    if (!customization) {
+      return [];
+    }
+
+    const productImageUrl = item.product.productMedia[0]?.media.url ?? null;
+    const base = {
+      customizationId: customization.id,
+      orderItemId: item.id,
+      productId: item.productId,
+      productName: item.product.title,
+      productImageUrl,
+      designArea: customization.designArea,
+      productVariantId: item.productVariantId,
+      variantTitle: item.productVariant?.title ?? null,
+      sku: item.productVariant?.sku ?? null,
+      quantity: item.quantity,
+      previewUrl: customization.previewUrl,
+      thumbnailUrl: customization.thumbnailUrl,
+      designData: customization.designData,
+      layerCount: customization.layerCount,
+      printMethod: customization.printMethod,
+      productionGenerated: customization.productionGenerated,
+      productionFileUrl: customization.productionFileUrl,
+      productionPublicId: customization.productionPublicId,
+      productionDpi: customization.productionDpi,
+      downloadedAt: customization.downloadedAt ? customization.downloadedAt.toISOString() : null,
+    } satisfies ProductionOrderFilesResult["items"][number];
+
+    if (!customization.productionGenerated || !customization.productionPublicId) {
+      return [base];
+    }
+
+    const download = buildDownloadUrl(customization.id, customization.productionPublicId);
+    return [
+      {
+        ...base,
+        downloadUrl: download.downloadUrl,
+        downloadExpiresAt: download.expiresAt,
+      },
+    ];
+  });
+};
+
+const buildBatchDownloadItems = (
+  items: ProductionOrderFilesResult["items"],
+): ProductionDownloadResult[] => {
+  const downloads: ProductionDownloadResult[] = [];
+
+  // eslint-disable-next-line no-restricted-syntax -- explicit iteration keeps lint rules satisfied.
+  for (const item of items) {
+    if (item.downloadUrl && item.downloadExpiresAt) {
+      downloads.push({
+        customizationId: item.customizationId,
+        downloadUrl: item.downloadUrl,
+        expiresAt: item.downloadExpiresAt,
+      });
+    }
+  }
+
+  return downloads;
+};
+
+const buildOrderManifest = (
+  orderId: string,
+  orderDate: string,
+  config: ProductionFileConfig,
+  items: ProductionOrderFilesResult["items"],
+): ProductionOrderManifest => ({
+  orderId,
+  orderDate,
+  customizations: items.map((item) => ({
+    productName: item.productName,
+    designArea: item.designArea,
+    productionFile: item.productionFileUrl ?? null,
+    printMethod: formatPrintMethod(item.printMethod),
+    resolution: buildResolutionLabel(config),
+    colorProfile: config.colorProfile,
+    bleed: config.bleedArea,
+    safeArea: config.safeArea,
+  })),
+});
+
+const resolveOrderProductionStatus = (
+  orderStatus: OrderStatus,
+  pendingCount: number,
+  downloadedCount: number,
+  printedStatuses: readonly OrderStatus[],
+): ProductionOrderStatus => {
+  if (printedStatuses.includes(orderStatus)) {
+    return "printed";
+  }
+  if (pendingCount > 0) {
+    return "pending";
+  }
+  if (downloadedCount > 0) {
+    return "downloaded";
+  }
+  return "ready";
+};
+
+const buildProductionOrdersWhere = (
+  query: ProductionOrdersListQuery,
+  printedStatuses: readonly OrderStatus[],
+): Prisma.OrderWhereInput => {
+  const base: Prisma.OrderWhereInput = {
+    items: {
+      some: {
+        customization: {
+          isNot: null,
+        },
+      },
+    },
+  };
+
+  if (query.search) {
+    base.reference = { contains: query.search.trim(), mode: "insensitive" };
+  }
+
+  if (query.from || query.to) {
+    base.createdAt = {
+      ...(query.from ? { gte: query.from } : {}),
+      ...(query.to ? { lte: query.to } : {}),
+    };
+  }
+
+  if (!query.status) {
+    return base;
+  }
+
+  const pendingCustomizations: Prisma.OrderWhereInput = {
+    items: {
+      some: {
+        customization: {
+          is: {
+            OR: [{ productionGenerated: false }, { productionPublicId: null }],
+          },
+        },
+      },
+    },
+  };
+
+  const anyCustomizationDownloaded: Prisma.OrderWhereInput = {
+    items: {
+      some: {
+        customization: {
+          is: {
+            downloadedAt: { not: null },
+          },
+        },
+      },
+    },
+  };
+
+  const noCustomizationDownloaded: Prisma.OrderWhereInput = {
+    items: {
+      none: {
+        customization: {
+          is: {
+            downloadedAt: { not: null },
+          },
+        },
+      },
+    },
+  };
+
+  const isNotPrinted: Prisma.OrderWhereInput = {
+    status: { notIn: [...printedStatuses] },
+  };
+
+  const allGenerated: Prisma.OrderWhereInput = {
+    items: {
+      none: {
+        customization: {
+          is: {
+            OR: [{ productionGenerated: false }, { productionPublicId: null }],
+          },
+        },
+      },
+    },
+  };
+
+  switch (query.status) {
+    case "printed": {
+      return { ...base, status: { in: [...printedStatuses] } };
+    }
+    case "pending": {
+      return { AND: [base, isNotPrinted, pendingCustomizations] };
+    }
+    case "ready": {
+      return { AND: [base, isNotPrinted, allGenerated, noCustomizationDownloaded] };
+    }
+    case "downloaded": {
+      return { AND: [base, isNotPrinted, allGenerated, anyCustomizationDownloaded] };
+    }
+    default: {
+      return base;
+    }
+  }
+};
+
+const buildProductionOrderListItem = (
+  order: ProductionOrdersListRow,
+  printedStatuses: readonly OrderStatus[],
+): ProductionOrderListItem => {
+  const orderDate = normaliseOrderDate(order.placedAt ?? order.createdAt);
+  const customerName = resolveCustomerName({
+    shippingFullName: order.shippingAddress?.fullName,
+    userFirstName: order.user?.firstName,
+    userLastName: order.user?.lastName,
+    userEmail: order.user?.email,
+  });
+
+  const customizations = order.items
+    .map((item) => item.customization)
+    .filter(
+      (customization): customization is NonNullable<typeof customization> => customization != null,
+    );
+
+  const customizationCount = customizations.length;
+  const pendingCount = customizations.filter(
+    (customization) => !customization.productionGenerated || !customization.productionPublicId,
+  ).length;
+  const downloadedCount = customizations.filter(
+    (customization) => customization.downloadedAt,
+  ).length;
+
+  return {
+    orderId: order.id,
+    orderReference: order.reference,
+    orderStatus: order.status,
+    orderDate,
+    customer: {
+      userId: order.user?.id ?? undefined,
+      name: customerName,
+      email: order.user?.email ?? undefined,
+    },
+    totals: buildOrderTotals(order.totalAmount, order.currency),
+    customizationCount,
+    pendingCount,
+    downloadedCount,
+    productionStatus: resolveOrderProductionStatus(
+      order.status,
+      pendingCount,
+      downloadedCount,
+      printedStatuses,
+    ),
+  };
 };
 
 export class ProductionService {
@@ -502,6 +882,7 @@ export class ProductionService {
         id: true,
         productionPublicId: true,
         productionGenerated: true,
+        downloadedAt: true,
       },
     });
 
@@ -514,6 +895,13 @@ export class ProductionService {
     if (!customization.productionGenerated || !customization.productionPublicId) {
       throw new ConflictError("Production file has not been generated for this customization.", {
         details: { customizationId },
+      });
+    }
+
+    if (!customization.downloadedAt) {
+      await this.prisma.orderItemCustomization.update({
+        where: { id: customization.id },
+        data: { downloadedAt: new Date() },
       });
     }
 
@@ -534,24 +922,70 @@ export class ProductionService {
         status: true,
         placedAt: true,
         createdAt: true,
+        totalAmount: true,
+        currency: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        shippingAddress: {
+          select: {
+            fullName: true,
+            phone: true,
+            line1: true,
+            line2: true,
+            city: true,
+            state: true,
+            postalCode: true,
+            country: true,
+          },
+        },
         items: {
           select: {
             id: true,
+            quantity: true,
             productId: true,
+            productVariantId: true,
             product: {
               select: {
                 title: true,
+                productMedia: {
+                  orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+                  take: 1,
+                  select: {
+                    media: {
+                      select: {
+                        url: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            productVariant: {
+              select: {
+                title: true,
+                sku: true,
               },
             },
             customization: {
               select: {
                 id: true,
                 designArea: true,
+                designData: true,
+                previewUrl: true,
+                thumbnailUrl: true,
                 printMethod: true,
                 productionGenerated: true,
                 productionFileUrl: true,
                 productionPublicId: true,
                 productionDpi: true,
+                layerCount: true,
+                downloadedAt: true,
               },
             },
           },
@@ -568,70 +1002,29 @@ export class ProductionService {
     const config = DEFAULT_PRODUCTION_CONFIG;
     const specs = ProductionService.addPrintSpecifications(config);
 
-    const items = order.items
-      .filter((item) => item.customization)
-      .map((item) => {
-        const customization = item.customization!;
-        const base = {
-          customizationId: customization.id,
-          orderItemId: item.id,
-          productId: item.productId,
-          productName: item.product.title,
-          designArea: customization.designArea,
-          printMethod: customization.printMethod,
-          productionGenerated: customization.productionGenerated,
-          productionFileUrl: customization.productionFileUrl,
-          productionPublicId: customization.productionPublicId,
-          productionDpi: customization.productionDpi,
-          downloadUrl: undefined,
-          downloadExpiresAt: undefined,
-        };
-
-        if (!customization.productionGenerated || !customization.productionPublicId) {
-          return base;
-        }
-
-        const download = this.buildDownloadUrl(customization.id, customization.productionPublicId);
-        return {
-          ...base,
-          downloadUrl: download.downloadUrl,
-          downloadExpiresAt: download.expiresAt,
-        };
-      });
-
-    const batchItems: ProductionDownloadResult[] = [];
-
-    // eslint-disable-next-line no-restricted-syntax -- explicit iteration keeps lint rules satisfied.
-    for (const item of items) {
-      if (item.downloadUrl && item.downloadExpiresAt) {
-        batchItems.push({
-          customizationId: item.customizationId,
-          downloadUrl: item.downloadUrl,
-          expiresAt: item.downloadExpiresAt,
-        });
-      }
-    }
-
-    const manifest: ProductionOrderManifest = {
-      orderId: order.id,
-      orderDate,
-      customizations: items.map((item) => ({
-        productName: item.productName,
-        designArea: item.designArea,
-        productionFile: item.productionFileUrl ?? null,
-        printMethod: formatPrintMethod(item.printMethod),
-        resolution: buildResolutionLabel(config),
-        colorProfile: config.colorProfile,
-        bleed: config.bleedArea,
-        safeArea: config.safeArea,
-      })),
-    };
+    const items = buildOrderProductionItems(order.items, this.buildDownloadUrl);
+    const batchItems = buildBatchDownloadItems(items);
+    const manifest = buildOrderManifest(order.id, orderDate, config, items);
+    const customerName = resolveCustomerName({
+      shippingFullName: order.shippingAddress?.fullName,
+      userFirstName: order.user?.firstName,
+      userLastName: order.user?.lastName,
+      userEmail: order.user?.email,
+    });
+    const totals = buildOrderTotals(order.totalAmount, order.currency);
 
     return {
       orderId: order.id,
       orderReference: order.reference,
       orderStatus: order.status,
       orderDate,
+      customer: {
+        userId: order.user?.id ?? undefined,
+        name: customerName,
+        email: order.user?.email ?? undefined,
+      },
+      totals,
+      shippingAddress: order.shippingAddress,
       printSpecs: specs,
       items,
       batchDownload: {
@@ -639,6 +1032,84 @@ export class ProductionService {
         items: batchItems,
       },
       manifest,
+    };
+  };
+
+  listProductionOrders = async (
+    query: ProductionOrdersListQuery,
+  ): Promise<{ items: ProductionOrderListItem[]; meta: PaginationMeta }> => {
+    const printedStatuses: OrderStatus[] = [
+      OrderStatus.FULFILLED,
+      OrderStatus.SHIPPED,
+      OrderStatus.DELIVERED,
+    ];
+
+    const where = buildProductionOrdersWhere(query, printedStatuses);
+
+    const totalItems = await this.prisma.order.count({ where });
+    const totalPages = totalItems === 0 ? 0 : Math.max(1, Math.ceil(totalItems / query.pageSize));
+    const page = Math.min(query.page, totalPages === 0 ? 1 : totalPages);
+    const skip = (page - 1) * query.pageSize;
+
+    const orders = await this.prisma.order.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }],
+      skip,
+      take: query.pageSize,
+      select: {
+        id: true,
+        reference: true,
+        status: true,
+        placedAt: true,
+        createdAt: true,
+        totalAmount: true,
+        currency: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        shippingAddress: {
+          select: {
+            fullName: true,
+          },
+        },
+        items: {
+          where: {
+            customization: {
+              isNot: null,
+            },
+          },
+          select: {
+            customization: {
+              select: {
+                productionGenerated: true,
+                productionPublicId: true,
+                downloadedAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const items = orders.map((order) =>
+      buildProductionOrderListItem(order as unknown as ProductionOrdersListRow, printedStatuses),
+    );
+
+    return {
+      items,
+      meta: {
+        totalItems,
+        totalPages,
+        page,
+        pageSize: query.pageSize,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1 && totalPages > 0,
+      },
     };
   };
 
