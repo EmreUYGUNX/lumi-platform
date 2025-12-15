@@ -181,6 +181,25 @@ const buildDefaultArea = (name: string, rect: Rect): DesignAreaDTO => {
   };
 };
 
+let fallbackAreaIdCounter = 0;
+
+const createAreaIdFragment = () => {
+  const { crypto } = globalThis;
+
+  if (typeof crypto?.randomUUID === "function") {
+    return crypto.randomUUID().replaceAll("-", "");
+  }
+
+  if (typeof crypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  fallbackAreaIdCounter += 1;
+  return `${Date.now().toString(16)}${fallbackAreaIdCounter.toString(16)}`;
+};
+
 const createUniqueAreaName = (areas: readonly DesignAreaDTO[]) => {
   const used = new Set(areas.map((area) => area.name.trim().toLowerCase()));
 
@@ -191,12 +210,16 @@ const createUniqueAreaName = (areas: readonly DesignAreaDTO[]) => {
     }
   }
 
-  const uuid =
-    typeof globalThis.crypto?.randomUUID === "function"
-      ? globalThis.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const fragment = createAreaIdFragment();
+    const candidate = `area-${fragment.slice(0, 8)}`;
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+  }
 
-  return `area-${uuid.slice(0, 8)}`;
+  fallbackAreaIdCounter += 1;
+  return `area-${Date.now().toString(16)}${fallbackAreaIdCounter.toString(16)}`;
 };
 
 const formatRectLabel = (area: DesignAreaDTO) => {
