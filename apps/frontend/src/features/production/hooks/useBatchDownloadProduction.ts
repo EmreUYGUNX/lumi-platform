@@ -10,7 +10,7 @@ import { productionKeys } from "./production.keys";
 const resolveFilename = (contentDisposition: string | null): string | undefined => {
   if (!contentDisposition) return undefined;
 
-  const match = contentDisposition.match(/filename\\*?=(?:UTF-8''|\"?)([^\";]+)\"?/iu);
+  const match = contentDisposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)"?/iu);
   if (!match?.[1]) return undefined;
 
   try {
