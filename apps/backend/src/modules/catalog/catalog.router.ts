@@ -133,6 +133,10 @@ export const createCatalogRouter = (
   );
 
   const adminProductDetailRoutes = [ADMIN_PRODUCT_ROUTE, withCatalogPrefix(ADMIN_PRODUCT_ROUTE)];
+  adminProductDetailRoutes.forEach((path) => {
+    router.get(path, requireAuth, requireAdmin, controller.getAdminProduct);
+    registerRoute(options.registerRoute, "GET", path);
+  });
   registerPut(
     router,
     options.registerRoute,

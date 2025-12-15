@@ -1,12 +1,89 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment, unicorn/no-null, prefer-destructuring */
 // @ts-nocheck
 import { describe, expect, it, jest } from "@jest/globals";
+import type { Request, RequestHandler } from "express";
 import request from "supertest";
 
 import { NotFoundError } from "@/lib/errors.js";
+import type { AuthenticatedUser } from "@/modules/auth/token.types.js";
 import { createTestApp, withTestApp } from "@/testing/index.js";
 
 import type { CatalogService } from "../catalog.service.js";
+
+const parseUserHeader = (req: Request): AuthenticatedUser | undefined => {
+  const header = req.get("x-auth-user");
+  if (!header) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(header) as AuthenticatedUser;
+  } catch {
+    return undefined;
+  }
+};
+
+const requireAuthMiddleware: RequestHandler = (req, _res, next) => {
+  const { UnauthorizedError } = jest.requireActual("@/lib/errors.js") as {
+    UnauthorizedError: new (...args: ConstructorParameters<typeof Error>) => Error;
+  };
+
+  const user = parseUserHeader(req);
+  if (!user) {
+    next(new UnauthorizedError("Authentication required."));
+    return;
+  }
+
+  req.user = user;
+  next();
+};
+
+jest.mock("@/middleware/auth/requireAuth.js", () => ({
+  createRequireAuthMiddleware: () => requireAuthMiddleware,
+}));
+
+jest.mock("@/middleware/auth/requireRole.js", () => ({
+  createRequireRoleMiddleware: (roles: readonly string[]) =>
+    ((req, _res, next) => {
+      const { ForbiddenError } = jest.requireActual("@/lib/errors.js") as {
+        ForbiddenError: new (...args: ConstructorParameters<typeof Error>) => Error;
+      };
+
+      const required = roles.map((role) => role.toLowerCase());
+      if (required.length === 0) {
+        next();
+        return;
+      }
+
+      const userRoles = new Set((req.user?.roles ?? []).map((role) => role.name.toLowerCase()));
+      const allowed = required.some((role) => userRoles.has(role));
+      if (allowed) {
+        next();
+        return;
+      }
+
+      next(new ForbiddenError("You do not have permission to perform this action."));
+    }) as RequestHandler,
+}));
+
+const buildUser = (roleName: string) =>
+  ({
+    id: `user_${roleName}`,
+    email: `${roleName}@example.com`,
+    sessionId: `session_${roleName}`,
+    permissions: [],
+    token: {
+      sub: `user_${roleName}`,
+      email: `${roleName}@example.com`,
+      sessionId: `session_${roleName}`,
+      roleIds: [`role_${roleName}`],
+      permissions: [],
+      jti: `jti-${roleName}`,
+      iat: 0,
+      exp: 0,
+    },
+    roles: [{ id: `role_${roleName}`, name: roleName }],
+  }) as AuthenticatedUser;
 
 const buildProduct = () => ({
   id: "prod_1",
@@ -58,6 +135,7 @@ const createCatalogServiceStub = () => {
         hasPreviousPage: false,
       },
     }),
+    getAdminProductById: jest.fn().mockResolvedValue(product),
     listPopularProducts: jest.fn().mockResolvedValue([product]),
     getProductDetail: jest.fn().mockResolvedValue({
       product,
@@ -108,6 +186,39 @@ describe("catalog router", () => {
         expect(stub.listPublicProducts).toHaveBeenCalledTimes(1);
         expect(response.body.success).toBe(true);
         expect(response.body.data[0].slug).toBe(product.slug);
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
+  });
+
+  it("returns admin product detail payloads", async () => {
+    const { stub, product } = createCatalogServiceStub();
+    const adminHeader = JSON.stringify(buildUser("admin"));
+
+    await withTestApp(
+      async ({ app }) => {
+        const response = await request(app)
+          .get(`/api/v1/admin/products/${product.id}`)
+          .set("x-auth-user", adminHeader)
+          .expect(200);
+
+        expect(stub.getAdminProductById).toHaveBeenCalledWith(product.id);
+        expect(response.body.data.id).toBe(product.id);
+      },
+      appOptionsWithService(stub as unknown as CatalogService),
+    );
+  });
+
+  it("rejects admin product detail requests from non-admin users", async () => {
+    const { stub, product } = createCatalogServiceStub();
+    const customerHeader = JSON.stringify(buildUser("customer"));
+
+    await withTestApp(
+      async ({ app }) => {
+        await request(app)
+          .get(`/api/v1/admin/products/${product.id}`)
+          .set("x-auth-user", customerHeader)
+          .expect(403);
       },
       appOptionsWithService(stub as unknown as CatalogService),
     );

@@ -60,13 +60,14 @@ export class CustomizationService {
     configInput: unknown,
   ): Promise<ProductCustomizationConfig> {
     const config = productCustomizationConfigSchema.parse(configInput);
+    const enabled = config.enabled ?? true;
 
     await this.validateDesignAreaCoordinates(config.designAreas, productId);
 
     const existing = await this.repository.findByProductId(productId);
 
     const data: Prisma.ProductCustomizationUpdateInput = {
-      enabled: true,
+      enabled,
       designAreas: config.designAreas as unknown as Prisma.InputJsonValue,
       maxLayers: config.maxLayers,
       allowImages: config.allowImages,
@@ -76,6 +77,7 @@ export class CustomizationService {
       minImageSize: config.minImageSize,
       maxImageSize: config.maxImageSize,
       allowedFonts: config.allowedFonts,
+      restrictedWords: config.restrictedWords,
       basePriceModifier: new Prisma.Decimal(config.basePriceModifier),
       pricePerLayer: new Prisma.Decimal(config.pricePerLayer),
     };
@@ -108,6 +110,7 @@ export class CustomizationService {
       ...patch,
       designAreas: patch.designAreas ?? current.designAreas,
       allowedFonts: patch.allowedFonts ?? current.allowedFonts,
+      restrictedWords: patch.restrictedWords ?? current.restrictedWords,
       enabled: patch.enabled ?? current.enabled,
     };
 
@@ -124,6 +127,7 @@ export class CustomizationService {
       minImageSize: next.minImageSize,
       maxImageSize: next.maxImageSize,
       allowedFonts: next.allowedFonts,
+      restrictedWords: next.restrictedWords,
       basePriceModifier: new Prisma.Decimal(next.basePriceModifier),
       pricePerLayer: new Prisma.Decimal(next.pricePerLayer),
     });
@@ -276,6 +280,7 @@ export class CustomizationService {
       minImageSize: record.minImageSize ?? undefined,
       maxImageSize: record.maxImageSize ?? undefined,
       allowedFonts: record.allowedFonts ?? [],
+      restrictedWords: record.restrictedWords ?? [],
       basePriceModifier: Number(record.basePriceModifier.toFixed(2)),
       pricePerLayer: Number(record.pricePerLayer.toFixed(2)),
     };

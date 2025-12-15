@@ -41,6 +41,8 @@ export class CatalogController {
 
   public readonly getProduct: RequestHandler;
 
+  public readonly getAdminProduct: RequestHandler;
+
   public readonly listProductReviews: RequestHandler;
 
   public readonly listVariants: RequestHandler;
@@ -75,6 +77,7 @@ export class CatalogController {
     this.listProducts = asyncHandler(this.handleListProducts.bind(this));
     this.listPopularProducts = asyncHandler(this.handleListPopularProducts.bind(this));
     this.getProduct = asyncHandler(this.handleGetProduct.bind(this));
+    this.getAdminProduct = asyncHandler(this.handleGetAdminProduct.bind(this));
     this.listProductReviews = asyncHandler(this.handleListProductReviews.bind(this));
     this.listVariants = asyncHandler(this.handleListVariants.bind(this));
     this.createProduct = asyncHandler(this.handleCreateProduct.bind(this));
@@ -198,6 +201,24 @@ export class CatalogController {
     res.setHeader("ETag", etag);
     res.setHeader("Cache-Control", "private, max-age=60");
     res.json(successResponse(payload));
+  }
+
+  private async handleGetAdminProduct(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+    if (!id) {
+      throw new ValidationError("Product identifier is required.", {
+        issues: [
+          {
+            path: "id",
+            message: "Product identifier must be provided in the route.",
+          },
+        ],
+      });
+    }
+
+    const summary = await this.service.getAdminProductById(id);
+
+    res.json(successResponse(summary));
   }
 
   private async handleListProductReviews(req: Request, res: Response): Promise<void> {

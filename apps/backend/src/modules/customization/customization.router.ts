@@ -37,6 +37,14 @@ export const createCustomizationRouter = (
   router.get(CUSTOMIZATION_ROUTE, controller.getCustomization);
   register(options.registerRoute, "GET", CUSTOMIZATION_ROUTE);
 
+  router.get(
+    ADMIN_CUSTOMIZATION_ROUTE,
+    requireAuth,
+    requireAdmin,
+    controller.getAdminCustomization,
+  );
+  register(options.registerRoute, "GET", ADMIN_CUSTOMIZATION_ROUTE);
+
   router.post(ADMIN_CUSTOMIZATION_ROUTE, requireAuth, requireAdmin, controller.createCustomization);
   register(options.registerRoute, "POST", ADMIN_CUSTOMIZATION_ROUTE);
 

@@ -343,6 +343,7 @@ model ProductCustomization {
   minImageSize Int?
   maxImageSize Int?
   allowedFonts String[] @default([])
+  restrictedWords String[] @default([])
 
   // Pricing
   basePriceModifier Decimal @default(0) @db.Decimal(10, 2)

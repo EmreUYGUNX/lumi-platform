@@ -49,6 +49,7 @@ const productCustomizationConfigBaseSchema = z
     minImageSize: z.coerce.number().int().min(1).optional(),
     maxImageSize: z.coerce.number().int().min(1).optional(),
     allowedFonts: z.array(z.string().trim().min(1).max(128)).default([]),
+    restrictedWords: z.array(z.string().trim().min(1).max(64)).max(200).default([]),
     basePriceModifier: z.coerce.number().min(0).default(0),
     pricePerLayer: z.coerce.number().min(0).default(0),
   })
@@ -82,6 +83,7 @@ export const customizationConstraintsSchema = productCustomizationConfigBaseSche
   minImageSize: true,
   maxImageSize: true,
   allowedFonts: true,
+  restrictedWords: true,
 });
 
 export const productCustomizationUpdateSchema = applyImageSizeRefinements(

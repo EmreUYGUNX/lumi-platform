@@ -23,6 +23,7 @@ export interface ProductCustomizationConfig {
   minImageSize?: number;
   maxImageSize?: number;
   allowedFonts: string[];
+  restrictedWords: string[];
   basePriceModifier: number;
   pricePerLayer: number;
 }
