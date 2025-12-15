@@ -20,6 +20,8 @@ export interface CustomizationControllerOptions {
 export class CustomizationController {
   public readonly getCustomization: RequestHandler;
 
+  public readonly getAdminCustomization: RequestHandler;
+
   public readonly createCustomization: RequestHandler;
 
   public readonly updateCustomization: RequestHandler;
@@ -32,6 +34,7 @@ export class CustomizationController {
     this.service = options.service;
 
     this.getCustomization = asyncHandler(this.handleGetCustomization.bind(this));
+    this.getAdminCustomization = asyncHandler(this.handleGetAdminCustomization.bind(this));
     this.createCustomization = asyncHandler(this.handleCreateCustomization.bind(this));
     this.updateCustomization = asyncHandler(this.handleUpdateCustomization.bind(this));
     this.deleteCustomization = asyncHandler(this.handleDeleteCustomization.bind(this));
@@ -41,6 +44,19 @@ export class CustomizationController {
     const { id } = productCustomizationParamsSchema.parse(req.params);
 
     const config = await this.service.getProductCustomization(id);
+    if (!config) {
+      throw new NotFoundError("Customization configuration not found.", {
+        details: { productId: id },
+      });
+    }
+
+    res.json(successResponse(config));
+  }
+
+  private async handleGetAdminCustomization(req: Request, res: Response): Promise<void> {
+    const { id } = productCustomizationParamsSchema.parse(req.params);
+
+    const config = await this.service.getProductCustomization(id, { includeDisabled: true });
     if (!config) {
       throw new NotFoundError("Customization configuration not found.", {
         details: { productId: id },

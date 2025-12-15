@@ -459,6 +459,23 @@ export class CatalogService {
     );
   }
 
+  async getAdminProductById(productIdInput: string): Promise<ProductSummaryDTO> {
+    const productId = productIdInput.trim();
+    const product = await this.productRepository.findById(productId, {
+      include: {
+        variants: true,
+        categories: { include: { category: true } },
+        productMedia: { include: { media: true } },
+      },
+    });
+
+    if (!product || product.deletedAt) {
+      throw new NotFoundError("Product not found.", { details: { productId } });
+    }
+
+    return mapProductToSummary(product as ProductWithRelations);
+  }
+
   async createProduct(_input: ProductCreateRequestDTO): Promise<ProductSummaryDTO> {
     const input = _input;
     const currency = input.currency ?? input.price.currency;
