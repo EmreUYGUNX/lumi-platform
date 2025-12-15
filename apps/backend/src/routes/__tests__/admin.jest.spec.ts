@@ -171,7 +171,9 @@ describe("admin router placeholders", () => {
 
     expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/production/generate");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/production/download/:id");
+    expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/production/orders");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/production/order/:orderId");
+    expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/production/batch/download");
     expect(registerRoute).toHaveBeenCalledWith("GET", "/admin/users");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/users");
     expect(registerRoute).toHaveBeenCalledWith("POST", "/admin/users/:userId/unlock");

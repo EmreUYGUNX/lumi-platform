@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { cuidSchema as baseCuidSchema } from "@lumi/shared/dto";
+import { cuidSchema, localeStringSchema, paginationRequestSchema } from "@lumi/shared/dto";
 import { previewLayersSchema } from "@/modules/preview/preview.validators.js";
 
 export {
@@ -17,10 +17,30 @@ export const orderItemDesignDataSchema = z
 
 export const productionGenerateBodySchema = z
   .object({
-    orderItemId: baseCuidSchema,
+    orderItemId: cuidSchema,
     force: z.boolean().optional(),
+  })
+  .strict();
+
+export const productionOrderStatusSchema = z.enum(["pending", "ready", "downloaded", "printed"]);
+
+export const productionOrdersListQuerySchema = paginationRequestSchema
+  .extend({
+    status: productionOrderStatusSchema.optional(),
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    search: localeStringSchema.max(64).optional(),
+  })
+  .strict();
+
+export const productionBatchDownloadBodySchema = z
+  .object({
+    orderIds: z.array(cuidSchema).min(1).max(50),
   })
   .strict();
 
 export type OrderItemDesignData = z.infer<typeof orderItemDesignDataSchema>;
 export type ProductionGenerateBody = z.infer<typeof productionGenerateBodySchema>;
+export type ProductionOrdersListQuery = z.infer<typeof productionOrdersListQuerySchema>;
+export type ProductionOrderStatus = z.infer<typeof productionOrderStatusSchema>;
+export type ProductionBatchDownloadBody = z.infer<typeof productionBatchDownloadBodySchema>;

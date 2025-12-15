@@ -835,6 +835,7 @@ model OrderItemCustomization {
   productionFileUrl   String?
   productionDpi       Int         @default(300)
   productionGenerated Boolean     @default(false)
+  downloadedAt        DateTime?
   printMethod         PrintMethod @default(DTG)
 
   layerCount Int     @default(0)
@@ -850,6 +851,7 @@ model OrderItemCustomization {
   @@index([orderItemId])
   @@index([productId])
   @@index([productionGenerated])
+  @@index([downloadedAt])
   @@map("order_item_customizations")
 }
 
