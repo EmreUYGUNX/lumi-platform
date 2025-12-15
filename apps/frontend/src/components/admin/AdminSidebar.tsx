@@ -9,6 +9,8 @@ const adminNav = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/systems", label: "Systems" },
   { href: "/admin/production", label: "Production" },
+  { href: "/admin/design-library/templates", label: "Design Templates" },
+  { href: "/admin/design-library/clipart", label: "Clipart Library" },
 ];
 
 export function AdminSidebar(): JSX.Element {

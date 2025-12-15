@@ -13,71 +13,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
+import { useClipartAssets } from "../../hooks/useClipartAssets";
+import { useDesignTemplates } from "../../hooks/useDesignTemplates";
 import { useUserDesigns } from "../../hooks/useUserDesigns";
+import type { ClipartAssetView } from "../../types/clipart.types";
 import type { CustomerDesignView, DesignListQuery } from "../../types/design.types";
-
-type ClipartCategory = "shapes" | "icons" | "seasonal";
-
-interface ClipartAsset {
-  id: string;
-  name: string;
-  category: ClipartCategory;
-  svg: string;
-  isPaid: boolean;
-}
-
-const CLIPART_ASSETS: ClipartAsset[] = [
-  {
-    id: "clipart-star",
-    name: "Star",
-    category: "icons",
-    isPaid: false,
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><path fill="#facc15" d="M48 6l12.6 25.5 28.2 4.1-20.4 19.9 4.8 28.1L48 70.9 22.8 83.7l4.8-28.1L7.2 35.6l28.2-4.1L48 6z"/></svg>`,
-  },
-  {
-    id: "clipart-heart",
-    name: "Heart",
-    category: "icons",
-    isPaid: true,
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><path fill="#fb7185" d="M48 86S10 61.8 10 34.2C10 21 20.6 10 33.7 10c7.1 0 13.8 3.3 18.3 8.7C56.5 13.3 63.2 10 70.3 10 83.4 10 94 21 94 34.2 94 61.8 56 86 56 86H48z"/></svg>`,
-  },
-  {
-    id: "clipart-bolt",
-    name: "Lightning",
-    category: "seasonal",
-    isPaid: false,
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><path fill="#38bdf8" d="M54 2L18 56h24l-6 38 42-58H54z"/></svg>`,
-  },
-  {
-    id: "clipart-circle",
-    name: "Circle",
-    category: "shapes",
-    isPaid: false,
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><circle cx="48" cy="48" r="38" fill="#a78bfa"/></svg>`,
-  },
-];
-
-type TemplateCategory = "minimal" | "bold" | "sale";
-
-interface DesignTemplate {
-  id: string;
-  name: string;
-  category: TemplateCategory;
-  previewLabel: string;
-}
-
-const TEMPLATES: DesignTemplate[] = [
-  { id: "template-minimal", name: "Minimal Logo", category: "minimal", previewLabel: "Minimal" },
-  { id: "template-bold", name: "Bold Statement", category: "bold", previewLabel: "Bold" },
-  { id: "template-sale", name: "Sale Badge", category: "sale", previewLabel: "Sale" },
-];
+import type { DesignTemplateSummaryView } from "../../types/templates.types";
 
 interface DesignLibraryProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectDesign: (design: CustomerDesignView) => void;
-  onSelectClipart?: (clipart: ClipartAsset) => void;
-  onSelectTemplate?: (template: DesignTemplate) => void;
+  onSelectClipart?: (clipart: ClipartAssetView) => void;
+  onSelectTemplate?: (template: DesignTemplateSummaryView) => void;
   className?: string;
 }
 
@@ -118,26 +66,65 @@ export function DesignLibrary({
   const canNext = Boolean(pagination?.hasNextPage);
   const canPrev = Boolean(pagination?.hasPreviousPage);
 
-  const [clipartCategory, setClipartCategory] = useState<ClipartCategory | "all">("all");
+  const [clipartCategory, setClipartCategory] = useState<string | "all">("all");
   const [clipartSearch, setClipartSearch] = useState("");
+
+  const clipartQuery = useClipartAssets({
+    page: 1,
+    perPage: 200,
+    sort: "popularity",
+    order: "desc",
+  });
+
+  const clipartCategories = useMemo(() => {
+    const categories = new Set<string>();
+    (clipartQuery.data?.items ?? []).forEach((asset) => {
+      const category = asset.category?.trim();
+      if (category) categories.add(category);
+    });
+    return ["all", ...[...categories].sort((left, right) => left.localeCompare(right))];
+  }, [clipartQuery.data?.items]);
 
   const filteredClipart = useMemo(() => {
     const query = clipartSearch.trim().toLowerCase();
-    return CLIPART_ASSETS.filter((asset) => {
+    return (clipartQuery.data?.items ?? []).filter((asset) => {
       if (clipartCategory !== "all" && asset.category !== clipartCategory) return false;
       if (!query) return true;
-      return asset.name.toLowerCase().includes(query);
+      const name = asset.name.toLowerCase();
+      if (name.includes(query)) return true;
+      return asset.tags.some((tag) => tag.toLowerCase().includes(query));
     });
-  }, [clipartCategory, clipartSearch]);
+  }, [clipartCategory, clipartQuery.data?.items, clipartSearch]);
 
-  const [templateCategory, setTemplateCategory] = useState<TemplateCategory | "all">("all");
-  const filteredTemplates = useMemo(
-    () =>
-      TEMPLATES.filter(
-        (template) => templateCategory === "all" || template.category === templateCategory,
-      ),
-    [templateCategory],
-  );
+  const [templateCategory, setTemplateCategory] = useState<string | "all">("all");
+  const [templateSearch, setTemplateSearch] = useState("");
+
+  const templatesQuery = useDesignTemplates({
+    page: 1,
+    perPage: 100,
+    sort: "popularity",
+    order: "desc",
+  });
+
+  const templateCategories = useMemo(() => {
+    const categories = new Set<string>();
+    (templatesQuery.data?.items ?? []).forEach((template) => {
+      const category = template.category?.trim();
+      if (category) categories.add(category);
+    });
+    return ["all", ...[...categories].sort((left, right) => left.localeCompare(right))];
+  }, [templatesQuery.data?.items]);
+
+  const filteredTemplates = useMemo(() => {
+    const query = templateSearch.trim().toLowerCase();
+    return (templatesQuery.data?.items ?? []).filter((template) => {
+      if (templateCategory !== "all" && template.category !== templateCategory) return false;
+      if (!query) return true;
+      const name = template.name.toLowerCase();
+      if (name.includes(query)) return true;
+      return template.tags.some((tag) => tag.toLowerCase().includes(query));
+    });
+  }, [templateCategory, templateSearch, templatesQuery.data?.items]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -308,7 +295,7 @@ export function DesignLibrary({
           <TabsContent value="clipart" className="mt-5 space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/10 p-1">
-                {(["all", "icons", "shapes", "seasonal"] as const).map((value) => (
+                {clipartCategories.map((value) => (
                   <Button
                     key={value}
                     type="button"
@@ -333,51 +320,70 @@ export function DesignLibrary({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {filteredClipart.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  className="group overflow-hidden rounded-2xl border border-white/10 bg-black/10 text-left transition hover:border-white/25"
-                  onClick={() => {
-                    onSelectClipart?.(asset);
-                    onOpenChange(false);
-                  }}
-                >
-                  <div className="flex aspect-square items-center justify-center bg-black/30 p-6">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Clipart previews are local inline SVG data. */}
-                    <img
-                      src={`data:image/svg+xml;utf8,${encodeURIComponent(asset.svg)}`}
-                      alt={asset.name}
-                      className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.04]"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2 px-3 py-2">
-                    <span className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
-                      {asset.name}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "text-[10px] uppercase tracking-[0.16em]",
-                        asset.isPaid
-                          ? "bg-amber-500/15 text-amber-100"
-                          : "bg-white/10 text-white/70",
-                      )}
-                    >
-                      {asset.isPaid ? "Paid" : "Free"}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {clipartQuery.isLoading && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <Skeleton
+                    key={`clipart-skeleton-${index}`}
+                    className="h-36 rounded-2xl bg-white/5"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!clipartQuery.isLoading && filteredClipart.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-[11px] text-white/60">
+                No clipart found. Try a different tag or category.
+              </div>
+            )}
+
+            {!clipartQuery.isLoading && filteredClipart.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {filteredClipart.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className="group overflow-hidden rounded-2xl border border-white/10 bg-black/10 text-left transition hover:border-white/25"
+                    onClick={() => {
+                      onSelectClipart?.(asset);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <div className="flex aspect-square items-center justify-center bg-black/30 p-6">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Clipart previews are local inline SVG data. */}
+                      <img
+                        src={`data:image/svg+xml;utf8,${encodeURIComponent(asset.svg)}`}
+                        alt={asset.name}
+                        className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.04]"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <span className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
+                        {asset.name}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-[10px] uppercase tracking-[0.16em]",
+                          asset.isPaid
+                            ? "bg-amber-500/15 text-amber-100"
+                            : "bg-white/10 text-white/70",
+                        )}
+                      >
+                        {asset.isPaid ? "Paid" : "Free"}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="templates" className="mt-5 space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/10 p-1">
-                {(["all", "minimal", "bold", "sale"] as const).map((value) => (
+                {templateCategories.map((value) => (
                   <Button
                     key={value}
                     type="button"
@@ -391,38 +397,85 @@ export function DesignLibrary({
                 ))}
               </div>
 
-              <p className="text-[11px] text-white/50">
-                Hover a template to preview, click to load.
-              </p>
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                <Input
+                  value={templateSearch}
+                  onChange={(event) => setTemplateSearch(event.target.value)}
+                  placeholder="Search templates…"
+                  className="h-10 rounded-xl border-white/10 bg-black/10 pl-10 text-[11px] text-white"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-              {filteredTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  className="group overflow-hidden rounded-2xl border border-white/10 bg-black/10 text-left transition hover:border-white/25"
-                  onClick={() => {
-                    onSelectTemplate?.(template);
-                    onOpenChange(false);
-                  }}
-                >
-                  <div className="flex aspect-[16/10] items-center justify-center bg-gradient-to-br from-white/10 via-white/5 to-black/30 p-5">
-                    <span className="text-sm font-semibold uppercase tracking-[0.28em] text-white/70 transition group-hover:text-white">
-                      {template.previewLabel}
-                    </span>
-                  </div>
-                  <div className="px-3 py-2">
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
-                      {template.name}
-                    </span>
-                    <span className="block text-[10px] uppercase tracking-[0.16em] text-white/45">
-                      {template.category}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {templatesQuery.isLoading && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <Skeleton
+                    key={`template-skeleton-${index}`}
+                    className="h-32 rounded-2xl bg-white/5"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!templatesQuery.isLoading && filteredTemplates.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-[11px] text-white/60">
+                No templates found. Try a different tag or category.
+              </div>
+            )}
+
+            {!templatesQuery.isLoading && filteredTemplates.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                {filteredTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className="group overflow-hidden rounded-2xl border border-white/10 bg-black/10 text-left transition hover:border-white/25"
+                    onClick={() => {
+                      onSelectTemplate?.(template);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-white/10 via-white/5 to-black/30">
+                      <ResponsiveImage
+                        src={template.previewUrl ?? template.thumbnailUrl ?? ""}
+                        alt={template.name}
+                        width={520}
+                        height={320}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                        loading="lazy"
+                        fallbackLabel={template.name.slice(0, 2).toUpperCase()}
+                      />
+                      <div className="absolute inset-0 bg-black/25 opacity-0 transition group-hover:opacity-100" />
+                    </div>
+                    <div className="space-y-1 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="block truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
+                          {template.name}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[10px] uppercase tracking-[0.16em]",
+                            template.isPaid
+                              ? "bg-amber-500/15 text-amber-100"
+                              : "bg-white/10 text-white/70",
+                          )}
+                        >
+                          {template.isPaid ? "Paid" : "Free"}
+                        </Badge>
+                      </div>
+                      {template.category && (
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          {template.category}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

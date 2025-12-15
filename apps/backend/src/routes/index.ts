@@ -17,6 +17,10 @@ import { createCustomizationRouter } from "@/modules/customization/customization
 import type { CustomizationRouterOptions } from "@/modules/customization/customization.router.js";
 import { createDesignRouter } from "@/modules/design/design.router.js";
 import type { DesignRouterOptions } from "@/modules/design/design.router.js";
+import { createTemplateRouter } from "@/modules/template/template.router.js";
+import type { TemplateRouterOptions } from "@/modules/template/template.router.js";
+import { createClipartRouter } from "@/modules/clipart/clipart.router.js";
+import type { ClipartRouterOptions } from "@/modules/clipart/clipart.router.js";
 import { createMediaRouter } from "@/modules/media/media.router.js";
 import { createOrderRouter } from "@/modules/order/order.router.js";
 import type { OrderRouterOptions } from "@/modules/order/order.router.js";
@@ -44,6 +48,8 @@ interface ApiRouterOptions {
   catalogOptions?: Pick<CatalogRouterOptions, "service">;
   customizationOptions?: Pick<CustomizationRouterOptions, "service">;
   designOptions?: Pick<DesignRouterOptions, "service" | "controller">;
+  templateOptions?: Pick<TemplateRouterOptions, "service">;
+  clipartOptions?: Pick<ClipartRouterOptions, "service">;
   previewOptions?: Pick<PreviewRouterOptions, "service" | "controller">;
   sessionOptions?: Pick<SessionRouterOptions, "service" | "controller">;
   authOptions?: AuthRouterOptions;
@@ -221,6 +227,22 @@ export const createV1Router = (
     createDesignRouter(config, {
       registerRoute: registerV1Route,
       ...options.designOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createTemplateRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.templateOptions,
+    }),
+  );
+
+  router.use(
+    "/",
+    createClipartRouter(config, {
+      registerRoute: registerV1Route,
+      ...options.clipartOptions,
     }),
   );
 

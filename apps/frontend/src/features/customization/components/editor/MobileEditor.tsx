@@ -6,14 +6,22 @@ import type * as fabric from "fabric";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 import type { DesignArea } from "../../types/design-area.types";
 import type { Layer } from "../../types/layer.types";
+import type { DesignTemplateSummaryView } from "../../types/templates.types";
+import { designTemplateViewSchema } from "../../types/templates.types";
 import { useCanvasHistory } from "../../hooks/useCanvasHistory";
 import { addClipartSvgToCanvas, addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 import { setAlignmentGuidesEnabled } from "../../utils/alignment-guides";
-import { createLayerId, ensureFabricLayerMetadata } from "../../utils/layer-serialization";
+import {
+  deserializeLayer,
+  createLayerId,
+  ensureFabricLayerMetadata,
+} from "../../utils/layer-serialization";
+import { extractTemplateLayers } from "../../utils/template-canvas-data";
 import { SelectTool } from "../tools/SelectTool";
 import { TextTool } from "../tools/TextTool";
 import type { CanvasTool } from "./CanvasToolbar";
@@ -39,6 +47,11 @@ const findObjectByLayerId = (canvas: fabric.Canvas, layerId: string) =>
 const updateObjectMetadata = (object: fabric.Object, patch: Record<string, unknown>) => {
   const raw = object as unknown as Record<string, unknown>;
   Object.assign(raw, patch);
+};
+
+const clearObjects = (canvas: fabric.Canvas) => {
+  canvas.getObjects().forEach((object) => canvas.remove(object));
+  canvas.discardActiveObject();
 };
 
 const vibrate = (pattern: number | number[]) => {
@@ -94,6 +107,83 @@ export function MobileEditor({
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
   const history = useCanvasHistory({ canvas, layers });
+
+  const loadTemplate = useCallback(
+    async (template: Pick<DesignTemplateSummaryView, "id" | "name">) => {
+      if (readOnly) return;
+      if (!canvas) {
+        toast({
+          title: "Canvas not ready",
+          description: "Please wait for the editor to initialize.",
+        });
+        return;
+      }
+
+      try {
+        const response = await apiClient.get(`/templates/${template.id}`, {
+          dataSchema: designTemplateViewSchema,
+        });
+
+        const editorLayers = extractTemplateLayers(response.data.canvasData);
+        if (!editorLayers || editorLayers.length === 0) {
+          throw new Error("This template cannot be restored (missing layer data).");
+        }
+
+        if (editorLayers.length > MAX_MOBILE_LAYERS) {
+          toast({
+            title: "Template truncated",
+            description: `This template has ${editorLayers.length} layers. Mobile supports ${MAX_MOBILE_LAYERS}.`,
+          });
+        }
+
+        clearObjects(canvas);
+
+        const orderedLayers = [...editorLayers]
+          .sort((left, right) => left.zIndex - right.zIndex)
+          .slice(0, MAX_MOBILE_LAYERS);
+
+        const results = await Promise.allSettled(
+          orderedLayers.map((layer) => deserializeLayer(layer)),
+        );
+
+        let restored = 0;
+        let failed = 0;
+
+        results.forEach((result) => {
+          if (result.status === "fulfilled") {
+            canvas.add(result.value);
+            restored += 1;
+            return;
+          }
+
+          failed += 1;
+        });
+
+        canvas.requestRenderAll();
+
+        toast({
+          title: "Template loaded",
+          description: `${template.name} applied (${restored} layer${restored === 1 ? "" : "s"}).`,
+        });
+
+        if (failed > 0) {
+          toast({
+            title: "Partial restore",
+            description: `${failed} layer(s) could not be restored (missing images or unsupported data).`,
+          });
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to load template into the editor.";
+        toast({
+          title: "Template load failed",
+          description: message,
+          variant: "destructive",
+        });
+      }
+    },
+    [canvas, readOnly],
+  );
 
   useEffect(() => {
     if (!canvas) return;
@@ -458,6 +548,9 @@ export function MobileEditor({
             clipartId: asset.id,
             isPaid: asset.isPaid,
           }).catch(() => {});
+        }}
+        onSelectTemplate={(template) => {
+          loadTemplate(template).catch(() => {});
         }}
       />
 

@@ -13,11 +13,22 @@ import type { ProductDetail, ProductReviewStats } from "../types/product-detail.
 import type { ProductReview, ReviewVoteInput, SubmitReviewInput } from "../types/review.types";
 import { productReviewSchema } from "../types/review.types";
 
+const getCrypto = (): Crypto | undefined => {
+  return (globalThis as unknown as { crypto?: Crypto }).crypto;
+};
+
 const randomId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const cryptoApi = getCrypto();
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+
+  if (typeof cryptoApi?.getRandomValues === "function") {
+    const bytes = new Uint8Array(12);
+    cryptoApi.getRandomValues(bytes);
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `rev_${hex.slice(0, 8)}`;
   }
-  return `rev_${Math.random().toString(36).slice(2, 10)}`;
+
+  return `rev_${Date.now().toString(36)}_${Math.floor(Date.now() % 10_000).toString(36)}`;
 };
 
 const REVIEW_AUTH_ERROR = "AUTH_REQUIRED";

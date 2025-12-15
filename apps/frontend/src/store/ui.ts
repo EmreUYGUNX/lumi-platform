@@ -89,11 +89,25 @@ export type UIStore = UIState & UIActions;
 const FALLBACK_TOAST_DURATION = 5000;
 const TOAST_QUEUE_LIMIT = 5;
 
+let fallbackToastSequence = 0;
+
+const getCrypto = (): Crypto | undefined => {
+  return (globalThis as unknown as { crypto?: Crypto }).crypto;
+};
+
 const randomId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const cryptoApi = getCrypto();
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+
+  if (typeof cryptoApi?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    cryptoApi.getRandomValues(bytes);
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `toast_${hex}`;
   }
-  return `toast_${Math.random().toString(36).slice(2)}`;
+
+  fallbackToastSequence = (fallbackToastSequence + 1) % 1_000_000;
+  return `toast_${Date.now().toString(36)}_${fallbackToastSequence.toString(36)}`;
 };
 
 export const useUIStore = create<UIStore>()(

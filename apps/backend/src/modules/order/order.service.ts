@@ -3,7 +3,7 @@
 /* order orchestration covered via integration suites */
 
 /* eslint-disable sonarjs/cognitive-complexity, unicorn/no-null */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import {
   InventoryPolicy,
@@ -320,9 +320,8 @@ export class OrderService {
 
   private async generateReference(client: PrismaClientLike = this.prisma): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `LM-${Date.now().toString(36).toUpperCase()}-${Math.random()
-        .toString(36)
-        .slice(2, 6)
+      const candidate = `LM-${Date.now().toString(36).toUpperCase()}-${randomBytes(2)
+        .toString("hex")
         .toUpperCase()}`;
 
       // eslint-disable-next-line no-await-in-loop -- sequential uniqueness check is required

@@ -2,14 +2,17 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 
-import * as fabric from "fabric";
+import type * as fabric from "fabric";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 import type { DesignArea } from "../../types/design-area.types";
 import type { Layer } from "../../types/layer.types";
+import type { DesignTemplateSummaryView } from "../../types/templates.types";
+import { designTemplateViewSchema } from "../../types/templates.types";
 import { useCanvasHistory } from "../../hooks/useCanvasHistory";
 import { useCanvasShortcuts } from "../../hooks/useCanvasShortcuts";
 import { useCanvasZoom } from "../../hooks/useCanvasZoom";
@@ -18,7 +21,12 @@ import { useSaveDesign } from "../../hooks/useSaveDesign";
 import { alignActiveSelection, distributeActiveSelection } from "../../utils/canvas-align";
 import { addClipartSvgToCanvas, addCustomerDesignToCanvas } from "../../utils/canvas-assets";
 import { setGridOverlayEnabled, setSnapToGridEnabled } from "../../utils/fabric-canvas";
-import { createLayerId, ensureFabricLayerMetadata } from "../../utils/layer-serialization";
+import {
+  deserializeLayer,
+  createLayerId,
+  ensureFabricLayerMetadata,
+} from "../../utils/layer-serialization";
+import { extractTemplateLayers } from "../../utils/template-canvas-data";
 import { SelectTool } from "../tools/SelectTool";
 import { TextTool } from "../tools/TextTool";
 import { CanvasToolbar, type CanvasTool } from "./CanvasToolbar";
@@ -350,77 +358,70 @@ export const CustomizationEditor = forwardRef<CustomizationEditorHandle, Customi
     }, [designArea, layers, productImageUrl]);
 
     const loadTemplate = useCallback(
-      (templateId: string) => {
-        if (!canvas) return;
-
-        clearObjects(canvas);
-
-        const designWidth = (canvas as unknown as { lumiDesignWidth?: number }).lumiDesignWidth;
-        const designHeight = (canvas as unknown as { lumiDesignHeight?: number }).lumiDesignHeight;
-        const bounds = {
-          width: typeof designWidth === "number" ? designWidth : canvas.getWidth(),
-          height: typeof designHeight === "number" ? designHeight : canvas.getHeight(),
-        };
-
-        const addText = (text: string, options: Partial<fabric.ITextProps> = {}) => {
-          const textbox = new fabric.Textbox(text, {
-            left: bounds.width / 2,
-            top: bounds.height / 2,
-            originX: "center",
-            originY: "center",
-            width: Math.min(420, bounds.width),
-            fontFamily: "Inter",
-            fontSize: 64,
-            fontWeight: "800",
-            textAlign: "center",
-            fill: "#111827",
-            ...options,
+      async (template: Pick<DesignTemplateSummaryView, "id" | "name">) => {
+        if (readOnly) return;
+        if (!canvas) {
+          toast({
+            title: "Canvas not ready",
+            description: "Please wait for the editor to initialize.",
           });
-
-          ensureFabricLayerMetadata(textbox, {
-            layerId: createLayerId("text"),
-            layerType: "text",
-            layerName: "TEMPLATE TEXT",
-            zIndex: canvas.getObjects().length,
-            customData: { templateId },
-          });
-
-          canvas.add(textbox);
-        };
-
-        if (templateId === "template-sale") {
-          const circle = new fabric.Circle({
-            left: bounds.width / 2,
-            top: bounds.height / 2,
-            originX: "center",
-            originY: "center",
-            radius: Math.min(bounds.width, bounds.height) * 0.22,
-            fill: "#ef4444",
-          });
-          ensureFabricLayerMetadata(circle, {
-            layerId: createLayerId("shape"),
-            layerType: "shape",
-            layerName: "BADGE",
-            zIndex: canvas.getObjects().length,
-            customData: { templateId },
-          });
-          canvas.add(circle);
-          addText("SALE", { fontSize: 54, fill: "#ffffff" });
-        } else if (templateId === "template-bold") {
-          addText("BOLD", {
-            fontSize: 84,
-            fill: "#111827",
-            stroke: "#ffffff",
-            strokeWidth: 3,
-          });
-        } else {
-          addText("LUMI", { fontSize: 72, fontWeight: "700" });
-          addText("CUSTOM", { top: bounds.height / 2 + 64, fontSize: 26, fontWeight: "500" });
+          return;
         }
 
-        canvas.requestRenderAll();
+        try {
+          const response = await apiClient.get(`/templates/${template.id}`, {
+            dataSchema: designTemplateViewSchema,
+          });
+
+          const editorLayers = extractTemplateLayers(response.data.canvasData);
+          if (!editorLayers || editorLayers.length === 0) {
+            throw new Error("This template cannot be restored (missing layer data).");
+          }
+
+          clearObjects(canvas);
+
+          const orderedLayers = [...editorLayers].sort((left, right) => left.zIndex - right.zIndex);
+          const results = await Promise.allSettled(
+            orderedLayers.map((layer) => deserializeLayer(layer)),
+          );
+
+          let restored = 0;
+          let failed = 0;
+
+          results.forEach((result) => {
+            if (result.status === "fulfilled") {
+              canvas.add(result.value);
+              restored += 1;
+              return;
+            }
+
+            failed += 1;
+          });
+
+          canvas.requestRenderAll();
+
+          toast({
+            title: "Template loaded",
+            description: `${template.name} applied (${restored} layer${restored === 1 ? "" : "s"}).`,
+          });
+
+          if (failed > 0) {
+            toast({
+              title: "Partial restore",
+              description: `${failed} layer(s) could not be restored (missing images or unsupported data).`,
+            });
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unable to load template into the editor.";
+          toast({
+            title: "Template load failed",
+            description: message,
+            variant: "destructive",
+          });
+        }
       },
-      [canvas],
+      [canvas, readOnly],
     );
 
     const editorReady = Boolean(canvas);
@@ -582,7 +583,9 @@ export const CustomizationEditor = forwardRef<CustomizationEditorHandle, Customi
               isPaid: asset.isPaid,
             }).catch(() => {});
           }}
-          onSelectTemplate={(template) => loadTemplate(template.id)}
+          onSelectTemplate={(template) => {
+            loadTemplate(template).catch(() => {});
+          }}
         />
 
         <SaveDesignModal

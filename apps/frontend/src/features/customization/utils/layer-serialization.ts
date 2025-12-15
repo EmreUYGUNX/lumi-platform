@@ -23,12 +23,25 @@ const CUSTOM_FABRIC_PROPERTIES = [
   "zIndex",
 ] as const;
 
+let fallbackSequence = 0;
+
+const createSecureToken = (): string => {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  fallbackSequence = (fallbackSequence + 1) % 1_000_000;
+  return `${Date.now().toString(36)}-${fallbackSequence.toString(36)}`;
+};
+
 export const createLayerId = (prefix = "layer"): string => {
-  const random =
-    typeof globalThis.crypto?.randomUUID === "function"
-      ? globalThis.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}_${random}`;
+  return `${prefix}_${createSecureToken()}`;
 };
 
 const asNumber = (value: unknown, fallback: number): number =>

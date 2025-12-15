@@ -423,6 +423,71 @@ model DesignSession {
   @@map("design_sessions")
 }
 
+// Reusable design templates for the customization editor.
+model DesignTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?
+  tags        String[] @default([])
+
+  isPaid   Boolean @default(false)
+  price    Decimal @default(0) @db.Decimal(10, 2)
+  currency String  @default("TRY")
+
+  thumbnailUrl String?
+  previewUrl   String?
+  canvasData   Json
+
+  isPublished Boolean @default(false)
+  isFeatured  Boolean @default(false)
+  usageCount  Int     @default(0)
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([tags], type: Gin)
+  @@index([isPaid])
+  @@index([usageCount])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@map("design_templates")
+}
+
+// Admin-managed clipart library assets for the customization editor.
+model ClipartAsset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?
+  tags        String[] @default([])
+
+  isPaid   Boolean @default(false)
+  price    Decimal @default(0) @db.Decimal(10, 2)
+  currency String  @default("TRY")
+
+  svg          String
+  thumbnailUrl String?
+
+  usageCount Int @default(0)
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([tags], type: Gin)
+  @@index([isPaid])
+  @@index([usageCount])
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@map("clipart_assets")
+}
+
 model ProductVariant {
   id             String   @id @default(cuid())
   productId      String
